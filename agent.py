@@ -3,6 +3,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import pdb
 
 # agent
@@ -13,12 +14,24 @@ class Agent:
         self.kw = kw
         self.kd = kd
         self.kt = 1
+        ####
+        # t=0, velociy=1 for convinience so attraction isn't nan
+        # self.nodes.append([self.x, 0, 0)
+        # records for position (independent of the creation of nodes)
         self.history = []
 
     # actions
     # training
     # self.x = -2.5
     # self.training_fx()
+
+    # normalizing fx
+    # Np & Nv are calculated in a normalized SM space where
+    # the range of sensor and motor values are scaled between 0 and 1
+    # (x - min)/(max - min)
+    def normalize(self, x, dataset):
+        nx = (x-min(dataset))/(max(dataset)-min(dataset))
+        return nx
 
     # weight function
     # weight_fx = 2/1+np.exp(-kw*Nw)
@@ -29,7 +42,14 @@ class Agent:
     # distance function
     # distance_fx = 2/1+np.exp(kd*(Np-x)**2)
     def distance_fx(self, x, Np):
-        distance = 2/(1+np.exp(self.kd*(Np-x)**2))
+        # normalize values
+        x_dataset = [node[0] for node in self.nodes]
+        # nx = self.normalize(self.x, x_dataset)
+        # nNp = self.normalize(Np, x_dataset)
+        ndistance = self.normalize((Np-self.x), x_dataset)
+        # eq
+        import pdb; pdb.set_trace()
+        distance = 2/(1+np.exp(self.kd*ndistance**2))
         return distance
 
     # density function
@@ -44,26 +64,15 @@ class Agent:
             density += weight*distance
         return density
 
-    # creation of nodes
-    # if density fx < kt = 1
-    def add_node_fx(self):
-        density = self.density_fx()
-        if density < self.kt:
-            # change from last node to current position
-            velocity = self.x-self.nodes[-1]
-            weight = 0
-            nodes.append([self.x, velocity, weight])
-            print("node added")
-            print([self.x, velocity, weight])
-        else:
-            print("nothing")
-        print("density = "+str(density))
-
     # attraction function
     # attraction_fx = (Np - x) - (Np-x)*(Nv/np.absolute(Nv))
     def attraction_fx(self, x, Np, Nv):
-        # pdb.set_trace()
-        attraction = (Np-x)-(Np-x)*(Nv/np.absolute(Nv))
+        # normalize
+        v_dataset = [node[1] for node in self.nodes]
+        nNv = self.normalize(Nv, v_dataset)
+        # eq
+        import pdb; pdb.set_trace()
+        attraction = (Np-x)-(Np-x)*(Nv/nNv)
         return attraction
 
     # IDSM motor influence function
@@ -81,7 +90,20 @@ class Agent:
             attraction = self.attraction_fx(self.x, Np, Nv)
             motor_influence += weight*distance*(Nv+attraction)
         idsm_influence = (1/density)*motor_influence
-        return idsm_influence
+        # new position
+        self.x = self.x + idsm_influence
+        # creation of nodes
+        # if density fx < kt = 1
+        if density < self.kt:
+            # velocity is given by the idsm
+            # position = x + idsm influence
+            # initial weight = 0
+            self.nodes.append([self.x, idsm_influence, 0])
+            print("node added")
+            print([self.x, idsm_influence, 0])
+        else:
+            print("nothing")
+        print("density = "+str(density))
 
     # node's reinforcement function
     # r(N,x) = 10 * d(Np,x)
@@ -93,17 +115,15 @@ class Agent:
     # maintenance of nodes (updating of nodes' weights)
     # dNw/dt = -1 + r(N,x)
     def maintenance_fx(self):
-        for node in self.nodes:
-            Np = node[0]
+        for n in range(len(self.nodes)):
+            Np = self.nodes[n][0]
             reinforcement = self.reinforcement_fx(self.x, Np)
             updated_weight = -1+reinforcement
-            node[2] = updated_weight
+            self.nodes[n][2] = updated_weight
 
     # training
     # for the first 20 time units the robot is controlled by a training controller
     def training_fx(self, t=20):
-        # t=0
-        self.nodes.append([self.x,0,0])
         for t in range(1, t+1):
             # movement
             velocity = np.cos(t/2)/2
@@ -119,16 +139,15 @@ class Agent:
         #plt.savefig("TrainingPlot")
 
     # idsm control phase
-    def operation(self, time=100):
+    def operation(self, time=10):
         print("\n")
         [print(node) for node in self.nodes]
         print("\n")
         for t in range(time):
             print("\n")
             print(t)
-            self.maintenance_fx()
             self.idsm_fx()
-            self.add_node_fx()
+            self.maintenance_fx()
             [print(node) for node in self.nodes[-5:-1]]
             self.history.append(self.x)
         plt.plot([t for t in range(len(self.nodes))], [i[0] for i in self.nodes])
