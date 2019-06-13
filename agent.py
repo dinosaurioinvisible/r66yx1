@@ -20,18 +20,13 @@ class Agent:
         # records for position (independent of the creation of nodes)
         self.history = []
 
-    # actions
-    # training
-    # self.x = -2.5
-    # self.training_fx()
-
-    # normalizing fx
+    # escaling fx
     # Np & Nv are calculated in a normalized SM space where
     # the range of sensor and motor values are scaled between 0 and 1
-    # (x - min)/(max - min)
-    def normalize(self, x, dataset):
-        nx = (x-min(dataset))/(max(dataset)-min(dataset))
-        return nx
+    def scale(self, x, datamax, rangemax=1):
+        # ex = (x * range max) / (dataset max)
+        e_x = (x*rangemax)/datamax
+        return e_x
 
     # weight function
     # weight_fx = 2/1+np.exp(-kw*Nw)
@@ -42,14 +37,11 @@ class Agent:
     # distance function
     # distance_fx = 2/1+np.exp(kd*(Np-x)**2)
     def distance_fx(self, x, Np):
-        # normalize values
-        x_dataset = [node[0] for node in self.nodes]
-        # nx = self.normalize(self.x, x_dataset)
-        # nNp = self.normalize(Np, x_dataset)
-        ndistance = self.normalize((Np-self.x), x_dataset)
-        # eq
-        import pdb; pdb.set_trace()
-        distance = 2/(1+np.exp(self.kd*ndistance**2))
+        # scale values
+        xmax = max([node[0] for node in self.nodes])
+        ex = self.scale(x, xmax)
+        eNp = self.scale(Np, xmax)
+        distance = 2/(1+np.exp(self.kd*((ex-eNp)**2)))
         return distance
 
     # density function
@@ -57,8 +49,8 @@ class Agent:
     def density_fx(self):
         density = 0
         for node in self.nodes:
-            Nw = node[2]
-            Np = node[0]
+            Nw = np.array(node[2])
+            Np = np.array([node[0]])
             weight = self.weight_fx(Nw)
             distance = self.distance_fx(self.x, Np)
             density += weight*distance
@@ -67,11 +59,9 @@ class Agent:
     # attraction function
     # attraction_fx = (Np - x) - (Np-x)*(Nv/np.absolute(Nv))
     def attraction_fx(self, x, Np, Nv):
-        # normalize
-        v_dataset = [node[1] for node in self.nodes]
-        nNv = self.normalize(Nv, v_dataset)
-        # eq
-        import pdb; pdb.set_trace()
+        # scale
+        vmax = max([node[1] for node in self.nodes])
+        nNv = self.scale(Nv, vmax)
         attraction = (Np-x)-(Np-x)*(Nv/nNv)
         return attraction
 
@@ -81,9 +71,9 @@ class Agent:
         density = self.density_fx()
         motor_influence = 0
         for node in self.nodes:
-            Np = node[0]
-            Nv = node[1]
-            Nw = node[2]
+            Np = np.array([node[0]])
+            Nv = np.array([node[1]])
+            Nw = np.array(node[2])
             weight = self.weight_fx(Nw)
             distance = self.distance_fx(self.x, Np)
             # velocity : Nv
@@ -116,7 +106,7 @@ class Agent:
     # dNw/dt = -1 + r(N,x)
     def maintenance_fx(self):
         for n in range(len(self.nodes)):
-            Np = self.nodes[n][0]
+            Np = np.array(self.nodes[n][0])
             reinforcement = self.reinforcement_fx(self.x, Np)
             updated_weight = -1+reinforcement
             self.nodes[n][2] = updated_weight
