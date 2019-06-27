@@ -10,34 +10,26 @@ import pdb
 # agent
 class Agent:
     def __init__(self, sim_time=15\
-    ,x=[], xmax=[]
+    ,x=[], xmax=1
     ,kw=0.0025, kd=1000, kt=1, nodes=[]):
         self.sim_time = sim_time
         self.x = np.array(x)
+        self.xhistory = []
         self.xmax = xmax
         self.kw = kw
         self.kd = kd
         self.kt = kt
         self.nodes = nodes
         self.sensor_hist = []
-        ####
-        # initial node
-        # self.nodes.append([self.x, 0, 0])
-        # 
-        #
-        #
-        # records for position (independent of the creation of nodes)
-        self.all_x = []
-        self.all_nodes = []
-        self.why = []
+
 
     # escaling fx
     # Np & Nv are calculated in a normalized SM space where
     # the range of sensor and motor values are scaled between 0 and 1
-    def scale(self, x, datamax, rangemax=1):
-        # ex = (x * range max) / (dataset max)
-        e_x = (x*rangemax)/datamax
-        return e_x
+    # ex = (x * range max) / (dataset max)
+    def scale(self, x, rangemax=1):
+        ex = (x*rangemax)/self.xmax
+        return ex
 
     # weight function
     # weight_fx = 2/1+np.exp(-kw*Nw)
@@ -49,10 +41,8 @@ class Agent:
     # distance_fx = 2/1+np.exp(kd*(Np-x)**2)
     def distance_fx(self, x, Np):
         # scale values
-        # scale from dataset values (problem : values change : scaling is incorrect)
-        # xmax = max([max(np.absolute(node[0])) for node in self.nodes])
-        u = self.scale(x, self.xmax)
-        v = self.scale(Np, self.xmax)
+        u = self.scale(x)
+        v = self.scale(Np)
         # euclidian distance between vectors
         eudist = np.sqrt(sum([(i-j)**2 for i,j in zip(u,v)]))
         distance = 2/(1+np.exp(self.kd*((eudist)**2)))
@@ -90,6 +80,9 @@ class Agent:
     def idsm_fx(self):
         density = self.density_fx()
         motor_influence = 0
+        sum_weight = 0
+        sum_distance = 0
+        sum_vel_attraction = 0
         for node in self.nodes:
             Np = np.array(node[0])
             Nv = np.array(node[1])
@@ -98,11 +91,17 @@ class Agent:
             distance = self.distance_fx(self.x, Np)
             # velocity : Nv
             attraction = self.attraction_fx(self.x, Np, Nv)
-            #
+            # sum
             motor_influence += weight*distance*(Nv+attraction)
+            sum_weight += weight
+            sum_distance += distance
+            sum_vel_attraction += (Nv*attraction)
         idsm_influence = (1/density)*motor_influence
+        print(self.x)
+        print("idsm={} = 1/density={} * w(Nw)={} * d(Np,x)={} * Vel+Att={}".format(idsm_influence, density, sum_weight, sum_distance, sum_vel_attraction))
         # new position
         self.x = self.x + idsm_influence
+        self.xhistory.append(copy.deepcopy(self.x))
         # creation of nodes
         # if density fx < kt = 1
         if density < self.kt:
@@ -110,11 +109,6 @@ class Agent:
             # position = x + idsm influence
             # initial weight = 0
             self.nodes.append([copy.deepcopy(self.x), idsm_influence, 0])
-        #
-        #
-        #
-        self.all_nodes.append([copy.deepcopy(self.x), idsm_influence, 0])
-        self.why.append([density, motor_influence, Nv, attraction, idsm_influence])
 
     # sensory input
     def sensory_fx(self):
@@ -126,8 +120,7 @@ class Agent:
     # r(N,x) = 10 * d(Np,x)
     def reinforcement_fx(self, x, Np):
         xdistance = self.distance_fx(x, Np)
-        reinforcement = 10*xdistance
-        return reinforcement
+        return 10*xdistance
 
     # maintenance of nodes (updating of nodes' weights)
     def maintenance_fx(self):
@@ -143,32 +136,53 @@ class Agent:
                       # Example experiments
     #####################################################
 
-    # Figure 3
-    # 2-motor, 0-sensor IDSM
-    # sim_time = 20
-    # manually added 4 nodes in relative proximity
-    # externally assigned 2 motor states
-    # m1 = 0.75 * cos( (2π / 10) * t
-    # m2 = 0.75 * sin( (2π / 10) * t
-    def figure3(self, time=20, iw = [-500, -100, 0, 50, 100]):
-        for iwx in iw:
-            # nodes = [position, velocity, weight]
-            n1 = [[0.55, 0.50], 0, iwx]
-            n2 = [[0.50, 0.45], 0, 0]
-            n3 = [[0.45, 0.50], 0, 0]
-            n4 = [[0.50, 0.55], 0, 0]
-            self.nodes.append(n1, n2, n3, n4)
-            for t in range(1, time+1):
-                self.idsm_fx()
-                self.maintenance_fx()
-                self.all_x.append(copy.deepcopy(self.x))
-            # plot x, y
-            plt.plot([node[0][0] for node in self.nodes],[node[0][1] for node in self.nodes])
-            figname = "node_weight_fig3_{}".format(iwx)
-            plt.savefig(figname)
-            plt.close
-            # plot weight influence
-            # plt.streamplot(x, y, u, v)
-            # figname = "influence_fig3_{}".format(iwx)
-            # plt.savefig(figname)
-            # plt.close
+    def training_fx(self, time=20):
+        self.x = np.array([-2.5])
+        self.xhistory.append(copy.deepcopy(self.x))
+        self.nodes.append([copy.deepcopy(self.x), 0, 0])
+        for t in range(1, time+1):
+            # movement
+            velocity = np.array([np.cos(t/2)/2])
+            self.x += velocity
+            # sensor
+            sensor = 1/(1+self.x**2)
+            self.sensor_hist.append(sensor)
+            # creation of nodes
+            self.nodes.append([copy.deepcopy(self.x), velocity, 0])
+            # record for whole history
+            self.xhistory.append(copy.deepcopy(self.x))
+            # print
+            print("x={}".format(self.x))
+            print("vel={}".format(velocity))
+        # plot
+        plt.plot([t for t in range(len(self.nodes))], [i[0] for i in self.nodes])
+        plt.scatter([t for t in range(len(self.nodes))], [i[0] for i in self.nodes])
+        plt.xlabel("Time")
+        plt.ylabel("Position")
+        plt.savefig("_TrainingPlot")
+        # plt.close()
+        # IDSM operation
+        for t in range(15):
+            self.idsm_fx()
+            # sensor
+            sensor = 1/(1+self.x**2)
+            self.sensor_hist.append(sensor)
+            #
+        plt.plot([t for t in range(len(self.nodes))], [i[0] for i in self.nodes])
+        plt.scatter([t for t in range(len(self.nodes))], [i[0] for i in self.nodes])
+        plt.xlabel("Time")
+        plt.ylabel("Position")
+        plt.savefig("_TrainingPlot_all")
+        # plt.close()
+        plt.plot([t for t in range(len(self.xhistory))], [i[0] for i in self.xhistory])
+        plt.scatter([t for t in range(len(self.xhistory))], [i[0] for i in self.xhistory])
+        plt.xlabel("Time")
+        plt.ylabel("Position")
+        plt.savefig("_TrainingPlot_x")
+        plt.close()
+        plt.plot([t for t in range(len(self.sensor_hist))], [i for i in self.sensor_hist])
+        plt.scatter([t for t in range(len(self.sensor_hist))], [i for i in self.sensor_hist])
+        plt.xlabel("Time")
+        plt.ylabel("Position")
+        plt.savefig("_TrainingPlot_s")
+        plt.close()
