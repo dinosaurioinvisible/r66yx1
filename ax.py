@@ -3,22 +3,19 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 import copy
 import pdb
 
-# scale values
-# u = self.scale(x)
-# v = self.scale(Np)
-
-# sensor?????????????
-# self.s = np.array(s)
-# self.smax = smax
-# self.shist = []
-# inside Np as another dimension : Np=[Px,Ps] : Nv=[Vx,Vs]??
+# TODO
+# why || Np-x || > 1 ?
+# activate nodes 10 second later
+# figures 2, 3, 4
+# sum distance = density ??
+# scaling
 
 # agent
 class Agent:
+    
     def __init__(self, x=[], xmax=[]
     ,kw=0.0025, kd=1000, kt=1, kr=10\
     ,sim_time=100\
@@ -27,6 +24,9 @@ class Agent:
         # motors and sensors
         self.x = np.array(x)
         self.xmax = np.array(xmax)
+        # self.s = np.array(s)
+        # self.smax = smax
+        # inside Np as another dimension : Np=[Px,Ps] : Nv=[Vx,Vs]?
         # constants
         self.kw = kw
         self.kd = kd
@@ -35,6 +35,7 @@ class Agent:
         # records
         self.nodes = nodes
         self.xhist = []
+        # self.shist = []
 
     # weight function
     # weight_fx = 2/1+np.exp(-kw*Nw)
@@ -45,6 +46,7 @@ class Agent:
     # distance function
     # distance_fx = 2/1+np.exp(kd*(Np-x)**2)
     def distance_fx(self, Np, x):
+        print("Np={}, x={}".format(Np, x))
         print(np.linalg.norm(Np-x))
         distance = 2/(1+np.exp(self.kd*(np.linalg.norm(Np-x)**2)))
         return distance
@@ -89,6 +91,7 @@ class Agent:
     def motor_fx(self):
         motor_sum = 0
         for node in self.nodes:
+            # scale Np and Nv
             Np = node[0]
             Nv = node[1]
             Nw = node[2]
@@ -97,13 +100,19 @@ class Agent:
             attraction = self.attraction_fx(Np, self.x, Nv)
             motor_sum += (weight*distance*(Nv+attraction))
         density = self.density_fx()
-        motor_influence = motor_sum/density
-        return motor_influence
+        motor_idsm = motor_sum/density
+        # new position
+        self.x += motor_idsm
+        self.xhist.append(copy.deepcopy(self.x))
+        # append new nodes
+        if density < 1:
+            self.nodes.append(copy.deepcopy([self.x, motor_idsm, 0]))
 
     # IDSM
     def idsm_fx(self):
         self.maintenance_fx()
         self.motor_fx()
+
 
 #####################################################
                   # Example experiments
