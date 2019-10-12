@@ -1,8 +1,6 @@
 
 # Agent from egbert and barandarian agent, 2014. version 7
 
-# TODO: the nodes, ho do I put them inside the dif.eq. ?
-
 # Agent
     # distance_fx
     # weight_fx
@@ -28,157 +26,173 @@
     # idsm_fx
         # motor_fx()
         # maintenance_fx()
-
 # Node
     # activation
 
+# TODO : sensors
+
 import numpy as np
-import matplotlib as plt
+import math
+import matplotlib.pyplot as plt
 from copy import deepcopy
+from tqdm import tqdm
 
 class Agent:
 
     def __init__(self, m=[], s=[]\
     ,nodes=[]\
-    ,delta_t=0.01\
-    ,kw=0.0025, kd=1000, kt=1, kr=10\
-    ,sim_time=20):
+    ,dt=0.1\
+    ,kw=0.0025, kd=1000, kt=1, kr=10.0\
+    ,sim_time=100):
         self.m = np.array(m)
         self.s = np.array(s)
         self.nodes = nodes
-        self.delta_t = delta_t
-        # constant for weight_fx
+        self.dt = dt
         self.kw = kw
-        # constant for distant_fx
         self.kd = kd
-        # new node if density < kt
         self.kt = kt
-        # reinforcement = kr * d(Np,x)
         self.kr = kr
         self.sim_time = sim_time
-        ###
-        self.mdim = len(m)
-        self.sdim = len(s)
+        # internal
+        self.motor_dims = len(m)
+        self.sensor_dims = len(s)
         self.x = np.concatenate((self.m, self.s))
-        self.x0 = deepcopy(x)
         self.velocity = np.array([0]*len(self.x))
+        # records
+        self.motor_records = []
+        self.sensor_records = []
 
     # distance function
     # distance_fx = 2/1+np.exp(kd*(Np-x)**2)
     def distance_fx(self, Np, x):
         try:
-            distance = 2/(1+np.exp(self.kd*((np.linalg.norm(Np-x))**2)))
-            return distance
+            distance = 2/(1+math.exp(self.kd*(np.linalg.norm(Np-x)**2)))
         except OverflowError:
-            return 0
+            distance = 0
+        return distance
 
     # weight function
     # weight_fx = 2/1+np.exp(-kw*Nw)
     def weight_fx(self, Nw):
-        # % Nw : self.weight = 0.0
-        weight = 2/(1+np.exp(-self.kw*Nw))
+        try:
+            weight = 2/(1+np.math(-self.kw*Nw))
+        except:
+            weight=0
         return weight
 
     # density function
     # density_fx = summatory_N(weight_fx * distance_fx)
     def density_fx(self):
-        density = 0
+        density=0
         for node in self.nodes:
             if node.active:
                 weight = self.weight_fx(node.weight)
                 distance = self.distance_fx(node.position, self.x)
-                density += (weight*distance)
-        return density
+                density += weight*distance
+        return density*self.dt
 
     # velocity function
     # velocity_fx = ∑ w(Nw) * d(Np,x) * Nv_µ
     def velocity_fx(self):
-        self.velocity *= 0
+        self.velocity[:self.motor_dims] *= 0.0
         for node in self.nodes:
             if node.active:
-                Nv_motor = node.velocity[0:self.motor_dims]
-                weight = weight_fx(node.weight)
-                distance = distance_fx(node.position, self.x)
-            self.velocity += weight * distance * Nv_motor
+                Nv_motor = node.velocity[:self.motor_dims]
+                weight = self.weight_fx(node.weight)
+                distance = self.distance_fx(node.position, self.x)
+                self.velocity[:self.motor_dims]+=weight*distance*Nv_motor
+        self.velocity[:self.motor_dims]*=self.dt
 
     # attraction function
     # attraction_fx = ∑ w(Nw) * d(Np,x) * Gamma(Np-x,Nv)_µ
     def attraction_fx(self):
-        attraction = 0
+        attraction=np.array([0.0]*self.motor_dims)
         for node in self.nodes:
             if node.active:
-                weight = weight_fx(node.weight)
-                distance = distance_fx(node.position, self.x)
-                # to avoid division by zero
-                Nv = 1 if Nv == 0 else Nv
-                # unit vector
-                nNv = Nv/np.linalg.norm(Nv)
+                weight = self.weight_fx(node.weight)
+                distance = self.distance_fx(node.position, self.x)
+                # motor velocity
+                Nv_mu = node.velocity[:self.motor_dims]
                 # gamma function
-                # Gamma_fx = a - a dot (Nv / ||Nv||)
-                gamma = (node.position-self.x) - ((node.position-self.x)*nNv)
-                attraction += weight * distance * gamma
-        return attraction
+                # Gamma_fx = a - a * (Nv / ||Nv||)
+                nNv_mu = Nv_mu/np.linalg.norm(Nv_mu) if np.linalg.norm(Nv_mu) > 0 else Nv_mu
+                # a = Np_motor - x_motor
+                Npx = node.position[:self.motor_dims] - self.x[:self.motor_dims]
+                gamma = Npx - Npx*nNv_mu
+                attraction+=weight*distance*gamma
+        return attraction*self.dt
 
     # adding nodes
     # if phi(x) < kt=1
-    def add_node(self):
-        density = self.density_fx()
-        if density < self.kt:
-            self.nodes.append(Node(self.x, self.velocity))
-
-    # dif. eqs.
-    # 1) dx/dt = F(x,t)
-    # 2) dx/dt = ∆x/∆t (for small ∆)
-    # 3) x_n+1 = x_n + ∆x
-    # 2) => ∆x = (dx/dt) * ∆t
-    # 1,2 > 3 => x_n+1 = x_n + F(x,t) ∆t
+    # def add_node(self):
+    #     if self.density*self.dt < self.kt:
+    #         self.nodes.append(Node(self.x, self.velocity))
 
     # motor influence
     # dµ/dt = ( V(x) + A(x) ) / phi(x)
     def motor_fx(self):
-        # dif. eq.
-        t = 0
-        while t < 1:
-            # F(x,t) = ( V(x) + A(x) ) / phi(x)
-            velocity = self.velocity_fx()
-            attraction = self.attraction_fx()
-            density = self.density_fx()
-            f_xt = (velocity+attraction)/density
-            # x_n+1 = x_n + F(x,t) ∆t
-            self.x = self.x0 + (f_xt * self.delta_t)
-            # new x0 and t
-            self.x0 = deepcopy(self.x)
-            t += self.delta_t
+        self.velocity_fx()
+        attraction=self.attraction_fx()
+        density=self.density_fx()
+        #if density < self.kt:
+        self.nodes.append(Node(self.x, self.velocity))
+        mu = (self.velocity[:self.motor_dims]+attraction)/density
+        return mu
 
     # maintenance of nodes (updating of nodes' weights)
     # dNw/dt = -1 + r(N,x)
-    def maintenance_fx(self, distance_to_x):
-        # dif. eq.
-        t = 0
-        while t < 1:
-            # node's reinforcement function
-            # r(N,x) = kr=10 * d(Np,x)
-            reinforcement = self.kr * distance_to_x
-            # F(x,t) = -1 + r(N,x)
-            f_xt = -1 + reinforcement
-            #
-            self.nodes[n][2] = updated_weight
-            # x_n+1 = x_n + F(x,t) ∆t
-            self.x = self.x0 + (f_xt * self.delta_t)
-            # new x0 and t
-            self.x0 = deepcopy(self.x)
-            t += self.delta_t
+    def maintenance_fx(self):
+        dws = []
+        for node in self.nodes:
+            if node.active:
+                # node's reinforcement function
+                # r(N,x) = kr=10 * d(Np,x)
+                distance_to_x = self.distance_fx(node.position,self.x)
+                reinforcement = self.kr * distance_to_x
+                dw = (-1 + reinforcement)
+                dws.append(dw)
+            else:
+                dws.append(0.0)
+        return np.array(dws)
+
+    # Euler method
+    # 1) dx/dt = F(x,t)
+    # 2) dx/dt = ∆x/∆t (for small ∆)
+    # 3) x_n+1 = x_n + ∆x
+    # 2 => ∆x = (dx/dt) * ∆t
+    # 1,2 > 3 => x_n+1 = x_n + F(x,t) ∆t
 
     # IDSM
     def idsm_fx(self):
-        # dif. time
+        x_mu0 = self.x[:self.motor_dims]
         t = 0
+        pbar = tqdm(total=self.sim_time)
         while t < self.sim_time:
-            idsm_motor = self.motor_fx()
-
-
+            # dif. eq. functions
+            # dmu/dt : F(x,t) = ( V(x) + A(x) ) / phi(x)
+            f_xmu = self.motor_fx()
+            # dNw/dt : F(x,t) = -1 + r(N,x)
+            f_Nw = self.maintenance_fx()
+            # update system
+            # dif. eqs. steps : x_n+1 = x_n + F(x,t)*∆t
+            # position
+            x_mu = x_mu0 + f_xmu
+            self.x[:self.motor_dims] = x_mu
+            x_mu0 = x_mu
+            # record changes
+            self.motor_records.append(deepcopy(self.x))
+            # weights
+            weights0 = np.array([node.weight if node.active else 0.0 for node in self.nodes])
+            updated_weights = weights0 + f_Nw*self.dt
+            for n in range(len(self.nodes)):
+                self.nodes[n].weight = updated_weights[n]
+            # nodes
             [node.activation_fx() for node in self.nodes]
-
+            #self.add_node()
+            # dif. time
+            t += self.dt
+            pbar.update(self.dt)
+        pbar.close()
 
 class Node:
 
@@ -195,6 +209,67 @@ class Node:
             self.t2a -= 1
         else:
             self.active = True
+
+#####################################################
+              # Experiments
+#####################################################
+
+def training_fx(time=35, dt=0.1):
+    # intitialize agent
+    agent = Agent(m=[-2.5], s=[1/(1+(-2.5)**2)])
+    agent.nodes.append(Node(agent.x,agent.velocity))
+    # run trainer controller
+    t = 0
+    pbar = tqdm(total=20)
+    while t < 20:
+        # movement
+        dm = np.array([np.cos(t/2)])*dt
+        agent.m += dm
+        agent.s = np.array(1/(1+agent.m**2))
+        ds = agent.x[agent.motor_dims:]-agent.s
+        agent.velocity = np.concatenate((dm,ds))
+        agent.x = np.concatenate((agent.m, agent.s))
+        # nodes
+        f_Nw = agent.maintenance_fx()
+        weights0 = np.array([node.weight if node.active else 0.0 for node in agent.nodes])
+        updated_weights = weights0 + f_Nw*dt
+        for n in range(len(agent.nodes)):
+            agent.nodes[n].weight = updated_weights[n]
+        [node.activation_fx() for node in agent.nodes]
+        agent.nodes.append(Node(agent.x,agent.velocity))
+        # record
+        agent.motor_records.append(deepcopy(agent.x[:agent.motor_dims]))
+        agent.sensor_records.append(deepcopy(agent.x[agent.motor_dims:]))
+        t += dt
+        pbar.update(dt)
+    pbar.close()
+    # plots
+    plt.plot([t/100 for t in range(len(agent.nodes))], [node.position[0] for node in agent.nodes])
+    plt.xlabel("Time")
+    plt.ylabel("Position")
+    plt.savefig("_TrainingPlot")
+    plt.close()
+    plt.plot([t/100 for t in range(len(agent.nodes))], [node.position[1] for node in agent.nodes])
+    plt.xlabel("Time")
+    plt.ylabel("Position")
+    plt.savefig("_TrainingPlot2")
+    plt.close()
+    # run IDSM
+    agent.sim_time = 15
+    agent.idsm_fx()
+    # plot
+    plt.plot([t for t in range(len(agent.nodes))], [node.position for node in agent.nodes])
+    plt.xlabel("Time")
+    plt.ylabel("Position")
+    plt.savefig("_IDSMplot")
+    plt.close()
+    # plot
+    plt.plot([t for t in range(len(agent.motor_records))], [x[0] for x in agent.motor_records])
+    plt.xlabel("Time")
+    plt.ylabel("Position")
+    plt.savefig("_xPlot")
+    plt.close()
+    return agent
 
 
 
