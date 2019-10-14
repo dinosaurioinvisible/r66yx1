@@ -8,15 +8,49 @@ import numpy as np
 #import grid
 
 
+class Cell:
+    def __init__(self, size=2, inside=None):
+        self.inside = inside
+
+class Food:
+    def __init__(self, )
+
 class SimWorld:
-    def __init__(self, size=100, xmax=100, xmin=0, ymax=100, ymin=0, end=-100):
-        self.size = size
+    def __init__(self, xmax=100, ymax=100):
+        # world starting from (0,0), just postive coords
         self.xmax = xmax
-        self.xmin = xmin
         self.ymax = ymax
-        self.ymin = ymin
-        self.end = end
-        self.bounds = [(xmin, xmax), (ymin, ymax)]
+        self.world = np.full((self.xmax, self.ymax), None)
+
+    def init_world(self):
+        # cells
+        for i in range(0,len(grid),Cell.size):
+            for j in range(0,len(grid[i]),Cell.size):
+                grid[i,j] = Cell()
+        # food sources
+
+
+        # allocate agents
+
+    def allocate_food(self, n=1, food):
+        for i in range(n):
+            x = np.random.randint(self.xmin, self.xmax)
+            y = np.random.randint(self.ymin, self.ymax)
+            if grid[x,y] grid[x,y] = food
+
+
+
+class Food:
+    def __init__(self, food_type=):
+        self.food_type = food_type
+
+    def allocate(self):
+        if self.food_type == "tree":
+
+        elif self.food_type == "":
+            y
+        else:
+
 
 
 
