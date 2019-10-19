@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import numpy as np
+import geometry
 
 class Robot:
     def __init__(self, x=None, y=None, o=None\
@@ -31,37 +32,6 @@ class Robot:
             w = 1.2*w
         w += self.motor_noise
         return speed
-
-    # geometry
-    def force_angle(self, angle):
-        if angle > 2*np.pi:
-            return angle-2*np.pi
-        elif angle < 0:
-            return angle+2*np.pi
-        else:
-            return angle
-
-    # geometry
-    def shortest_dist(self, a, b, point):
-        # between line segment [a,b] and a point p
-        dist = np.linalg(a-b)
-        if dist == 0:           # special case A=B
-            return np.linalg(point-a)
-
-        # line extending the segment, parameterized as a+t (b-a)
-        # find proyection of point p onto the line
-        # it falls where t = [(p-a).(b-a)]/dist^2
-        t = np.dot((point-a),(b-a))/(dist**2)
-
-        if t < 0:
-            np.linalg(point-a)  # off the A end
-        if t > 1:
-            np.linalg(point-b)  # off the B end
-        # proyection onto the line segment
-        proy_x = a[0] + t*(b[0]-a[0])
-        proy_y = a[1] + t*(b[1]-a[1])
-        proyection = np.array([proy_x,proy_y])
-        return np.linalg(point-proyection)
 
     def wall_collision(self):
         if self.shortest_dist(p1,p2,robot_position) <= self.radius:
