@@ -1,105 +1,175 @@
+
+import numpy as np
+import geometry
+import world
+
+#TODO
+# after collisions
+# urgency fx, to define speed
+# parameter/variable to differentiate lw and rw speed
+
 class Robot:
-    # robrad = 6.5          # robot outer radius
-    # rob_toprad = 5.75     # radius top body where sensors are
-    # wheel_sep = 10        # distance between the wheels along axe
-    # sim_time_speed = 0.1
-    # num_IRs = 6           # 6 proximity IRs?
-    # motor_noise = 0.4
-    #
-    # num_IR = 6            # number of proximity sensors ?
-    # raylen = 25           # length of IR ray
-    # ir_noise = 50         # IR sensor noise
-    # ir_spread = 0.873     # spread of the ir beam in radians (50 degrees)
-    # ir_coef = 1           # reflection coefficient
-    def __init__ (self, size=5\
-    , fs_number=1, fs_loc=0, fs_range=20\
-    , ps=4, ps_loc=4, ps_range=6\
-    , wheel_sep=5, vel=1\
-    , energy=50):
-        self.size = size
-        self.fs_number = fs_number
-        self.fs_loc = fs_loc
-        self.fs_range = fs_range
-        self.ps = ps_number
-        self.ps_loc = ps_loc
-        self.ps_range = ps_range
+    def __init__(self, x=50, y=50, orientation=0\
+    , radius=2.5, wheel_sep=2, n_irs=2):
+        self.x = x
+        self.y = y
+        self.position = np.array([self.x, self.y])
+        self.orientation = orientation
+        self.radius = radius
+        #
         self.wheel_sep = wheel_sep
-        self.vel = vel
-        self.energy = energy
-        # features for moving
-        self.xloc = np.random.randint(grid.xmin, grid.xmax)
-        self.yloc = np.random.randint(grid.ymin, grid.ymin)
-        #self.orientation = np.radians(np.random.randint(0,360))
-        #self.lw_loc = [self.xloc-(self.wheel_sep/2),self.yloc]
-        #self.lw_vel = 0
-        #self.rw_loc = [self.xloc+(self.wheel_sep/2),self.yloc]
-        #self.rw_vel = 0
-        self.dest = False
-
-
-    # move_robot
-    # robot_speed
-    # collision
-    # wall_collision
-    # uniform_noise
-    # read_IRs
-    # ray_hit
-    # IRval
-    # fullIRval
-    # ray_hit_nearest
-    # ray_end
-    # ir_reading
-    # init_robot
-
-    def sens(self):
-        self.food = []
-        for fsensor in fs_number:
-            # define sensing area
-            for i in range(self.xloc-self.fs_range, self.xloc+self.fs_range+1):
-                for j in range(self.yloc-self.fs_range, self.yloc+self.fs_range+1):
-                    # if food, take note
-                    if grid[i,j] > 0:
-                        rx = i-self.xloc
-                        ry = j-self.yloc
-                        r = np.sqrt(x**2+y**2)
-                        self.food.append([r, grid[i,j], [i,j]])
-
-    # neural network (input -> percept input -> percept output -> output)
-    def decide(self):
-        try:
-            self.dest = min(self.food)
-        except:
-            self.dest = False
+        self.lw_speed = 5
+        self.rw_speed = 5
+        #
+        self.n_irs = n_irs
+        self.irs_angles = []
+        self.allocate_irs()
+        #
+        # urgency parameter between 0 and 1
+        self.urgency = 0
+        #
+        print("\nrobot in {} looking at {}".format(self.position, self.orientation))
 
     def move(self):
-        # turn
-        if self.dest:
-            xdest = self.dest[0][0]
-            ydest = self.dest[0][1]
-            # dtheta = (self.lw-self.rw)/self.wheel_sep
-            # dtheta = np.arctan2(ydest-self.yloc, xdest-self.xloc)
-            # self.orientation += dtheta
-            # move
-            # self.vel = (self.lw_vel+self.rw_vel)/2
-            if self.xloc != xdest:
-                self.xloc += self.vel*(xdest/np.abs(xdest))
-            if self.yloc != ydest:
-                self.yloc += self.vel*(ydest/np.abs(ydest))
-        else:
-            # random/easier move
-            # other = np.radians(np.random.randint(0,360))
-            # self.orientation = np.random.choice([self.orientation, other])
-            # move
-            self.xloc = self.vel*np.random.choice([1,0,-1])
-            self.yloc = self.vel*np.random.choice([1,0,-1])
-        self.energy += -1
+        l_speed, r_speed = self.robot_speed()
+        vel = (l_speed+r_speed)/2
+        dx = vel*np.sin(self.orientation)
+        dy = vel*np.cos(self.orientation)
+        do = (l_speed - r_speed)/self.wheel_sep
 
-    def check_energy(self):
-        if self.energy == 0 and self.size == 1:
-            sys.stdout.write("the robot is dead")
-        elif self.energy == 0:
-            self.size += -1
-            self.energy = 50
-        elif self.energy == 100:
-            self.size += 1
-            self.energy = 50
+        # oldx = self.x
+        # oldy = self.y
+        # oldtheta = self.orientation
+
+        # new x,y and orientation
+        # keep x and y within limits
+        # force angle between 0 and 2pi
+        self.x += dx
+        if self.x > world.xmax:
+            self.x = world.xmax
+        self.y += dy
+        if self.y > world.ymax:
+            self.y = world.ymax
+        self.orientation += do
+        self.orientation = geometry.force_angle(self.orientation)
+
+        if collision == True:
+            # what to do after collisions?
+            # reset after collision
+            self.x -= dx
+            self.y -= dy
+            # self.orientation = oldtheta
+            print("collided...")
+            self.orientation += np.random.random()
+            self.orientation = geometry.force_angle(self.orientation)
+
+    def robot_speed(self):
+        # there is no translation from voltage in this case
+        # speed = speed % ? % urgency % noise
+        # ? = something to get different speeds for lw and rw
+        l_speed = self.lw_speed * 1 + self.lw*urgency
+        r_speed = self.rw_speed * 1 + self.rw*urgency
+        # add random noise from a normal distribution
+        l_speed += np.random.randn()
+        r_speed += np.random.randn()
+        return l_speed, r_speed
+
+    def collision(self):
+        # collision with world walls
+        for wall in world.walls:
+            # wall: line segment [a,b]
+            a = np.array(wall[0])
+            b = np.array(wall[1])
+            if geometry.shortest_dist(a, b, self.position) <= self.radius:
+                print("\nposition: {}".format(self.position))
+                print("wall, A: {} to B: {}".format(a,b))
+                return True
+
+    def allocate_irs(self):
+        # sensor only on the top half of the body uniformily distributed
+        angle = 0
+        angle_sep = 180/(self.n_irs+1)
+        for n in self.n_irs:
+            # starting from the middle top
+            if 90 >= angle >= 270:
+                angle = 360 - angle
+            else:
+                angle += angle_sep
+            self.irs_angles.append(np.radians(angle))
+
+    def ir_reading(self):
+        for angle in self.irs_angles:
+            sensor_angle = self.orientation + angle
+            sens_x = self.x + self.radius*np.cos(sensor_angle)
+            sens_y = self.y + self.radius*np.sin(sensor_angle)
+            # bounding rays relative to a central ir beam
+            # sp_left =
+            # sp_right =
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        #
