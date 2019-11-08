@@ -21,7 +21,7 @@ def shortest_dist(a, b, point):
     px = a[0] + t*(b[0]-a[0])
     py = a[1] + t*(b[1]-a[1])
     proyection = np.array([px,py])
-    return mp.linalg.norm(point-proyection)
+    return np.linalg.norm(point-proyection)
 
 def orientation(p, q, r):
     # to find orientation of ordered triplets of points in a plane
@@ -88,7 +88,7 @@ def intersection_point(p1,p2,p3,p4,r):
     # x1 + t(x2-x1) = x3 + s(x4-x3)
     # y1 + t(y2-y1) = y3 + s(y4-y3)
     A = (p4[1]-p3[1])*(p2[0]-p1[0]) - (p4[0]-p3[0])*(p2[1]-p1[1])
-    t = ()(p4[0]-p3[0])*(p1[1]-p3[1]) - (p4[1]-p3[1])*(p1[0]-p3[0]))/A
+    t = ((p4[0]-p3[0])*(p1[1]-p3[1]) - (p4[1]-p3[1])*(p1[0]-p3[0]))/A
     rx = p1[0]+t*(p2[0]-p1[0])
     ry = p1[1]+t*(p2[1]-p1[1])
     r = np.array([rx,ry])
