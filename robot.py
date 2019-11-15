@@ -12,9 +12,14 @@ import world
 # innner wall could rotate clockwise
 
 class Robot:
-    def __init__(self, x=50, y=50, orientation=0\
+    def __init__(self, energy=100\
+    , x=50, y=50, orientation=0\
     , radius=2.5, wheel_sep=2, motor_noise=0\
     , n_irs=2, ray_length=10, n_rays=5, ray_spread=1, ir_noise=0):
+        # energy
+        self.energy = energy
+        # urgency parameter between 0 and 1
+        self.urgency = 0
         # movement
         self.x = x
         self.y = y
@@ -34,8 +39,6 @@ class Robot:
         self.ir_noise = ir_noise        # np.random.random()
         self.irs = []
         self.allocate_irs()
-        # urgency parameter between 0 and 1
-        self.urgency = 0
         # temporary, replacement for empirical fxs
         self.rob_speed = 1
         self.irval = 1
@@ -46,25 +49,23 @@ class Robot:
 
 
     def act(self):
-        print("\nrobot in {} looking at {}".format(self.position, self.orientation))
-        print("ir_readings: {}".format(self.reading))
-        self.data.append([self.position, self.orientation, self.reading, self.notes])
+        #print("\nrobot in {} looking at {}".format(self.position, self.orientation))
+        #print("ir_readings: {}".format(self.reading))
+        self.data.append([self.position, int(np.degrees(self.orientation)), self.reading, self.notes])
         self.notes = None
         self.ir_reading()
         self.move()
 
     def move(self):
-        print("move")
+        #print("move")
         l_speed, r_speed = self.robot_speed()
         vel = (l_speed+r_speed)/2
         dx = vel*np.sin(self.orientation)
         dy = vel*np.cos(self.orientation)
         do = (l_speed - r_speed)/self.wheel_sep
-
         # oldx = self.x
         # oldy = self.y
         # oldtheta = self.orientation
-
         # new x,y and orientation
         # keep x and y within limits
         # force angle between 0 and 2pi
@@ -84,7 +85,7 @@ class Robot:
             self.x -= dx
             self.y -= dy
             # self.orientation = oldtheta
-            print("collided...")
+            #print("collided...")
             self.notes = "collision"
             self.orientation += self.motor_noise
             self.orientation = geometry.force_angle(self.orientation)
@@ -107,13 +108,13 @@ class Robot:
             a = np.array(wall[0])
             b = np.array(wall[1])
             if geometry.shortest_dist(a, b, self.position) <= self.radius:
-                print("\nposition: {}".format(self.position))
-                print("wall, A: {} to B: {}".format(a,b))
+                #print("\nposition: {}".format(self.position))
+                #print("wall, A: {} to B: {}".format(a,b))
                 return True
 
     # define relative angles and positions from mid top
     def allocate_irs(self):
-        print("allocate")
+        #print("allocate")
         # sensor only on the top half of the body uniformily distributed
         ir_rel_angle = 0
         angle_sep = 180/(self.n_irs+1)
@@ -205,7 +206,7 @@ class Robot:
         return dist
 
     def ir_reading(self):
-        print("ir_reading")
+        #print("ir_reading")
         for ir_sensor in self.irs:
             rel_angle = ir_sensor[0]
             rel_pos = ir_sensor[1]
