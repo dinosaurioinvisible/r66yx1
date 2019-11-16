@@ -21,7 +21,7 @@ def shortest_dist(a, b, point):
     px = a[0] + t*(b[0]-a[0])
     py = a[1] + t*(b[1]-a[1])
     proyection = np.array([px,py])
-    return mp.linalg.norm(point-proyection)
+    return np.linalg.norm(point-proyection)
 
 def orientation(p, q, r):
     # to find orientation of ordered triplets of points in a plane
@@ -33,7 +33,8 @@ def orientation(p, q, r):
     # i.e. direction of turn of path p,q,r
     # orientation depends on wether the slope of PQ
     # is less tha, equal, or greater than QR
-    dif_slope = (q[1]-p[1]) * (r[0]-q[0]) - (q[0]-p[0]) * (r[1-q[1]])
+    dif_slope = (q[1]-p[1]) * (r[0]-q[0]) - (q[0]-p[0]) * (r[1]-q[1])
+    #import pdb; pdb.set_trace()
     if dif_slope == 0:
         return 0            # colinear
     elif dif_slope > 1:
@@ -76,7 +77,7 @@ def intersect(p1,p2,p3,p4):
     # if it soesn't fall in any of the above cases:
     return False
 
-def intersection_point(p1,p2,p3,p4,r):
+def intersection_point(p1,p2,p3,p4):
     # r is the intersection point of p1p2 and p3p4
     # used when previously checked that there is an intersection
     # (no risk of dividing by zero)
@@ -88,12 +89,13 @@ def intersection_point(p1,p2,p3,p4,r):
     # x1 + t(x2-x1) = x3 + s(x4-x3)
     # y1 + t(y2-y1) = y3 + s(y4-y3)
     A = (p4[1]-p3[1])*(p2[0]-p1[0]) - (p4[0]-p3[0])*(p2[1]-p1[1])
-    t = ()(p4[0]-p3[0])*(p1[1]-p3[1]) - (p4[1]-p3[1])*(p1[0]-p3[0]))/A
+    t = ((p4[0]-p3[0])*(p1[1]-p3[1]) - (p4[1]-p3[1])*(p1[0]-p3[0]))/A
     rx = p1[0]+t*(p2[0]-p1[0])
     ry = p1[1]+t*(p2[1]-p1[1])
     r = np.array([rx,ry])
+    return r
 
-def force_angle(self, angle):
+def force_angle(angle):
     # make sure angles ream in range 0-2pi
     # to avoid problems with sin and cos fxs
     if angle > 2*np.pi:
