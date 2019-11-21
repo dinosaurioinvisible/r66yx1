@@ -3,40 +3,39 @@ import numpy as np
 import geometry
 import world
 
-#TODO
-# after collisions
-# urgency fx, to define speed
-# parameter/variable to differentiate lw and rw speed
-# parameter/variable to alter irval
-# compute for all ray_spread values (5 in the original)
-# innner wall could rotate clockwise
+energy = 100
+radius = 5
 
 class Robot:
-    def __init__(self, energy=100\
-    , x=50, y=50, orientation=0\
-    , radius=2.5, wheel_sep=2, motor_noise=0\
-    , n_irs=2, ray_length=10, n_rays=5, ray_spread=1, ir_noise=0):
+    def __init__(self, energy=energy\
+    , pos="random", orientation=0\
+    , radius=radius, wheel_sep=2, motor_noise=0\
+    , n_irs=2, ray_length=5, n_rays=5, ray_spread=5, ir_noise=0):
         # energy
         self.energy = energy
         # urgency parameter between 0 and 1
         self.urgency = 0
         # movement
-        self.x = x
-        self.y = y
+        if pos=="center":
+            self.x = world.xmax/2
+            self.y = world.ymax/2
+        else:
+            self.x = np.random.randint(world.xmax)
+            self.y = np.random.randint(world.ymax)
         self.position = np.array([self.x, self.y])
         self.orientation = orientation
         self.radius = radius
         self.wheel_sep = wheel_sep
         self.lw_speed = 5
         self.rw_speed = 5
-        self.motor_noise = motor_noise  #np.random.random()
+        self.motor_noise = motor_noise  # direct np.random.random() for now
         # sensors
         self.reading = None
         self.n_irs = n_irs
         self.ray_length = ray_length
         self.n_rays = n_rays
-        self.ray_spread = ray_spread
-        self.ir_noise = ir_noise        # np.random.random()
+        self.ray_spread = np.radians(ray_spread)
+        self.ir_noise = ir_noise        # direct np.random.random() for now
         self.irs = []
         self.allocate_irs()
         # temporary, replacement for empirical fxs
@@ -51,7 +50,10 @@ class Robot:
     def act(self):
         #print("\nrobot in {} looking at {}".format(self.position, self.orientation))
         #print("ir_readings: {}".format(self.reading))
-        self.data.append([self.position, int(np.degrees(self.orientation)), self.reading, self.notes])
+        # sensors: [[rel_x, rel_y], rel_angle, ray_length, left_most, right_most
+        sensors = [[[self.x+irs[0][0],self.y+irs[0][1]], geometry.force_angle(self.orientation+irs[1]), self.ray_length, geometry.force_angle(self.orientation+irs[1]+irs[2][0]), geometry.force_angle(self.orientation+irs[1]+irs[2][-1])] for irs in self.irs]
+        # data: [position, orientation, sensors, ir_reading, notes]
+        self.data.append([self.position, int(np.degrees(self.orientation)), sensors, self.reading, self.notes])
         self.notes = None
         self.ir_reading()
         self.move()
@@ -60,8 +62,8 @@ class Robot:
         #print("move")
         l_speed, r_speed = self.robot_speed()
         vel = (l_speed+r_speed)/2
-        dx = vel*np.sin(self.orientation)
-        dy = vel*np.cos(self.orientation)
+        dx = vel*np.cos(self.orientation)
+        dy = vel*np.sin(self.orientation)
         do = (l_speed - r_speed)/self.wheel_sep
         # oldx = self.x
         # oldy = self.y
@@ -87,8 +89,8 @@ class Robot:
             # self.orientation = oldtheta
             #print("collided...")
             self.notes = "collision"
-            self.orientation += self.motor_noise
-            self.orientation = geometry.force_angle(self.orientation)
+            self.energy -= 10
+            self.orientation = geometry.force_angle(self.orientation-np.pi-np.random.random())
 
     def robot_speed(self):
         # there is no translation from voltage in this case
@@ -97,8 +99,9 @@ class Robot:
         l_speed = self.lw_speed * self.rob_speed + self.lw_speed*self.urgency
         r_speed = self.rw_speed * self.rob_speed + self.rw_speed*self.urgency
         # add random noise from a normal distribution
-        l_speed += np.random.randn()
-        r_speed += np.random.randn()
+        l_speed += self.motor_noise     #np.random.randn()
+        r_speed += self.motor_noise     #np.random.randn()
+        # print("{}, {}".format(l_speed, r_speed))
         return l_speed, r_speed
 
     def collision(self):
@@ -116,25 +119,19 @@ class Robot:
     def allocate_irs(self):
         #print("allocate")
         # sensor only on the top half of the body uniformily distributed
-        ir_rel_angle = 0
         angle_sep = 180/(self.n_irs+1)
+        ir_rel_angles = [geometry.force_angle(np.radians(-90+angle_sep*i)) for i in range(1,self.n_irs+1)]
         for n in range(self.n_irs):
-            # define relative angle
-            if 90 >= ir_rel_angle >= 270:
-                ir_rel_angle = 360 - ir_rel_angle
-            else:
-                ir_rel_angle += angle_sep
-            # define relative position
-            ir_rel_x = self.radius*np.cos(ir_rel_angle)
-            ir_rel_y = self.radius*np.sin(ir_rel_angle)
+            # relative position for each sensor
+            ir_rel_x = self.radius*np.cos(ir_rel_angles[n])
+            ir_rel_y = self.radius*np.sin(ir_rel_angles[n])
             ir_rel_pos = np.array([ir_rel_x, ir_rel_y])
-            # define ray relative angles
+            # define ray relative angles for beams
             rays_sep = self.ray_spread/(self.n_rays-1)
             # negative for counterclockwise
             ir_rel_rays = [(-self.ray_spread/2)+rays_sep*n for n in range(self.n_rays)]
-            # ir = [angle, position, rays]
             # everything relative to location/orientation
-            self.irs.append([np.radians(ir_rel_angle), ir_rel_pos, ir_rel_rays])
+            self.irs.append([ir_rel_pos, ir_rel_angles[n], ir_rel_rays])
 
     def ray_end(self, ir_x, ir_y, angle, rel_angle):
         # end of ray given standard lenght and particular angle
@@ -208,8 +205,8 @@ class Robot:
     def ir_reading(self):
         #print("ir_reading")
         for ir_sensor in self.irs:
-            rel_angle = ir_sensor[0]
-            rel_pos = ir_sensor[1]
+            rel_pos = ir_sensor[0]
+            rel_angle = ir_sensor[1]
             rel_rays = ir_sensor[2]
             # angle of mid ray from sensor, clockwise from due north
             ir_angle = geometry.force_angle(self.orientation + rel_angle)

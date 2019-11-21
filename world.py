@@ -2,11 +2,12 @@
 import numpy as np
 
 # variables
-xmax = 100
-ymax = 100
+xmax = 200
+ymax = 200
 n_walls = 6
 walls_loc = "random"
 n_trees = 3
+#tree_size = 10
 energy= 1000
 
 def allocate(xmax, ymax, n_walls, walls_loc, n_trees, energy):
@@ -32,9 +33,10 @@ def allocate(xmax, ymax, n_walls, walls_loc, n_trees, energy):
             bx = input("bx for wall {}: ".format(n+4))
             by = input("by for wall {}: ".format(n+4))
             walls.append([[ax,ay],[bx,by]])
+    # trees
     for n in range(n_trees):
-        ax = np.random.randint(10,90)
-        ay = np.random.randint(10,90)
+        ax = np.random.randint(0,xmax)
+        ay = np.random.randint(0,ymax)
         trees.append([ax, ay])
     # print locations and return
     print("\nwalls alocated at:")
