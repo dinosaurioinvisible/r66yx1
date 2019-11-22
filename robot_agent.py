@@ -3,13 +3,10 @@ import numpy as np
 import geometry
 import world
 
-energy = 100
-radius = 5
-
 class Robot:
-    def __init__(self, energy=energy\
+    def __init__(self, energy=100\
     , pos="random", orientation=0\
-    , radius=radius, wheel_sep=2, motor_noise=0\
+    , radius=world.xmax/100, wheel_sep=2, motor_noise=0\
     , n_irs=2, ray_length=5, n_rays=5, ray_spread=5, ir_noise=0):
         # energy
         self.energy = energy
@@ -48,8 +45,7 @@ class Robot:
 
 
     def act(self):
-        #print("\nrobot in {} looking at {}".format(self.position, self.orientation))
-        #print("ir_readings: {}".format(self.reading))
+        # updated information from sensors
         # sensors: [[rel_x, rel_y], rel_angle, ray_length, left_most, right_most
         sensors = [[[self.x+irs[0][0],self.y+irs[0][1]], geometry.force_angle(self.orientation+irs[1]), self.ray_length, geometry.force_angle(self.orientation+irs[1]+irs[2][0]), geometry.force_angle(self.orientation+irs[1]+irs[2][-1])] for irs in self.irs]
         # data: [position, orientation, sensors, ir_reading, notes]
@@ -60,37 +56,40 @@ class Robot:
 
     def move(self):
         #print("move")
+        # new x,y and orientation
         l_speed, r_speed = self.robot_speed()
         vel = (l_speed+r_speed)/2
         dx = vel*np.cos(self.orientation)
         dy = vel*np.sin(self.orientation)
         do = (l_speed - r_speed)/self.wheel_sep
-        # oldx = self.x
-        # oldy = self.y
-        # oldtheta = self.orientation
-        # new x,y and orientation
         # keep x and y within limits
-        # force angle between 0 and 2pi
         self.x += dx
         if self.x > world.xmax:
-            self.x = world.xmax
+            self.x = world.xmax - self.radius
+        if self.x < 0:
+            self.x = self.radius
         self.y += dy
         if self.y > world.ymax:
-            self.y = world.ymax
+            self.y = world.ymax - self.radius
+        if self.y < 0:
+            self.y = self.radius
+        # update
         self.position = np.array([self.x, self.y])
         self.orientation += do
+        # force angle between 0 and 2pi
         self.orientation = geometry.force_angle(self.orientation)
-
+        # what to do after collisions?
         if self.collision() == True:
-            # what to do after collisions?
-            # reset after collision
-            self.x -= dx
-            self.y -= dy
-            # self.orientation = oldtheta
             #print("collided...")
             self.notes = "collision"
             self.energy -= 10
-            self.orientation = geometry.force_angle(self.orientation-np.pi-np.random.random())
+            self.orientation = geometry.force_angle(self.orientation-np.degrees(np.random.randint(90, 270)))
+        # update sensors parameters
+        # irs[i]: [ir_rel_pos, ir_rel_angles[n], ir_rel_rays]
+        for i in range(len(self.irs)):
+            rel_x = self.radius*np.cos(self.orientation+self.irs[i][1])
+            rel_y = self.radius*np.sin(self.orientation+self.irs[i][1])
+            self.irs[i][0] = [rel_x, rel_y]
 
     def robot_speed(self):
         # there is no translation from voltage in this case
@@ -99,8 +98,8 @@ class Robot:
         l_speed = self.lw_speed * self.rob_speed + self.lw_speed*self.urgency
         r_speed = self.rw_speed * self.rob_speed + self.rw_speed*self.urgency
         # add random noise from a normal distribution
-        l_speed += self.motor_noise     #np.random.randn()
-        r_speed += self.motor_noise     #np.random.randn()
+        l_speed += np.random.randn()    #self.motor_noise     #np.random.randn()
+        r_speed += np.random.randn()    #self.motor_noise     #np.random.randn()
         # print("{}, {}".format(l_speed, r_speed))
         return l_speed, r_speed
 

@@ -2,8 +2,8 @@
 import numpy as np
 
 # variables
-xmax = 200
-ymax = 200
+xmax = 250
+ymax = 250
 n_walls = 6
 walls_loc = "random"
 n_trees = 3
