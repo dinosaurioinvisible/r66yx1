@@ -7,7 +7,7 @@ class Robot:
     def __init__(self, energy=100\
     , pos="random", orientation=0\
     , radius=world.xmax/100, wheel_sep=2, motor_noise=0\
-    , n_irs=2, ray_length=5, n_rays=5, ray_spread=5, ir_noise=0):
+    , n_irs=2, ray_length=5, n_rays=5, ray_spread=45, ir_noise=0):
         # energy
         self.energy = energy
         # urgency parameter between 0 and 1
@@ -34,6 +34,7 @@ class Robot:
         self.ray_spread = np.radians(ray_spread)
         self.ir_noise = ir_noise        # direct np.random.random() for now
         self.irs = []
+        self.sensors = []
         self.allocate_irs()
         # temporary, replacement for empirical fxs
         self.rob_speed = 1
@@ -45,14 +46,24 @@ class Robot:
 
 
     def act(self):
-        # updated information from sensors
-        # sensors: [[rel_x, rel_y], rel_angle, ray_length, left_most, right_most
-        sensors = [[[self.x+irs[0][0],self.y+irs[0][1]], geometry.force_angle(self.orientation+irs[1]), self.ray_length, geometry.force_angle(self.orientation+irs[1]+irs[2][0]), geometry.force_angle(self.orientation+irs[1]+irs[2][-1])] for irs in self.irs]
         # data: [position, orientation, sensors, ir_reading, notes]
-        self.data.append([self.position, int(np.degrees(self.orientation)), sensors, self.reading, self.notes])
-        self.notes = None
         self.ir_reading()
         self.move()
+        self.update_sensors()
+        self.data.append([self.position, int(np.degrees(self.orientation)), self.sensors, self.reading, self.notes])
+        self.notes = None
+
+    def update_sensors(self):
+        # update information from sensors
+        self.sensors = []
+        for sensor in self.irs:
+            sx = self.x+sensor[0][0]
+            sy = self.y+sensor[0][1]
+            so = geometry.force_angle(self.orientation+sensor[1])
+            ll_ray = geometry.force_angle(so+sensor[2][0])
+            rr_ray = geometry.force_angle(so+sensor[2][-1])
+            # [[rel_x, rel_y], rel_angle, ray_length, left_most_ray, right_most_ray]
+            self.sensors.append([[sx,sy], so, self.ray_length, ll_ray, rr_ray])
 
     def move(self):
         #print("move")
