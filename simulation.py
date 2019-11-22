@@ -18,7 +18,7 @@ import matplotlib.animation as animation
 # ir input -> net -> output motor
 
 
-def runsim(t=100, n_robots=5):
+def runsim(t=100, n_robots=10):
     tx = 0
     simrobots = [robot_agent.Robot() for n in range(n_robots)]
     while tx < t:
@@ -28,7 +28,7 @@ def runsim(t=100, n_robots=5):
     data = [simrobot.data for simrobot in simrobots]
     return data
 
-def runsim_plot(data, past=True):
+def runsim_plot(data, past=False):
     # definitions
     fig = plt.figure()
     ax = plt.axes(xlim=(0,world.xmax), ylim=(0,world.ymax), aspect="equal")
@@ -56,8 +56,8 @@ def runsim_plot(data, past=True):
     rays = []
     ray, = plt.plot([], [])
     n_sensors = len(sensors_data[0][0])
-    for i in range(n_robots+n_sensors*n_robots):
-        # main orientations + sensors for each robot[1:]
+    for i in range(n_robots+2*n_sensors*n_robots):
+        # main orientations + left/right rays for each sensor for each robot
         scolor = "black" if i < n_robots else "orange"
         ray_obj = ax.plot([],[], color=scolor)[0]
         rays.append(ray_obj)
@@ -92,7 +92,7 @@ def runsim_plot(data, past=True):
         xlocs.append(x)
         ylocs.append(y)
         # more than one you can't see anything
-        if past == True and len(xlocs) < len(simlocations):
+        if past == True and n_robots == 1:
             past_locations.set_data(xlocs, ylocs)
         # sensors list, added proyection for main orientation
         sx = [[x[n], x[n]+10*np.cos(o[n])] for n in range(len(x))]
@@ -113,8 +113,12 @@ def runsim_plot(data, past=True):
                 re_xr = rs_x + sray*np.cos(sright)
                 re_yr = rs_y + sray*np.sin(sright)
                 # ir_rays
-                sx.append([rs_x, re_xl, re_x, re_xr, rs_x])
-                sy.append([rs_y, re_yl, re_y, re_yr, rs_y])
+                # sx.append([rs_x, re_xl, re_x, re_xr, rs_x])
+                # sy.append([rs_y, re_yl, re_y, re_yr, rs_y])
+                sx.append([rs_x, re_xl])
+                sy.append([rs_y, re_yl])
+                sx.append([rs_x, re_xr])
+                sy.append([rs_y, re_yr])
         # plot ir_rays
         for enum, ray in enumerate(rays):
             ray.set_data(sx[enum], sy[enum])
