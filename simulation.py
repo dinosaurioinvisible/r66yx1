@@ -5,7 +5,6 @@ import robot_agent
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import pdb
 
 #TODO
 # after collisions
@@ -14,9 +13,12 @@ import pdb
 # parameter/variable to alter irval
 # compute for all ray_spread values (5 in the original)
 # innner wall could rotate clockwise
-# draw outer body and sensors
+# ir input should see obstacles and food (classify)?
+# connect ir values to motor behaviour
+# ir input -> net -> output motor
 
-def runsim(t=100, n_robots=1):
+
+def runsim(t=100, n_robots=5):
     tx = 0
     simrobots = [robot_agent.Robot() for n in range(n_robots)]
     while tx < t:
@@ -26,7 +28,7 @@ def runsim(t=100, n_robots=1):
     data = [simrobot.data for simrobot in simrobots]
     return data
 
-def runsim_plot(data, past=False):
+def runsim_plot(data, past=True):
     # definitions
     fig = plt.figure()
     ax = plt.axes(xlim=(0,world.xmax), ylim=(0,world.ymax), aspect="equal")
@@ -45,7 +47,7 @@ def runsim_plot(data, past=False):
     robot = plt.Circle(0,0)
     n_robots = len(data)
     for i in range(n_robots):
-        robot_obj = plt.Circle((0,0), radius=robot_agent.radius, fill=False)
+        robot_obj = plt.Circle((0,0), radius=world.xmax/100, fill=False)
         robots.append(robot_obj)
     # past locations
     xlocs, ylocs = [], []
@@ -54,8 +56,8 @@ def runsim_plot(data, past=False):
     rays = []
     ray, = plt.plot([], [])
     n_sensors = len(sensors_data[0][0])
-    for i in range(n_sensors+n_robots):
-        # sensors [1:] + main orientations
+    for i in range(n_robots+n_sensors*n_robots):
+        # main orientations + sensors for each robot[1:]
         scolor = "black" if i < n_robots else "orange"
         ray_obj = ax.plot([],[], color=scolor)[0]
         rays.append(ray_obj)
@@ -81,7 +83,7 @@ def runsim_plot(data, past=False):
         # current location
         x = [robot_loc[0] for robot_loc in simlocations[i]]
         y = [robot_loc[1] for robot_loc in simlocations[i]]
-        o = [robot_or for robot_or in orientations[i]]
+        o = [np.radians(robot_or) for robot_or in orientations[i]]
         # allocate robot
         for enum, robot in enumerate(robots):
             #import pdb; pdb.set_trace()
@@ -96,28 +98,28 @@ def runsim_plot(data, past=False):
         sx = [[x[n], x[n]+10*np.cos(o[n])] for n in range(len(x))]
         sy = [[y[n], y[n]+10*np.sin(o[n])] for n in range(len(y))]
         # ir beams proyections
-        robot_i = 0
-        for ir_sensor in sensors_data[i][robot_i]:
-            #import pdb; pdb.set_trace()
-            spos, so, sray, sleft, sright = ir_sensor
-            rs_x, rs_y = spos
-            # center ray of beam
-            re_x = rs_x + sray*np.cos(so)
-            re_y = rs_y + sray*np.sin(so)
-            # left most ray from left most beam
-            re_xl = rs_x + sray*np.cos(sleft)
-            re_yl = rs_y + sray*np.sin(sleft)
-            # right most ray from right most beam
-            re_xr = rs_x + sray*np.cos(sright)
-            re_yr = rs_y + sray*np.sin(sright)
-            # ir_rays
-            sx.append([rs_x, re_xl, re_x, re_xr, rs_x])
-            sy.append([rs_y, re_yl, re_y, re_yr, rs_y])
+        for robot_i in range(n_robots):
+            for ir_sensor in sensors_data[i][robot_i]:
+                # data for each sensor for each robot
+                spos, so, sray, sleft, sright = ir_sensor
+                rs_x, rs_y = spos
+                # center ray of beam
+                re_x = rs_x + sray*np.cos(so)
+                re_y = rs_y + sray*np.sin(so)
+                # left most ray from left most beam
+                re_xl = rs_x + sray*np.cos(sleft)
+                re_yl = rs_y + sray*np.sin(sleft)
+                # right most ray from right most beam
+                re_xr = rs_x + sray*np.cos(sright)
+                re_yr = rs_y + sray*np.sin(sright)
+                # ir_rays
+                sx.append([rs_x, re_xl, re_x, re_xr, rs_x])
+                sy.append([rs_y, re_yl, re_y, re_yr, rs_y])
         # plot ir_rays
         for enum, ray in enumerate(rays):
             ray.set_data(sx[enum], sy[enum])
 
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         return (past_locations,)+tuple(robots)+tuple(rays)
 
     anim = animation.FuncAnimation(fig, animate,
