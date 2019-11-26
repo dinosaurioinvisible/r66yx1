@@ -26,7 +26,7 @@ class RNN:
         # states (s0 is for looking back at t=1)
         s0 = np.zeros((len(self.x), self.hidden_dims))
         self.states = [s0]
-        self.decide()
+        # self.decide()
 
     def apply_deltas(self):
         # update
