@@ -15,7 +15,13 @@ import matplotlib.animation as animation
 # innner wall could rotate clockwise
 # ir input should see obstacles and food (classify)?
 # connect ir values to motor behaviour
+# toto > 1. reactive rules > 2. landmarks > 3. distributed map of environment
+# fixation of reacting rules as patterns (habits)
 # ir input -> net -> output motor
+# subsumption: avoid > wander > explore
+# avoid robot-robot collisions
+# anticipate collisions
+# food sensor (olfatory type)
 
 
 def runsim(t=100, n_robots=10):

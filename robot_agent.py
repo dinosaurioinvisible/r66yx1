@@ -7,7 +7,8 @@ class Robot:
     def __init__(self, energy=100\
     , pos="random", orientation=0\
     , radius=world.xmax/100, wheel_sep=2, motor_noise=0\
-    , n_irs=2, ray_length=5, n_rays=5, ray_spread=45, ir_noise=0):
+    , n_irs=2, ray_length=5, n_rays=5, ray_spread=45, ir_noise=0\
+    , fs_range=10, fs_noise=0):
         # energy
         self.energy = energy
         # urgency parameter between 0 and 1
@@ -26,16 +27,21 @@ class Robot:
         self.lw_speed = 5
         self.rw_speed = 5
         self.motor_noise = motor_noise  # direct np.random.random() for now
-        # sensors
-        self.reading = None
+        # ir sensors
+        self.ir_reading = None
         self.n_irs = n_irs
         self.ray_length = ray_length
         self.n_rays = n_rays
         self.ray_spread = np.radians(ray_spread)
         self.ir_noise = ir_noise        # direct np.random.random() for now
         self.irs = []
-        self.sensors = []
+        self.ir_sensors = []
         self.allocate_irs()
+        # food sensor
+        self.fs_reading = None
+        self.fs_range = fs_range
+        self.fs_noise = fs_noise
+        self.trees_locs = [tree for tree in world.trees]
         # temporary, replacement for empirical fxs
         self.rob_speed = 1
         self.irval = 1
@@ -46,16 +52,19 @@ class Robot:
 
 
     def act(self):
-        # data: [position, orientation, sensors, ir_reading, notes]
+        # actions for each timestep
         self.ir_reading()
+        self.fs_reading()
         self.move()
         self.update_sensors()
-        self.data.append([self.position, int(np.degrees(self.orientation)), self.sensors, self.reading, self.notes])
+        # data: [position, orientation, sensors, ir_reading, fs_reading, notes]
+        self.data.append([self.position, int(np.degrees(self.orientation)), self.ir_sensors, self.ir_reading, self.fs_reading, self.notes])
         self.notes = None
 
     def update_sensors(self):
-        # update information from sensors
-        self.sensors = []
+        # update information from ir sensors
+        # ir sensors
+        self.ir_sensors = []
         for sensor in self.irs:
             sx = self.x+sensor[0][0]
             sy = self.y+sensor[0][1]
@@ -63,7 +72,9 @@ class Robot:
             ll_ray = geometry.force_angle(so+sensor[2][0])
             rr_ray = geometry.force_angle(so+sensor[2][-1])
             # [[rel_x, rel_y], rel_angle, ray_length, left_most_ray, right_most_ray]
-            self.sensors.append([[sx,sy], so, self.ray_length, ll_ray, rr_ray])
+            self.ir_sensors.append([[sx,sy], so, self.ray_length, ll_ray, rr_ray])
+        # food sensor
+        # TODO
 
     def move(self):
         #print("move")
@@ -212,6 +223,11 @@ class Robot:
         # k = -1*(d/8.5)*(d/8.5)
         return dist
 
+    def fs_reading(self):
+        # search within sensing area
+        self.fs_reading = [ti for ti in self.trees_loc if np.linalg.norm(ti-self.position)<=self.fs_range]
+
+
     def ir_reading(self):
         #print("ir_reading")
         for ir_sensor in self.irs:
@@ -234,7 +250,7 @@ class Robot:
             # py = sens_y
             if self.ray_hit(ir_pos, ir_angle, sp_left) == False and self.ray_hit(ir_pos, ir_angle, sp_right) == False:
                 # beam misses everything
-                self.reading = None
+                self.ir_reading = None
                 return 0
             else:
                 # check right and left rays
@@ -265,7 +281,7 @@ class Robot:
                     val += self.ir_noise
                     # it can only be positive
                     val == 0 if val < 0 else val
-                self.reading = int(val)
+                self.ir_reading = int(val)
                 return int(val)
 
 
