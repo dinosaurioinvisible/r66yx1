@@ -2,13 +2,14 @@
 import numpy as np
 import geometry
 import world
+import rnn
 
 class Robot:
     def __init__(self, energy=100\
     , pos="random", orientation=0\
     , radius=world.xmax/100, wheel_sep=2, motor_noise=0\
-    , n_irs=2, ray_length=5, n_rays=5, ray_spread=45, ir_noise=0\
-    , fs_range=10, fs_noise=0):
+    , n_irs=2, ray_length=20, n_rays=5, ray_spread=60, ir_noise=0\
+    , fs_range=20, fs_noise=0):
         # energy
         self.energy = energy
         # urgency parameter between 0 and 1
@@ -42,9 +43,14 @@ class Robot:
         self.fs_range = fs_range
         self.fs_noise = fs_noise
         self.trees_locs = [tree for tree in world.trees]
+        # rnn
+        # self.rnn = rnn.RNN()
+        # import pdb; pdb.set_trace()
         # temporary, replacement for empirical fxs
         self.rob_speed = 1
         self.irval = 1
+        # save parameters to return
+        self.parameters = [self.radius, self.ray_length, self.fs_range]
         # act
         self.data = []
         self.notes = None
@@ -53,17 +59,18 @@ class Robot:
 
     def act(self):
         # actions for each timestep
-        self.ir_reading()
-        self.fs_reading()
+        self.read_ir()
+        self.read_fs()
         self.move()
         self.update_sensors()
-        # data: [position, orientation, sensors, ir_reading, fs_reading, notes]
-        self.data.append([self.position, int(np.degrees(self.orientation)), self.ir_sensors, self.ir_reading, self.fs_reading, self.notes])
+        # join ir_sensors and ir_readings data
+        ir_data = [a+[b] for a,b in zip(self.ir_sensors, self.ir_reading)]
+        # data: [position, orientation, ir_sensors, ir_reading, fs_reading, notes]
+        self.data.append([self.position, int(np.degrees(self.orientation)), ir_data, self.fs_reading, self.notes])
         self.notes = None
 
     def update_sensors(self):
         # update information from ir sensors
-        # ir sensors
         self.ir_sensors = []
         for sensor in self.irs:
             sx = self.x+sensor[0][0]
@@ -71,13 +78,10 @@ class Robot:
             so = geometry.force_angle(self.orientation+sensor[1])
             ll_ray = geometry.force_angle(so+sensor[2][0])
             rr_ray = geometry.force_angle(so+sensor[2][-1])
-            # [[rel_x, rel_y], rel_angle, ray_length, left_most_ray, right_most_ray]
-            self.ir_sensors.append([[sx,sy], so, self.ray_length, ll_ray, rr_ray])
-        # food sensor
-        # TODO
+            # [[rel_x, rel_y], rel_angle, left_most_ray, right_most_ray]
+            self.ir_sensors.append([[sx,sy], np.degrees(so), np.degrees(ll_ray), np.degrees(rr_ray)])
 
     def move(self):
-        #print("move")
         # new x,y and orientation
         l_speed, r_speed = self.robot_speed()
         vel = (l_speed+r_speed)/2
@@ -101,11 +105,11 @@ class Robot:
         # force angle between 0 and 2pi
         self.orientation = geometry.force_angle(self.orientation)
         # what to do after collisions?
-        if self.collision() == True:
+        if self.wall_collision() == True:
             #print("collided...")
             self.notes = "collision"
             self.energy -= 10
-            self.orientation = geometry.force_angle(self.orientation-np.degrees(np.random.randint(90, 270)))
+            self.orientation = geometry.force_angle(self.orientation-np.radians(np.random.randint(90, 270)))
         # update sensors parameters
         # irs[i]: [ir_rel_pos, ir_rel_angles[n], ir_rel_rays]
         for i in range(len(self.irs)):
@@ -123,9 +127,13 @@ class Robot:
         l_speed += np.random.randn()    #self.motor_noise     #np.random.randn()
         r_speed += np.random.randn()    #self.motor_noise     #np.random.randn()
         # print("{}, {}".format(l_speed, r_speed))
+
+        #import pdb; pdb.set_trace()
+        # net
+
         return l_speed, r_speed
 
-    def collision(self):
+    def wall_collision(self):
         # collision with world walls
         for wall in world.walls:
             # wall: line segment [a,b]
@@ -136,12 +144,13 @@ class Robot:
                 #print("wall, A: {} to B: {}".format(a,b))
                 return True
 
-    # define relative angles and positions from mid top
     def allocate_irs(self):
-        #print("allocate")
         # sensor only on the top half of the body uniformily distributed
-        angle_sep = 180/(self.n_irs+1)
-        ir_rel_angles = [geometry.force_angle(np.radians(-90+angle_sep*i)) for i in range(1,self.n_irs+1)]
+        if self.n_irs == 2:
+            ir_rel_angles = [np.radians(315), np.radians(45)]
+        else:
+            angle_sep = 180/(self.n_irs+1)
+            ir_rel_angles = [geometry.force_angle(np.radians(-90+angle_sep*i)) for i in range(1,self.n_irs+1)]
         for n in range(self.n_irs):
             # relative position for each sensor
             ir_rel_x = self.radius*np.cos(ir_rel_angles[n])
@@ -160,8 +169,8 @@ class Robot:
         # angle2: angle of ray relative to sensor mid
             # anticlockwise is negative
         ray_angle = geometry.force_angle(angle + rel_angle)
-        ray_x = self.ray_length*np.cos(ray_angle)
-        ray_y = self.ray_length*np.sin(ray_angle)
+        ray_x = ir_x + self.ray_length*np.cos(ray_angle)
+        ray_y = ir_y + self.ray_length*np.sin(ray_angle)
         ray_end = np.array([ray_x, ray_y])
         return ray_end
 
@@ -223,13 +232,14 @@ class Robot:
         # k = -1*(d/8.5)*(d/8.5)
         return dist
 
-    def fs_reading(self):
-        # search within sensing area
-        self.fs_reading = [ti for ti in self.trees_loc if np.linalg.norm(ti-self.position)<=self.fs_range]
+    def read_fs(self):
+        # search trees within sensing area
+        self.fs_reading = [ti for ti in self.trees_locs if np.linalg.norm(ti-self.position)<=self.fs_range]
+        self.fs_reading = None if len(self.fs_reading) == 0 else self.fs_reading
 
-
-    def ir_reading(self):
+    def read_ir(self):
         #print("ir_reading")
+        self.ir_reading = []
         for ir_sensor in self.irs:
             rel_pos = ir_sensor[0]
             rel_angle = ir_sensor[1]
@@ -250,8 +260,7 @@ class Robot:
             # py = sens_y
             if self.ray_hit(ir_pos, ir_angle, sp_left) == False and self.ray_hit(ir_pos, ir_angle, sp_right) == False:
                 # beam misses everything
-                self.ir_reading = None
-                return 0
+                self.ir_reading.append(None)
             else:
                 # check right and left rays
                 left_ray_end = self.ray_end(ir_x, ir_y, ir_angle, sp_left)
@@ -279,10 +288,12 @@ class Robot:
                     # proportional to n rays that hit (proportion of the beam)
                     val = n_hits/self.n_rays*self.irval
                     val += self.ir_noise
-                    # it can only be positive
-                    val == 0 if val < 0 else val
-                self.ir_reading = int(val)
-                return int(val)
+                # it can only be positive
+                val == 0 if val < 0 else val
+                self.ir_reading.append(int(val))
+                self.notes = "detection"
+
+
 
 
 
