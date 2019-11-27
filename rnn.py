@@ -26,6 +26,7 @@ class RNN:
         # states (s0 is for looking back at t=1)
         s0 = np.zeros((len(self.x), self.hidden_dims))
         self.states = [s0]
+        self.outputs = []
         # self.decide()
 
     def apply_deltas(self):
@@ -61,7 +62,9 @@ class RNN:
         net_out = np.dot(self.W, st)
         # y(t) = g(net_out(t))
         y = self.softmax(net_out)
-        return y
+        # save
+        self.outputs.append(y)
+        #return y
 
 xin = np.random.rand(2)
 RNN(xin)
