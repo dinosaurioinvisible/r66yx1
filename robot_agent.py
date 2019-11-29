@@ -7,34 +7,34 @@ import rnn
 class Robot:
     def __init__(self, energy=100\
     , pos="random", orientation=0\
-    , radius=world.xmax/100, wheel_sep=2, motor_noise=0\
-    , n_irs=2, ray_length=20, n_rays=5, ray_spread=60, ir_noise=0\
-    , fs_range=20, fs_noise=0):
+    , radius=world.xmax/100, speed=5\
+    , n_irs=2, ray_length=20, n_rays=5, ray_spread=50\
+    , fs_range=25, fs_noise=0):
         # energy
         self.energy = energy
-        # urgency parameter between 0 and 1
-        self.urgency = 0
-        # movement
+        # x, y
         if pos=="center":
             self.x = world.xmax/2
             self.y = world.ymax/2
-        else:
+        elif pos=="random":
             self.x = np.random.randint(world.xmax)
             self.y = np.random.randint(world.ymax)
+        else:
+            self.x = float(input("x: "))
+            self.y = float(input("y: "))
+        # movement
         self.position = np.array([self.x, self.y])
         self.orientation = orientation
         self.radius = radius
-        self.wheel_sep = wheel_sep
-        self.lw_speed = 5
-        self.rw_speed = 5
-        self.motor_noise = motor_noise  # direct np.random.random() for now
+        self.speed = speed
+        self.wheel_sep = radius
         # ir sensors
-        self.ir_reading = None
         self.n_irs = n_irs
+        self.ir_reading = [None]*self.n_irs
         self.ray_length = ray_length
         self.n_rays = n_rays
         self.ray_spread = np.radians(ray_spread)
-        self.ir_noise = ir_noise        # direct np.random.random() for now
+        self.ir_noise = 50
         self.irs = []
         self.ir_sensors = []
         self.allocate_irs()
@@ -43,15 +43,11 @@ class Robot:
         self.fs_range = fs_range
         self.fs_noise = fs_noise
         self.trees_locs = [tree for tree in world.trees]
+        self.tree_r = world.tree_radius
         # rnn
-        # self.rnn = rnn.RNN()
-        # import pdb; pdb.set_trace()
-        # temporary, replacement for empirical fxs
-        self.rob_speed = 1
-        self.irval = 1
-        # save parameters to return
+        self.robot_net = rnn.RNN()
+        # act (save parameters to return)
         self.parameters = [self.radius, self.ray_length, self.fs_range]
-        # act
         self.data = []
         self.notes = None
         self.act()
@@ -66,7 +62,10 @@ class Robot:
         # join ir_sensors and ir_readings data
         ir_data = [a+[b] for a,b in zip(self.ir_sensors, self.ir_reading)]
         # data: [position, orientation, ir_sensors, ir_reading, fs_reading, notes]
-        self.data.append([self.position, int(np.degrees(self.orientation)), ir_data, self.fs_reading, self.notes])
+        try:
+            self.data.append([self.position, int(np.degrees(self.orientation)), ir_data, self.fs_reading, self.notes])
+        except:
+            import pdb; pdb.set_trace()
         self.notes = None
 
     def update_sensors(self):
@@ -83,33 +82,52 @@ class Robot:
 
     def move(self):
         # new x,y and orientation
-        l_speed, r_speed = self.robot_speed()
-        vel = (l_speed+r_speed)/2
+        ls, rs = self.robot_speed()
+        vel = (ls + rs)/2
         dx = vel*np.cos(self.orientation)
         dy = vel*np.sin(self.orientation)
-        do = (l_speed - r_speed)/self.wheel_sep
-        # keep x and y within limits
+        do = np.radians((ls - rs)/self.wheel_sep)
+        # update, but keep x and y within limits
         self.x += dx
         if self.x > world.xmax:
-            self.x = world.xmax - self.radius
+            self.x = world.xmax - self.radius*2
         if self.x < 0:
-            self.x = self.radius
+            self.x = self.radius*2
         self.y += dy
         if self.y > world.ymax:
-            self.y = world.ymax - self.radius
+            self.y = world.ymax - self.radius*2
         if self.y < 0:
-            self.y = self.radius
+            self.y = self.radius*2
+        # bounce with trees
+        for tree_loc in self.trees_locs:
+            if np.linalg.norm(tree_loc-self.position) < (self.radius+self.tree_r):
+                self.notes = "TREE"
+                self.x -= dx
+                self.y -= dy
+                # do = np.pi
+        # bounce with other robots
+        # create input for self.robots_locs
+        # for each robot do the same that trees
         # update
         self.position = np.array([self.x, self.y])
         self.orientation += do
-        # force angle between 0 and 2pi
         self.orientation = geometry.force_angle(self.orientation)
+
+        ## print
+        # print("\n")
+        # print("ir:{} - fs:{}".format(self.ir_reading, self.fs_reading))
+        # print("lw:{}, rw:{} -> vel:{}".format(round(ls,2), round(rs,2), round(vel,2)))
+        # print("dx:{}, dy:{} - do:{}".format(round(dx,2), round(dy,2), int(np.degrees(do))))
+        # print("x:{}, y:{} - or:{}".format(round(self.x,2), round(self.y,2), int(np.degrees(self.orientation))))
+        # import pdb; pdb.set_trace()
+
         # what to do after collisions?
         if self.wall_collision() == True:
             #print("collided...")
             self.notes = "collision"
             self.energy -= 10
-            self.orientation = geometry.force_angle(self.orientation-np.radians(np.random.randint(90, 270)))
+            # face opposite direction
+            self.orientation = geometry.force_angle(self.orientation+np.pi)
         # update sensors parameters
         # irs[i]: [ir_rel_pos, ir_rel_angles[n], ir_rel_rays]
         for i in range(len(self.irs)):
@@ -118,20 +136,18 @@ class Robot:
             self.irs[i][0] = [rel_x, rel_y]
 
     def robot_speed(self):
-        # there is no translation from voltage in this case
-        # speed = speed % ? % urgency % noise
-        # ? = something to get different speeds for lw and rw
-        l_speed = self.lw_speed * self.rob_speed + self.lw_speed*self.urgency
-        r_speed = self.rw_speed * self.rob_speed + self.rw_speed*self.urgency
-        # add random noise from a normal distribution
-        l_speed += np.random.randn()    #self.motor_noise     #np.random.randn()
-        r_speed += np.random.randn()    #self.motor_noise     #np.random.randn()
-        # print("{}, {}".format(l_speed, r_speed))
-
-        #import pdb; pdb.set_trace()
-        # net
-
-        return l_speed, r_speed
+        # speed = net output % urgency % noise
+        # input for each timestep
+        nin = [ir for ir in self.ir_reading] + [self.fs_reading]
+        nin = [0 if i==None else i for i in nin]
+        lw, rw = self.robot_net.decide(nin)
+        # multiply for max speed and add noise
+        lw = lw*self.speed + np.random.randn()*0.4
+        rw = rw*self.speed + np.random.randn()*0.4
+        # add urgency
+        # lw *= self.urgency
+        # rw *= self.urgency
+        return lw, rw
 
     def wall_collision(self):
         # collision with world walls
@@ -214,31 +230,41 @@ class Robot:
 
     def full_ir_val(self, ir_pos, ir_angle, w):
         # reading for a full beam from sensor at [x,y]
-        # with mid ray angle (a)
-        # center ray end (no spread)
-        # w: wall index
+        # center ray end (no spread), w: wall index
         ray_end_mid = self.ray_end(ir_pos[0], ir_pos[1], ir_angle, 0)
-        # intersection point mid ray to wall along ray
-        #try:
+        # find intersection point from mid ray to wall along ray
         ix = geometry.intersection_point(ir_pos, ray_end_mid, world.walls[w][0], world.walls[w][1])
-        #except:
-            #import pdb; pdb.set_trace()
         # distance from sensor to the intersection point
         dist = np.linalg.norm(ir_pos-ix)
-        # IRval
-        # IR reading for a given distance
-        # from empirical fitting data
+        # convert to val
+        val = self.ir_val(dist)
+        return val
+
+    def ir_val(self, dist):
+        # IR reading for a given distance from empirical fitting data
         # gaussian 3371*e^(-(d/8.5)^2) fits well
-        # k = -1*(d/8.5)*(d/8.5)
-        return dist
+        k = -1*(dist/8.5)*(dist/8.5)
+        ir_coeff = 1
+        val = ir_coeff * 3371 * np.exp(k)
+        # from 0 to 3500, far to near
+        return val
 
     def read_fs(self):
-        # search trees within sensing area
-        self.fs_reading = [ti for ti in self.trees_locs if np.linalg.norm(ti-self.position)<=self.fs_range]
-        self.fs_reading = None if len(self.fs_reading) == 0 else self.fs_reading
+        # search trees within sensing area in polar coordinates
+        fs = [np.linalg.norm(ti-self.position) for ti in self.trees_locs if np.linalg.norm(ti-self.position)<=self.fs_range]
+        # sort by distance
+        if len(fs) == 0:
+            self.fs_reading = None
+        else:
+            # min_d = sorted(reading, key=lambda i:i[0])[0]
+            # convert to value (for now)
+            self.fs_reading = self.fs_range/1+sum(fs)
 
     def read_ir(self):
-        #print("ir_reading")
+        # basically 3 options for left & right most rays of beam:
+        # a) don't sense anything: None
+        # b) sense the same wall: full_ir_val()
+        # c) sense different things: for all rays: hits/n_rays * irval(av_dist)
         self.ir_reading = []
         for ir_sensor in self.irs:
             rel_pos = ir_sensor[0]
@@ -286,8 +312,10 @@ class Robot:
                     # average value of min distance
                     av_dist /= n_hits
                     # proportional to n rays that hit (proportion of the beam)
-                    val = n_hits/self.n_rays*self.irval
-                    val += self.ir_noise
+                    val = (n_hits/self.n_rays)*self.ir_val(av_dist)
+                    # ir noise: random gaussian loc=0, sigma=1 * ir_noise
+                    ir_noise = np.random.normal()*self.ir_noise
+                    val += ir_noise
                 # it can only be positive
                 val == 0 if val < 0 else val
                 self.ir_reading.append(int(val))
