@@ -7,22 +7,24 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 #TODO
-# after collisions
+# urgency could also modify the shape of the food sensor, but for an energy cost
+# printable urgency and energy
 # urgency fx, to define speed
 # parameter/variable to differentiate lw and rw speed
 # parameter/variable to alter irval
 # compute for all ray_spread values (5 in the original)
 # innner wall could rotate clockwise
 # ir input should see obstacles and food (classify)?
+# the input from sensors should concider current position?
 # anticipate collisions -> RNN
 # connect ir values to motor behaviour
 # toto > 1. reactive rules > 2. landmarks > 3. distributed map of environment
 # fixation of reacting rules as patterns (habits)
 # ir input -> net -> output motor
 # subsumption: avoid > wander > explore
-# avoid robot-robot collisions
+# avoid robot-robot collisions > just put data
 
-def runsim(t=100, n_robots=1):
+def runsim(t=100, n_robots=1, print_data=False):
     tx = 0
     simrobots = [robot_agent.Robot() for n in range(n_robots)]
     while tx < t:
@@ -31,9 +33,15 @@ def runsim(t=100, n_robots=1):
         tx += 1
     data = [simrobot.data for simrobot in simrobots]
     parameters = simrobot.parameters
+    if print_data==True:
+        print("\ndata:")
+        for dataline in range(len(simdata[0])):
+            print("\nt={}".format(dataline))
+            for simrobot in simdata:
+                print(simrobot[dataline])
     return data, parameters
 
-def runsim_plot(data, parameters, past=False, start=False):
+def runsim_plot(data, parameters, past=True, start=True):
     # definitions
     fig = plt.figure()
     ax = plt.axes(xlim=(0,world.xmax), ylim=(0,world.ymax), aspect="equal")
@@ -41,17 +49,19 @@ def runsim_plot(data, parameters, past=False, start=False):
     robot_radius = parameters[0]
     ir_range = parameters[1]
     fs_range = parameters[2]
-    # organize data
+    # organize data by timestep > robot > specific data
     simlocations = []
     orientations = []
     ir_data = []
     fs_vals = []
+    notes = []
     for t in range(len(data[0])):
         simlocations.append([simrobot[t][0] for simrobot in data])
         orientations.append([simrobot[t][1] for simrobot in data])
         ir_data.append([simrobot[t][2] for simrobot in data])
         fs_vals.append([simrobot[t][3] for simrobot in data])
-    # plot basics for robots
+        notes.append([simrobot[t][4] for simrobot in data])
+    # plot basics for robots and food sensors
     robots = []
     robot = plt.Circle(0,0)
     fsensors = []
@@ -81,8 +91,11 @@ def runsim_plot(data, parameters, past=False, start=False):
         for wall in world.walls[4:]:
             ax.plot([wall[0][0],wall[1][0]], [wall[0][1],wall[1][1]], color="black")
         # trees
-        trees_x, trees_y = zip(*world.trees)
-        ax.scatter(trees_x,trees_y, color="green")
+        # trees_x, trees_y = zip(*world.trees)
+        # ax.scatter(trees_x,trees_y, color="green")
+        for tree_loc in world.trees:
+            tree = plt.Circle((tree_loc[0],tree_loc[1]), radius=world.tree_radius, color="green", fill=True)
+            ax.add_patch(tree)
         # starting point
         if start == True and n_robots == 1:
             xi = [robot_loc[0] for robot_loc in simlocations[0]]
@@ -103,6 +116,8 @@ def runsim_plot(data, parameters, past=False, start=False):
         # allocate robot
         for enum, robot in enumerate(robots):
             robot.center = (x[enum], y[enum])
+            if notes[i][enum] == "collision":
+                robot.set_color("red")
         # current food sensors locations
         for enum, fsensor in enumerate(fsensors):
             fsensor.center = (x[enum], y[enum])
@@ -165,11 +180,6 @@ def runsim_plot(data, parameters, past=False, start=False):
 
 # run
 simdata, simparams = runsim()
-print("\ndata:")
-for dataline in range(len(simdata[0])):
-    print("\nt={}".format(dataline))
-    for simrobot in simdata:
-        print(simrobot[dataline])
 runsim_plot(simdata, simparams)
 
 

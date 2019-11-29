@@ -6,8 +6,8 @@ xmax = 250
 ymax = 250
 n_walls = 6
 walls_loc = "random"
-n_trees = 3
-#tree_size = 10
+n_trees = 20
+tree_radius = 2.5
 energy= 1000
 
 def allocate(xmax, ymax, n_walls, walls_loc, n_trees, energy):
