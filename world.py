@@ -4,11 +4,11 @@ import numpy as np
 # variables
 xmax = 250
 ymax = 250
-n_walls = 6
+n_walls = 4
 walls_loc = "random"
-n_trees = 20
+n_trees = 4
 tree_radius = 2.5
-energy= 1000
+energy = 1000
 
 def allocate(xmax, ymax, n_walls, walls_loc, n_trees, energy):
     walls = []
@@ -26,7 +26,7 @@ def allocate(xmax, ymax, n_walls, walls_loc, n_trees, energy):
             bx = np.random.randint(10,90)
             by = np.random.randint(10,90)
             walls.append([[ax,ay],[bx,by]])
-    elif walls_loc>4 and walls_loc != "random":
+    elif n_walls>4 and walls_loc != "random":
         for n in range(n_walls-4):
             ax = input("ax for wall {}: ".format(n+4))
             ay = input("ay for wall {}: ".format(n+4))
