@@ -2,14 +2,15 @@
 import numpy as np
 import geometry
 import world
-import rnn
+import evol_net
 
 class Robot:
     def __init__(self, energy=100\
     , pos="random", orientation=0\
-    , radius=world.xmax/100, speed=5\
-    , n_irs=2, ray_length=20, n_rays=5, ray_spread=50\
-    , fs_range=25, fs_noise=0):
+    , radius=world.xmax/100, speed=world.xmax/100\
+    , n_irs=2, ray_angle=60, ray_length=20, n_rays=5, ray_spread=50\
+    , fs_angle=180, fs_range=25, fs_noise=0):
+    # , n_hidden=5, ut=0.5, lt=0.1, learning=0.4):
         # energy
         self.energy = energy
         # x, y
@@ -40,17 +41,19 @@ class Robot:
         self.allocate_irs()
         # food sensor
         self.fs_reading = None
+        self.fs_angle = fs_angle
         self.fs_range = fs_range
         self.fs_noise = fs_noise
         self.trees_locs = [tree for tree in world.trees]
         self.tree_r = world.tree_radius
         # rnn
-        self.robot_net = rnn.RNN()
+        # self.net = evol_net.RNN()
+        self.net = []
         # act (save parameters to return)
-        self.parameters = [self.radius, self.ray_length, self.fs_range]
+        self.parameters = [self.radius, self.ray_length, self.fs_angle, self.fs_range]
         self.data = []
         self.notes = None
-        self.act()
+        # self.act()
 
 
     def act(self):
@@ -61,11 +64,9 @@ class Robot:
         self.update_sensors()
         # join ir_sensors and ir_readings data
         ir_data = [a+[b] for a,b in zip(self.ir_sensors, self.ir_reading)]
-        # data: [position, orientation, ir_sensors, ir_reading, fs_reading, notes]
-        try:
-            self.data.append([self.position, int(np.degrees(self.orientation)), ir_data, self.fs_reading, self.notes])
-        except:
-            import pdb; pdb.set_trace()
+        # data: [position, orientation, ir_data, fs_reading, notes, energy]
+        self.energy -= 1
+        self.data.append([self.position, int(np.degrees(self.orientation)), ir_data, self.fs_reading, self.notes, self.energy])
         self.notes = None
 
     def update_sensors(self):
@@ -98,12 +99,13 @@ class Robot:
             self.y = world.ymax - self.radius*2
         if self.y < 0:
             self.y = self.radius*2
-        # bounce with trees
+        # reset location if find trees
         for tree_loc in self.trees_locs:
             if np.linalg.norm(tree_loc-self.position) < (self.radius+self.tree_r):
-                self.notes = "TREE"
-                self.x -= dx
-                self.y -= dy
+                self.notes = "tree"
+                self.x = np.random.randint(world.xmax)
+                self.y = np.random.randint(world.ymax)
+                self.energy += 5
                 # do = np.pi
         # bounce with other robots
         # create input for self.robots_locs
@@ -112,14 +114,6 @@ class Robot:
         self.position = np.array([self.x, self.y])
         self.orientation += do
         self.orientation = geometry.force_angle(self.orientation)
-
-        ## print
-        # print("\n")
-        # print("ir:{} - fs:{}".format(self.ir_reading, self.fs_reading))
-        # print("lw:{}, rw:{} -> vel:{}".format(round(ls,2), round(rs,2), round(vel,2)))
-        # print("dx:{}, dy:{} - do:{}".format(round(dx,2), round(dy,2), int(np.degrees(do))))
-        # print("x:{}, y:{} - or:{}".format(round(self.x,2), round(self.y,2), int(np.degrees(self.orientation))))
-        # import pdb; pdb.set_trace()
 
         # what to do after collisions?
         if self.wall_collision() == True:
@@ -140,10 +134,10 @@ class Robot:
         # input for each timestep
         nin = [ir for ir in self.ir_reading] + [self.fs_reading]
         nin = [0 if i==None else i for i in nin]
-        lw, rw = self.robot_net.decide(nin)
+        lw, rw = self.net.next(nin)
         # multiply for max speed and add noise
-        lw = lw*self.speed + np.random.randn()*0.4
-        rw = rw*self.speed + np.random.randn()*0.4
+        lw = lw *self.speed #+ np.random.randn()*0.4
+        rw = rw *self.speed #+ np.random.randn()*0.4
         # add urgency
         # lw *= self.urgency
         # rw *= self.urgency
@@ -250,15 +244,44 @@ class Robot:
         return val
 
     def read_fs(self):
-        # search trees within sensing area in polar coordinates
-        fs = [np.linalg.norm(ti-self.position) for ti in self.trees_locs if np.linalg.norm(ti-self.position)<=self.fs_range]
-        # sort by distance
-        if len(fs) == 0:
+        # search trees within sensing area in polar coordinates [dist, angle]
+        # arctan2(y,x)
+        fs_reading = [[np.linalg.norm(ti-self.position), np.arctan2(ti[1],ti[0]), ti] for ti in self.trees_locs if np.linalg.norm(ti-self.position)<=self.fs_range]
+        if len(fs_reading) == 0:
             self.fs_reading = None
         else:
-            # min_d = sorted(reading, key=lambda i:i[0])[0]
-            # convert to value (for now)
-            self.fs_reading = self.fs_range/1+sum(fs)
+            fs = sorted(fs_reading, key=lambda i:i[0])
+            fs_dist = fs[0][0]
+            self.fs_reading = self.fs_range/(1+fs_dist)
+
+        # for angle instead of full circle
+        # else:
+        #     # sort by distance
+        #     fs = sorted(fs_reading, key=lambda i:i[0])
+        #     # compute the sensing arc
+        #     arc_start = geometry.force_angle(self.orientation-np.radians(self.fs_angle/2))
+        #     arc_end = geometry.force_angle(self.orientation+np.radians(self.fs_angle/2))
+        #     for i in fs:
+        #         fs_dist = i[0]
+        #         fs_angle = i[1]
+        #         # rel angle
+        #         fs_angle = self.orientation-fs_angle
+        #         fs_pos = i[2]
+        #         # because arctan2 only give results between 0 and pi/2
+        #         if fs_pos[0]<self.x:
+        #             fs_angle = geometry.force_angle(fs_angle+np.pi/2)
+        #         if fs_pos[1]<self.y:
+        #             fs_angle = geometry.force_angle(fs_angle+np.pi/2)
+        #         # check if within range
+        #         if fs_angle>arc_start or fs_angle<arc_end:
+        #             # convert to value and save (for now)
+        #             # self.fs_reading = self.fs_range/(1+fs_dist)
+        #             print("\nESTE ES")
+        #             print(fs_pos)
+        #             self.fs_reading = fs_angle
+        #             break
+        #         else:
+        #             self.fs_reading = None
 
     def read_ir(self):
         # basically 3 options for left & right most rays of beam:

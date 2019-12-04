@@ -1,5 +1,6 @@
 
 import numpy as np
+import genome
 
 class RNN:
     def __init__(self\
