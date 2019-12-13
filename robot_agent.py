@@ -47,8 +47,8 @@ class Robot:
         self.trees_locs = [tree for tree in world.trees]
         self.tree_r = world.tree_radius
         # rnn
-        # self.net = evol_net.RNN()
-        self.net = []
+        self.net = evol_net.RNN()
+        # self.net = []
         # act (save parameters to return)
         self.parameters = [self.radius, self.ray_length, self.fs_angle, self.fs_range]
         self.data = []
@@ -134,10 +134,15 @@ class Robot:
         # input for each timestep
         nin = [ir for ir in self.ir_reading] + [self.fs_reading]
         nin = [0 if i==None else i for i in nin]
-        lw, rw = self.net.next(nin)
+        # wander if nothing
+        if sum(nin) == 0:
+            lw = 1
+            rw = 1
+        else:
+            lw, rw = self.net.action(nin)
         # multiply for max speed and add noise
-        lw = lw *self.speed #+ np.random.randn()*0.4
-        rw = rw *self.speed #+ np.random.randn()*0.4
+        lw = lw *self.speed #+ np.random.randn()
+        rw = rw *self.speed #+ np.random.randn()
         # add urgency
         # lw *= self.urgency
         # rw *= self.urgency
