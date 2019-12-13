@@ -44,4 +44,4 @@ def runsim(t=100, n_robots=1, print_data=False):
 
 # run
 simdata, simparams = runsim()
-# simplot.runsim_plot(simdata, simparams)
+simplot.runsim_plot(simdata, simparams)
