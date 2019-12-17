@@ -135,11 +135,12 @@ class Robot:
         nin = [ir for ir in self.ir_reading] + [self.fs_reading]
         nin = [0 if i==None else i for i in nin]
         # wander if nothing
-        if sum(nin) == 0:
-            lw = 1
-            rw = 1
-        else:
-            lw, rw = self.net.action(nin)
+        # if sum(nin) == 0:
+        #     lw = 1
+        #     rw = 1
+        # else:
+        #     lw, rw = self.net.action(nin)
+        lw, rw = self.net.action(nin)
         # multiply for max speed and add noise
         lw = lw *self.speed #+ np.random.randn()
         rw = rw *self.speed #+ np.random.randn()
@@ -245,19 +246,21 @@ class Robot:
         k = -1*(dist/8.5)*(dist/8.5)
         ir_coeff = 1
         val = ir_coeff * 3371 * np.exp(k)
-        # from 0 to 3500, far to near
+        # from 0 to 3500 far to near orginally. here normalized 0 to 1
+        val /= 3500
         return val
 
     def read_fs(self):
         # search trees within sensing area in polar coordinates [dist, angle]
         # arctan2(y,x)
-        fs_reading = [[np.linalg.norm(ti-self.position), np.arctan2(ti[1],ti[0]), ti] for ti in self.trees_locs if np.linalg.norm(ti-self.position)<=self.fs_range]
+        fs_reading = [[np.linalg.norm(tree_loc-self.position), np.arctan2(tree_loc[1],tree_loc[0]), tree_loc] for tree_loc in self.trees_locs if np.linalg.norm(tree_loc-self.position)<=self.fs_range]
         if len(fs_reading) == 0:
             self.fs_reading = None
         else:
             fs = sorted(fs_reading, key=lambda i:i[0])
             fs_dist = fs[0][0]
-            self.fs_reading = self.fs_range/(1+fs_dist)
+            # from 0 to 1, normalized
+            self.fs_reading = (1/np.exp(fs_dist/self.fs_range))
 
         # for angle instead of full circle
         # else:
@@ -345,7 +348,7 @@ class Robot:
                     ir_noise = np.random.normal()*self.ir_noise
                     val += ir_noise
                 # it can only be positive
-                val == 0 if val < 0 else val
+                val = 0 if val < 0 else val
                 self.ir_reading.append(int(val))
                 self.notes = "detection"
 
