@@ -6,7 +6,7 @@ import evol_net
 
 class Robot:
     def __init__(self, energy=100\
-    , pos="random", orientation=0\
+    , pos="center", orientation=0\
     , radius=world.xmax/100, speed=world.xmax/100\
     , n_irs=2, ray_angle=60, ray_length=20, n_rays=5, ray_spread=50\
     , fs_angle=180, fs_range=25, fs_noise=0):
@@ -51,9 +51,9 @@ class Robot:
         # self.net = []
         # act (save parameters to return)
         self.parameters = [self.radius, self.ray_length, self.fs_angle, self.fs_range]
+        self.genotype = [self.net.ut, self.net.lt, self.net.vt, self.net.weights, self.radius, self.ray_length, self.fs_angle, self.fs_range]
         self.data = []
         self.notes = None
-        # self.act()
 
 
     def act(self):
@@ -99,17 +99,6 @@ class Robot:
             self.y = world.ymax - self.radius*2
         if self.y < 0:
             self.y = self.radius*2
-        # reset location if find trees
-        for tree_loc in self.trees_locs:
-            if np.linalg.norm(tree_loc-self.position) < (self.radius+self.tree_r):
-                self.notes = "tree"
-                self.x = np.random.randint(world.xmax)
-                self.y = np.random.randint(world.ymax)
-                self.energy += 5
-                # do = np.pi
-        # bounce with other robots
-        # create input for self.robots_locs
-        # for each robot do the same that trees
         # update
         self.position = np.array([self.x, self.y])
         self.orientation += do
@@ -257,6 +246,7 @@ class Robot:
         if len(fs_reading) == 0:
             self.fs_reading = None
         else:
+            self.notes = "tree"
             fs = sorted(fs_reading, key=lambda i:i[0])
             fs_dist = fs[0][0]
             # from 0 to 1, normalized
