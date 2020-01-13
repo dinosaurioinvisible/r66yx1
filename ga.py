@@ -32,7 +32,7 @@ def ga(generations=100, population=100, t=100, m_rate=0.1):
         best_parameters = parents[0][1].genotype[4:]
         best_data = parents[0][1].data
         # for t in range(len(best_data)):
-        #     print("\nt={}\n{}".format(t, best_data[t]))
+        #     print("\nt={}\n{}".format(t, best_data[t][]))
         simplot.runsim_plot([best_data], best_parameters)
         # check for break
         if len(genotypes) == generations:

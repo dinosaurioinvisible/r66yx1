@@ -7,7 +7,7 @@ import evol_net
 class Robot:
     def __init__(self, energy=100\
     , pos="center", orientation=0\
-    , radius=world.xmax/100, speed=world.xmax/100\
+    , radius=2.5, speed=5\
     , n_irs=2, ray_angle=60, ray_length=20, n_rays=5, ray_spread=50\
     , fs_angle=180, fs_range=25, fs_noise=0):
     # , n_hidden=5, ut=0.5, lt=0.1, learning=0.4):
@@ -48,13 +48,11 @@ class Robot:
         self.tree_r = world.tree_radius
         # rnn
         self.net = evol_net.RNN()
-        # self.net = []
         # act (save parameters to return)
         self.parameters = [self.radius, self.ray_length, self.fs_angle, self.fs_range]
         self.genotype = [self.net.ut, self.net.lt, self.net.vt, self.net.weights, self.radius, self.ray_length, self.fs_angle, self.fs_range]
         self.data = []
         self.notes = None
-
 
     def act(self):
         # actions for each timestep
@@ -133,9 +131,6 @@ class Robot:
         # multiply for max speed and add noise
         lw = lw *self.speed #+ np.random.randn()
         rw = rw *self.speed #+ np.random.randn()
-        # add urgency
-        # lw *= self.urgency
-        # rw *= self.urgency
         return lw, rw
 
     def wall_collision(self):

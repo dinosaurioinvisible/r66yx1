@@ -68,8 +68,8 @@ class RNN:
         m2_h = eo[0][-1]
         m1 = m1_e - m1_h
         m2 = m2_e - m2_h
-        # print("\nt={}: m1={}, m2={}".format(len(self.e_states)-1,m1,m2))
-        # import pdb; pdb.set_trace()
+        print("\nt={}: m1={}, m2={}".format(len(self.e_states)-1,m1,m2))
+        import pdb; pdb.set_trace()
         return m1, m2
 
     def sigmoid(self, z):
