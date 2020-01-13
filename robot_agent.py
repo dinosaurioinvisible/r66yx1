@@ -9,20 +9,17 @@ class Robot:
     , pos="center", orientation=0\
     , radius=2.5, speed=5\
     , n_irs=2, ray_angle=60, ray_length=20, n_rays=5, ray_spread=50\
-    , fs_angle=180, fs_range=25, fs_noise=0):
-    # , n_hidden=5, ut=0.5, lt=0.1, learning=0.4):
+    , fs_angle=180, fs_range=25, fs_noise=0\
+    , n_in=0, n_hidden=0, n_out=0, upper_t=0, lower_t=0, veto_t=0, W=None, V=None):
         # energy
         self.energy = energy
         # x, y
         if pos=="center":
             self.x = world.xmax/2
             self.y = world.ymax/2
-        elif pos=="random":
+        else:
             self.x = np.random.randint(world.xmax)
             self.y = np.random.randint(world.ymax)
-        else:
-            self.x = float(input("x: "))
-            self.y = float(input("y: "))
         # movement
         self.position = np.array([self.x, self.y])
         self.orientation = orientation
@@ -47,10 +44,9 @@ class Robot:
         self.trees_locs = [tree for tree in world.trees]
         self.tree_r = world.tree_radius
         # rnn
-        self.net = evol_net.RNN()
-        # act (save parameters to return)
-        self.parameters = [self.radius, self.ray_length, self.fs_angle, self.fs_range]
-        self.genotype = [self.net.ut, self.net.lt, self.net.vt, self.net.weights, self.radius, self.ray_length, self.fs_angle, self.fs_range]
+        self.net = evol_net.RNN(n_in, n_hidden, n_out, upper_t, lower_t, veto_t, W, V)
+        # data to return
+        self.genotype = [self.radius, self.ray_length, self.fs_angle, self.fs_range, self.net.n_input, self.net.n_hidden, self.net.n_output, self.net.ut, self.net.lt, self.net.vt, self.net.W, self.net.V]
         self.data = []
         self.notes = None
 
@@ -122,12 +118,12 @@ class Robot:
         nin = [ir for ir in self.ir_reading] + [self.fs_reading]
         nin = [0 if i==None else i for i in nin]
         # wander if nothing
-        # if sum(nin) == 0:
-        #     lw = 1
-        #     rw = 1
-        # else:
-        #     lw, rw = self.net.action(nin)
-        lw, rw = self.net.action(nin)
+        if sum(nin) == 0:
+            lw = np.random.randn()
+            rw = np.random.randn()
+        else:
+            lw, rw = self.net.action(nin)
+        # lw, rw = self.net.action(nin)
         # multiply for max speed and add noise
         lw = lw *self.speed #+ np.random.randn()
         rw = rw *self.speed #+ np.random.randn()

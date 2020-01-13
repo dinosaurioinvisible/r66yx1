@@ -4,7 +4,7 @@ import numpy as np
 
 class RNN:
     def __init__(self, n_input=3, n_hidden=2, n_output=4\
-        , upper_t=0.5, lower_t=0.1, veto_t=0.9, weights=None):
+        , upper_t=0.5, lower_t=0.1, veto_t=0.9, W=[], V=[]):
         # dimensions
         self.n_input = n_input
         self.n_hidden = n_hidden
@@ -12,7 +12,7 @@ class RNN:
         self.n_net = self.n_input+self.n_hidden+self.n_output
         # matrices for weights (features as columns)
         # no output or input matrices
-        if weights == None:
+        if len(W) == 0 or len(V) == 0:
             # connectivity matrices
             self.W = np.zeros((self.n_net, self.n_net))
             self.V = np.zeros((self.n_net, self.n_net))
@@ -20,17 +20,17 @@ class RNN:
             for i in range(self.n_input):
                 for j in range(self.n_input, self.n_input+self.n_hidden):
                     self.W[i][j] = np.random.randn()
-                    self.V[i][j] = np.random.randint(2)
+                    self.V[i][j] = 0
+                    # self.V[i][j] = np.random.randint(2)
             # random init for hidden -> motor
             for i in range(self.n_input, self.n_input+self.n_hidden):
                 for j in range(self.n_input+self.n_hidden, self.n_net):
                     self.W[i][j] = np.random.randn()
-                    self.V[i][j] = np.random.randint(2)
+                    self.V[i][j] = 0
+                    # self.V[i][j] = np.random.randint(2)
         else:
-            self.W = weights[0]
-            self.V = weights[1]
-        # list of weight matrices for GA
-        self.weights = [self.W, self.V]
+            self.W = W
+            self.V = V
         # threshold values
         self.ut = upper_t
         self.lt = lower_t
@@ -49,8 +49,10 @@ class RNN:
         ei = np.dot(ix, self.W)
         hi = np.dot(ix, self.V)
         # add past states
-        ei += self.e_states[-1]
-        hi += self.h_states[-1]
+        pe = np.dot(self.e_states[-1], self.W)
+        ph = np.dot(self.h_states[-1], self.V)
+        ei += pe
+        hi += ph
         # go through nodes
         ho = self.veto_out_fx(ei)
         ei_noise = ei + np.random.randn(1, self.n_net)
@@ -68,8 +70,8 @@ class RNN:
         m2_h = eo[0][-1]
         m1 = m1_e - m1_h
         m2 = m2_e - m2_h
-        print("\nt={}: m1={}, m2={}".format(len(self.e_states)-1,m1,m2))
-        import pdb; pdb.set_trace()
+        # print("\nt={}: m1={}, m2={}".format(len(self.e_states)-1,m1,m2))
+        #  import pdb; pdb.set_trace()
         return m1, m2
 
     def sigmoid(self, z):
