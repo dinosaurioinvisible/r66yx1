@@ -117,13 +117,7 @@ class Robot:
         # input for each timestep
         nin = [ir for ir in self.ir_reading] + [self.fs_reading]
         nin = [0 if i==None else i for i in nin]
-        # wander if nothing
-        if sum(nin) == 0:
-            lw = np.random.randn()
-            rw = np.random.randn()
-        else:
-            lw, rw = self.net.action(nin)
-        # lw, rw = self.net.action(nin)
+        lw, rw = self.net.action(nin)
         # multiply for max speed and add noise
         lw = lw *self.speed #+ np.random.randn()
         rw = rw *self.speed #+ np.random.randn()
