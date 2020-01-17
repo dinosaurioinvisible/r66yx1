@@ -4,11 +4,16 @@ from tqdm import tqdm
 import evol_net
 import robot_agent
 import simplot
+import world
 
 ## TODO:
 # clean!
 # bounce with other robots or trees
 # robot aren't moving!!
+
+trees = [tree for tree in world.trees]
+max_dist = world.xmax
+tree_r = world.tree_radius
 
 def ga(generations=100, population=100, t=100, m_rate=0.5):
     # lists to store genotypes and behaviour data
@@ -68,8 +73,7 @@ def simulate(genotypes, t):
 def select_parents(robots):
     print("\n")
     # check fitness and choose parents
-    parents = []
-    backup = []
+    px = []
     # for each robot
     for robot in robots:
         fitness = 0
@@ -77,24 +81,22 @@ def select_parents(robots):
         for t in range(len(robot.data)):
             # check for collisions
             if robot.data[t][4] == "collision":
-                fitness -= 10
+                fitness -= 100
             # check for finding food
-            if robot.data[t][4] == "tree":
-                fitness += 5
-        # decide
-        if fitness > 0:
-            # parents.append([fitness, robot.genotype, robot.data])
-            parents.append([fitness, robot])
-            # print("robot {}, fitness = {}".format(len(backup), fitness))
-        # backup.append([fitness, robot.genotype, robot.data])
-        backup.append([1, robot])
-    # if no robot has good fitness
+            position = robot.data[t][0]
+            for tree in trees:
+                tree_dist = np.linalg.norm(position-tree)
+                fitness += 100/np.exp(tree_dist/max_dist)
+        px.append([fitness, robot])
+    # sort and select
+    px = sorted(px, reverse=True, key=lambda i:i[0])
+    # condition to survive: fitness > 0
+    parents = [p for p in px if p[0] > 0]
+    # in case no robot has good fitness
     if len(parents) == 0:
         print("all died")
-        parents = sorted(backup, reverse=True, key=lambda i:i[0])
         parents = parents[:10]
-    # sort by fitness and return
-    parents = sorted(parents, reverse=True, key=lambda i:i[0])
+    # print info and return
     print("\n{} robots from {} survived".format(len(parents), len(robots)))
     return parents
 
