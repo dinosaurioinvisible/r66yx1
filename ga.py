@@ -8,8 +8,6 @@ import world
 
 ## TODO:
 # clean!
-# bounce with other robots or trees
-# robot aren't moving!!
 
 trees = [tree for tree in world.trees]
 max_dist = world.xmax
