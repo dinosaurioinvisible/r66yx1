@@ -3,9 +3,10 @@ import idsm
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.gridspec as gridspec
 
 
-def idsm_simulation(tx=0, dt=0.1, t=75):
+def idsm_simulation(tx=0, dt=0.1, t=50):
     simdata = []
     robot = idsm.Agent(dt)
     loc = np.array([-2.5])
@@ -18,14 +19,28 @@ def idsm_simulation(tx=0, dt=0.1, t=75):
         tx += dt
         simdata.append(np.concatenate((sx,loc)))
         #print("tx:{} - sx:{} - mx:{}, loc:{}".format(tx,sx,mx,loc))
+    # mapping of motor influence
+    influence_data = []
+    for motor in np.arange(0.02,0.98,0.02):
+        for sensor in np.arange(0.02,0.98,0.02):
+            sm = np.array([motor, sensor])
+            mu = robot.motor_fx(sm)
+            xt = np.sqrt((1/sensor)-1)
+            nmotor = motor + mu[0]*0.1
+            xt = xt + 0.1 * (nmotor+1)/2
+            nsensor = 1/(1+xt**2)
+            influence_data.append([sensor,motor,nsensor-sensor,nmotor-motor])
+            # print("sensor:{}, motor:{}, nsen-sen:{}, nmotor-motor:{}".format(sensor,motor,nsensor-sensor,nmotor-motor))
     # idsm
     while tx < 35:
         mx = robot.idsm(sx)
         sx = 1/(1+loc**2)
-        loc += mx*dt
+        # loc = (1+loc)/2 + mx*amp_factor
+        loc += mx
         tx += dt
         simdata.append(np.concatenate((sx,loc)))
-        #print("tx:{} - sx:{} - mx:{}, loc:{}".format(tx,sx,mx,loc))
+        # print("tx:{} - sx:{} - mx:{}, loc:{}".format(tx,sx,mx,loc))
+        # import pdb; pdb.set_trace()
     # idsm rellocated
     loc = np.array([-2.5])
     while tx < t:
@@ -36,8 +51,27 @@ def idsm_simulation(tx=0, dt=0.1, t=75):
         simdata.append(np.concatenate((sx,loc)))
         #print("tx:{} - sx:{} - mx:{}, loc:{}".format(tx,sx,mx,loc))
     simdata_reduced = [simdata[sn] for sn in range(len(simdata)) if sn%10==0]
-    return simdata_reduced
+    return simdata_reduced, influence_data
 
+
+def idsm_streamplot(influence_data):
+    Y,X = np.mgrid[0.02:0.98:48j, 0.02:0.98:48j]
+    U,V = np.mgrid[0.0:0.0:48j, 0.0:0.0:48j]
+    # import pdb; pdb.set_trace()
+    for n in range(len(influence_data)):
+        for y in range(48):
+            U[n%48][y], V[n%48][y] = influence_data[n][2], influence_data[n][3]
+    speed = np.sqrt(U*U+V*V)
+    # import pdb; pdb.set_trace()
+    fig = plt.figure(figsize=(5,5))
+    gs = gridspec.GridSpec(nrows=1,ncols=1,height_ratios=[1])
+    # vary linewidth
+    ax2 = fig.add_subplot(gs[0,0])
+    lw = speed/speed.max()
+    ax2.streamplot(X,Y,U,V, density=0.7, color="k", linewidth=lw)
+    ax2.set_title("motor_influence")
+    plt.tight_layout()
+    plt.show()
 
 
 def idsm_animation(simdata):
@@ -51,7 +85,7 @@ def idsm_animation(simdata):
 
     def init():
         xi = [0, 20, 35]
-        yi = [robot_locs[0], robot_locs[19], robot_locs[0]]
+        yi = [robot_locs[0], robot_locs[20], robot_locs[35]]
         ax.scatter(xi, yi, color="grey")
         ax.add_patch(robot)
         return robot,
@@ -73,11 +107,9 @@ def idsm_animation(simdata):
 
 
 
-idsm_data = idsm_simulation()
+idsm_data, influence_data = idsm_simulation()
+idsm_streamplot(influence_data)
 idsm_animation(idsm_data)
-
-
-
 
 
 
