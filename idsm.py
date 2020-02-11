@@ -23,29 +23,15 @@ class Agent:
         # initial sm state
         self.nodes = []
         self.x = np.concatenate((np.array([0]*sdim), np.array([0]*mdim)))
-        self.c = 0
-        self.amp_factor = 1
 
     # for each timestep
     def idsm(self, sx):
         self.update_nodes()
         idsm_mu = self.motor_fx()
-        mx = self.x[self.sdim:] + idsm_mu * self.amp_factor
-        # mx = (1+self.x[self.sdim:])/2 + idsm_mu * self.amp_factor
+        mx = self.x[self.sdim:] + idsm_mu
         self.velocity = np.concatenate((sx,mx)) - self.x
         self.add_node()
         self.x = np.concatenate((sx,mx))
-        ##
-        self.c += 1
-        if self.c <= 10:
-            print("idsm")
-            print(self.c)
-            print(idsm_mu)
-            print(mx)
-            print(self.x)
-            print(self.velocity)
-        # import pdb; pdb.set_trace()
-        ##
         return mx
 
     def train(self, sx, mx):
@@ -55,7 +41,6 @@ class Agent:
         self.velocity = np.concatenate((sx,mx)) - self.x
         self.add_node()
         self.x = np.concatenate((sx,mx))
-        print(self.x)
 
     # creation of nodes
     def add_node(self):
@@ -63,17 +48,6 @@ class Agent:
         if density < self.kt:
             self.nodes.append(Node(self.x, self.velocity))
             # print("node added, pos={}, vel={}".format(self.x, self.velocity))
-
-    # for debugging
-    def node_map(self):
-        active_nodes = []
-        for node in self.nodes:
-            if node.active:
-                active_nodes.append([node.position, node.velocity, node.weight])
-        if len(active_nodes) > 1:
-            for n in enumerate(active_nodes):
-                print("{}: {} - {} - {}".format(n[0],n[1][0],n[1][1],n[1][2]))
-            import pdb; pdb.set_trace()
 
     # density fx
     def density_fx(self):
@@ -83,26 +57,15 @@ class Agent:
                 weight = self.weight_fx(node.weight)
                 distance = self.distance_fx(node.position)
                 density += weight*distance
-        # if density == 0:
-            # import pdb; pdb.set_trace()
-            # print("density=0, number of nodes: {}".format(len(self.nodes)))
         return density
     # weight fx
     def weight_fx(self, Nw):
-        if Nw < -2000 or Nw > 2000:
-            import pdb; pdb.set_trace()
-            return 0
         weight = 2/(1+np.exp(-self.kw*Nw))
-        if weight < 0 or weight > 2:
-            import pdb; pdb.set_trace()
-            return 0
         return weight
     #distance fx
     def distance_fx(self, Np):
         node_dist = np.linalg.norm(Np-self.x)
         if node_dist > 0.15:
-            # print("node dist: {}".format(node_dist))
-            # import pdb; pdb.set_trace()
             return 0
         distance = 2/(1+np.exp(self.kd*node_dist**2))
         return distance
@@ -126,11 +89,6 @@ class Agent:
     # velocity + attraction
     def influence_fx(self):
         influence = np.array([0.]*self.mdim)
-        nodes = 0
-        sweights = 0
-        sdistances = 0
-        svelocities = 0
-        sattractions = 0
         for node in self.nodes:
             if node.active:
                 weight = self.weight_fx(node.weight)
@@ -146,15 +104,6 @@ class Agent:
                     attraction = att - att*normed_vel
                 # weighted motor influence
                 influence += (weight*distance*(velocity+attraction))
-                nodes += 1
-                sweights += weight
-                sdistances += distance
-                svelocities += velocity
-                sattractions += attraction
-                # import pdb; pdb.set_trace()
-        #print(self.x)
-        #print("{},{},{},{},{},{}".format(nodes,sweights,sdistances,svelocities,sattractions,influence))
-        #import pdb; pdb.set_trace()
         return influence
 
 

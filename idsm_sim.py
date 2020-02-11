@@ -19,15 +19,13 @@ def idsm_simulation(tx=0, dt=0.1, t=65, map=False):
         loc += mx*dt
         tx += dt
         simdata.append(np.concatenate((sx,loc)))
-        # print("tx:{} - sx:{} - mx:{}, loc:{}".format(tx,sx,mx,loc))
-
     # mapping of motor influence
     influence_data = []
     if map:
         for motor in np.arange(0.02,0.98,0.02):
             for sensor in np.arange(0.02,0.98,0.02):
                 sm = np.array([motor, sensor])
-                mu = robot.motor_fx(sm)
+                mu = robot.motor_fx()
                 xt = np.sqrt((1/sensor)-1)
                 nmotor = motor + mu[0]*0.1
                 xt = xt + 0.1 * (nmotor+1)/2
@@ -35,14 +33,12 @@ def idsm_simulation(tx=0, dt=0.1, t=65, map=False):
                 influence_data.append([sensor,motor,nsensor-sensor,nmotor-motor])
                 # print("sensor:{}, motor:{}, nsen-sen:{}, nmotor-motor:{}".format(sensor,motor,nsensor-sensor,nmotor-motor))
     # idsm
-    while tx < t:
+    while tx < 35:
         sx = 1/(1+loc**2)
         mx = robot.idsm(sx)
         loc += ((mx*2)-1)*dt
         tx += dt
         simdata.append(np.concatenate((sx,loc)))
-        # print("tx:{} - sx:{} - mx:{}, loc:{}".format(tx,sx,mx,loc))
-        # import pdb; pdb.set_trace()
     # idsm rellocated
     loc = np.array([-2.5])
     while tx < t:
@@ -51,7 +47,7 @@ def idsm_simulation(tx=0, dt=0.1, t=65, map=False):
         loc += ((mx*2)-1)*dt
         tx += dt
         simdata.append(np.concatenate((sx,loc)))
-        #print("tx:{} - sx:{} - mx:{}, loc:{}".format(tx,sx,mx,loc))
+    # return data
     simdata_reduced = [simdata[sn] for sn in range(len(simdata)) if sn%10==0]
     return simdata_reduced, influence_data
 
@@ -82,15 +78,16 @@ def idsm_animation(simdata):
     robot_sensors = [data[0] for data in simdata]
     robot_locs = [data[1] for data in simdata]
     fig = plt.figure()
-    ax = plt.axes(xlim=(0,len(simdata)), ylim=(min(robot_locs),max(robot_locs)))
+    ax = plt.axes(xlim=(0,len(simdata)), ylim=(min(robot_locs)-1,max(robot_locs)+1))
     robot = plt.Circle((0, robot_locs[0]), radius=0.1, color="blue", fill=True)
     xlocs, ylocs = [], []
-    past_locations, = plt.plot([], [], color="grey")
+    past_locations, = plt.plot([], [], color="grey", ls="--")
 
     def init():
         xi = [0, 20, 35, len(robot_locs)]
         yi = [robot_locs[0], robot_locs[20], robot_locs[35], robot_locs[-1]]
         ax.scatter(xi, yi, color="grey")
+        ax.plot([35,35],[min(robot_locs),max(robot_locs)], color="black", ls=":")
         ax.add_patch(robot)
         return robot,
 
@@ -101,6 +98,8 @@ def idsm_animation(simdata):
         xlocs.append(x)
         ylocs.append(y)
         past_locations.set_data(xlocs, ylocs)
+        if i == 20:
+            past_locations.set_linestyle("-")
         return robot, past_locations
 
     anim = animation.FuncAnimation(fig, animate,
