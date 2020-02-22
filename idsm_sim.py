@@ -79,13 +79,14 @@ def idsm_animation(simdata):
     robot_locs = [data[1] for data in simdata]
     fig = plt.figure()
     ax = plt.axes(xlim=(0,len(simdata)), ylim=(min(robot_locs)-1,max(robot_locs)+1))
-    robot = plt.Circle((0, robot_locs[0]), radius=0.1, color="blue", fill=True)
-    xlocs, ylocs = [], []
+    robot = plt.Circle((0, robot_locs[0]), radius=0.2, color="blue", fill=True)
+    xlocs, ylocs = [], [],
     past_locations, = plt.plot([], [], color="grey", ls="--")
+    import pdb; pdb.set_trace()
 
     def init():
-        xi = [0, 20, 35, len(robot_locs)]
-        yi = [robot_locs[0], robot_locs[20], robot_locs[35], robot_locs[-1]]
+        xi = [0, 19, 35, len(robot_locs)]
+        yi = [robot_locs[0], robot_locs[19], robot_locs[35], robot_locs[-1]]
         ax.scatter(xi, yi, color="grey")
         ax.plot([35,35],[min(robot_locs),max(robot_locs)], color="black", ls=":")
         ax.add_patch(robot)
@@ -97,9 +98,10 @@ def idsm_animation(simdata):
         robot.center = (x,y)
         xlocs.append(x)
         ylocs.append(y)
+        if i == 35:
+            xlocs[-1] = None
+            ylocs[-1] = None
         past_locations.set_data(xlocs, ylocs)
-        if i == 20:
-            past_locations.set_linestyle("-")
         return robot, past_locations
 
     anim = animation.FuncAnimation(fig, animate,
