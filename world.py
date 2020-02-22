@@ -1,50 +1,46 @@
 
 import numpy as np
 
-# variables
-xmax = 250
-ymax = 250
-n_walls = 4
-walls_loc = "random"
-n_trees = 4
-tree_radius = 2.5
-energy = 1000
+class World:
+    def __init__(self, xmax=250, ymax=250\
+    , n_walls=4\
+    , n_trees=5, tree_radius=2.5\
+    , energy=1000):
+        # init
+        # self.energy = energy
+        self.xmax = xmax
+        self.ymax = ymax
+        self.n_walls = n_walls
+        self.n_trees = n_trees
+        # self.tree_radius = tree_radius
+        self.allocate()
 
-def allocate(xmax, ymax, n_walls, walls_loc, n_trees, energy):
-    walls = []
-    trees = []
-    # borders
-    walls.append([[0,0],[xmax,0]])
-    walls.append([[0,0],[0,ymax]])
-    walls.append([[0,ymax],[xmax,ymax]])
-    walls.append([[xmax,0],[xmax,ymax]])
-    # other optional walls
-    if  n_walls>4 and walls_loc == "random":
-        for n in range(n_walls-4):
-            ax = np.random.randint(10,90)
-            ay = np.random.randint(10,90)
-            bx = np.random.randint(10,90)
-            by = np.random.randint(10,90)
-            walls.append([[ax,ay],[bx,by]])
-    elif n_walls>4 and walls_loc != "random":
-        for n in range(n_walls-4):
-            ax = input("ax for wall {}: ".format(n+4))
-            ay = input("ay for wall {}: ".format(n+4))
-            bx = input("bx for wall {}: ".format(n+4))
-            by = input("by for wall {}: ".format(n+4))
-            walls.append([[ax,ay],[bx,by]])
-    # trees
-    for n in range(n_trees):
-        ax = np.random.randint(0,xmax)
-        ay = np.random.randint(0,ymax)
-        trees.append([ax, ay])
-    # print locations and return
-    print("\nwalls alocated at:")
-    for wall in walls:
-        print("A:{} to B:{}".format(wall[0],wall[1]))
-    print("\ntrees alocated at:")
-    for tree in trees:
-        print("x,y:{}".format(tree))
-    return walls, trees
+    def allocate(self):
+        # borders
+        self.walls = []
+        self.walls.append([[0,0],[self.xmax,0]])
+        self.walls.append([[0,0],[0,self.ymax]])
+        self.walls.append([[0,self.ymax],[self.xmax,self.ymax]])
+        self.walls.append([[self.xmax,0],[self.xmax,self.ymax]])
+        # optional walls
+        if self.n_walls>4:
+            for n in range(self.n_walls-4):
+                ax = np.random.randint(0,self.xmax)
+                ay = np.random.randint(0,self.ymax)
+                bx = np.random.randint(0,self.xmax)
+                by = np.random.randint(0,self.ymax)
+                self.walls.append(["wall",[ax,ay],[bx,by]])
+        # trees
+        self.trees = []
+        for n in range(self.n_trees):
+            ax = np.random.randint(0,self.xmax)
+            ay = np.random.randint(0,self.ymax)
+            self.trees.append(["tree",[ax,ay],[ax,ay]])
+        self.objects = self.walls+self.trees
 
-walls, trees = allocate(xmax, ymax, n_walls, walls_loc, n_trees, energy)
+    def update(self, robots_locs=[]):
+        # just robots positions for now
+        self.robots = []
+        for robot_loc in robots_locs:
+            self.robots.append("robot", robot_loc, robot_loc)
+        self.objects = self.walls+self.trees+self.robots

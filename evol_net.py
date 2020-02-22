@@ -74,9 +74,6 @@ class RNN:
         #  import pdb; pdb.set_trace()
         return m1, m2
 
-    def sigmoid(self, z):
-        return np.array([1/(1+np.exp(-i)) for i in z])
-
     def transfer_fx(self, x):
         # if x >= t_up : 1; if x <= t_low: 0; else: (x-t_low)/(t_up-t_low)
         x = np.where(x<=self.lt, 0, x)
