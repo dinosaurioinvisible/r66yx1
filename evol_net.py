@@ -3,7 +3,7 @@ import numpy as np
 # import genome
 
 class RNN:
-    def __init__(self, n_input=3, n_hidden=2, n_output=4\
+    def __init__(self, n_input=6, n_hidden=3, n_output=5\
         , upper_t=0.5, lower_t=0.1, veto_t=0.9, W=[], V=[]):
         # dimensions
         self.n_input = n_input
@@ -70,9 +70,10 @@ class RNN:
         m2_h = eo[0][-1]
         m1 = m1_e - m1_h
         m2 = m2_e - m2_h
+        com = eo[0][-5]
         # print("\nt={}: m1={}, m2={}".format(len(self.e_states)-1,m1,m2))
         #  import pdb; pdb.set_trace()
-        return m1, m2
+        return m1, m2, com
 
     def transfer_fx(self, x):
         # if x >= t_up : 1; if x <= t_low: 0; else: (x-t_low)/(t_up-t_low)

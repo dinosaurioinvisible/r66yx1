@@ -1,10 +1,8 @@
 
-import geometry
-import world
-import robot_agent
-import simplot
 import numpy as np
-
+import world
+import geometry
+import world_animation
 
 #TODO
 # urgency could also modify the shape of the food sensor, but for an energy cost
@@ -25,23 +23,32 @@ import numpy as np
 # subsumption: avoid > wander > explore
 # avoid robot-robot collisions > just put data
 
-def runsim(t=100, n_robots=1, print_data=False):
+def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=5, n_robots=3):
     tx = 0
-    simrobots = [robot_agent.Robot() for n in range(n_robots)]
+    simworld = world.World(xmax, ymax, n_walls, n_trees, n_robots)
+    world_limits = [xmax, ymax]
     while tx < t:
-        for simrobot in simrobots:
-            simrobot.act()
+        simworld.update()
         tx += 1
-    simdata = [simrobot.data for simrobot in simrobots]
-    parameters = simrobot.parameters
-    if print_data==True:
-        print("\ndata:")
-        for dataline in range(len(simdata[0])):
-            print("\nt={}".format(dataline))
-            for simrobot in simdata:
-                print(simrobot[dataline])
-    return simdata, parameters
+    return world_limits, simworld.opt_walls, simworld.trees, simworld.agents
+
+# def runsim(t=100, print_data=False):
+#     tx = 0
+#     simrobots = [robot_agent.Robot() for n in range(n_robots)]
+#     while tx < t:
+#         for simrobot in simrobots:
+#             simrobot.act()
+#         tx += 1
+#     simdata = [simrobot.data for simrobot in simrobots]
+#     parameters = simrobot.parameters
+#     if print_data==True:
+#         print("\ndata:")
+#         for dataline in range(len(simdata[0])):
+#             print("\nt={}".format(dataline))
+#             for simrobot in simdata:
+#                 print(simrobot[dataline])
+#     return simdata, parameters
 
 # run
-simdata, simparams = runsim()
-simplot.runsim_plot(simdata, simparams)
+world_limits, simdata_opt_walls, simdata_trees, simdata_agents = runsim()
+world_animation.animation(world_limits, simdata_opt_swalls, simdata_trees, simdata_agents)
