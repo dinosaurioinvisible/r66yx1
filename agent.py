@@ -1,16 +1,15 @@
 
 import numpy as np
-import world
+import geometry
 import sensors
 import evol_net
+import tree
 # import motor
 # import body
 
 # object - symbol - concept : world x - SM input - perception
 # the normative (cognitive?) domain is made of perceptions from experiences
 # meaning is the association of some trait to another (link between exps)
-
-#
 
 # Theoretical SM loop of interactions
 # de/dt = E(e,p)    # environment: environment & body
@@ -22,43 +21,69 @@ import evol_net
 # dp/dt = B(p,m,e)  # body: body & motors & environment
 
 class Agent:
-    def __init__(self, energy=100\
-    , x=100, y=100, or=0\
-    , r=2.5, speed=5):
+    def __init__(self, x=100, y=100, o=0\
+    , energy=100\
+    , r=2.5, max_speed=5\
+    , feed_range=5, feed_rate=5):
         # init
         self.energy = energy
-        self.x = x
-        self.y = y
-        self.or = or
-        self.r = r
-        self.speed = speed
+        self.x = x; self.y = y; self.o = o
+        self.r = r; self.max_speed = max_speed
         self.wheels_sep = r
+        self.velocity = 0
+        self.feed_range = feed_range
+        self.feed_rate = feed_rate
+        self.com = np.random.rand()
+        # modules
         self.sensors = sensors.Sensors()
-        self.nnet = nnet.Net()
+        self.net = evol_net.RNN()
         # SM array
-        self.sm = []
+        self.state = []
+        # for animation
+        self.params = [self.r, self.sensors.ray_length, self.sensors.ir_angles, self.sensors.olf_range, self.sensors.olf_angle, self.sensors.com_range]
+        self.data = [self.x, self.y, self.o, self.energy]
 
     def act(self, objects):
-        env_input = self.sensors.read_env(self.x, self.y, self.r, self.or, objects)
-        self.move(??)
+        self.energy -= 1
+        # sm state = [ir1, ir2, olf, com_in, vel, e]
+        env_input = self.sensors.read_env(self.x, self.y, self.r, self.o, objects)
+        int_input = np.array([self.velocity/self.max_speed, self.energy/100])
+        self.state = np.concatenate((env_input, int_input))
+        # controller
+        lw, rw, com = self.net.action(self.state)
+        self.communicate(com)
+        self.move(lw, rw)
+        self.feed(objects)
+        self.data.append([self.x, self.y, self.o, self.energy])
 
-
-    def move(self):
+    def move(self, lw, rw):
         # update x, y, or
-        lw, rw = self.net.action(??)
-        lw = lw*self.speed
-        rw = rw*self.speed
-        vel = (lw+rw)/2
-        dx = vel*np.cos(self.or)
-        dy = vel*np.sin(self.or)
+        lw = lw*self.max_speed
+        rw = rw*self.max_speed
+        self.velocity = (lw+rw)/2
+        dx = self.velocity * np.cos(self.o)
+        dy = self.velocity * np.sin(self.o)
         do = np.radians((lw-rw)/self.wheels_sep)
         # update
-        self.x += dx
-        self.y += dy
-        self.o += do
-        self.o = geometry.force_angle(self.or)
+        if self.energy > 0:
+            self.x += dx
+            self.y += dy
+            self.o += do
+            self.o = geometry.force_angle(self.o)
+            self.energy -= 1
 
+    def feed(self, objects):
+        # feed if tree is near
+        trees = [x for x in objects if type(x)==tree.Tree]
+        for tx in trees:
+            dist = np.linalg.norm(np.array([tx.x,tx.y])-np.array([self.x,self.y]))
+            if dist <= self.feed_range:
+                e = tx.feeding_fx()
+                self.energy += e
 
+    def communicate(self, com):
+        # ultra simple for now
+        self.com = com
 
 
 
