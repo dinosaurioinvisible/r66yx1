@@ -1,7 +1,6 @@
 
 import numpy as np
 import world
-import geometry
 import world_animation
 
 #TODO
@@ -23,10 +22,10 @@ import world_animation
 # subsumption: avoid > wander > explore
 # avoid robot-robot collisions > just put data
 
-def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=5, n_robots=3):
+def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=5, n_agents=3):
     tx = 0
-    simworld = world.World(xmax, ymax, n_walls, n_trees, n_robots)
     world_limits = [xmax, ymax]
+    simworld = world.World(xmax, ymax, n_walls, n_trees, n_agents)
     while tx < t:
         simworld.update()
         tx += 1
@@ -50,5 +49,5 @@ def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=5, n_robots=3
 #     return simdata, parameters
 
 # run
-world_limits, simdata_opt_walls, simdata_trees, simdata_agents = runsim()
-world_animation.animation(world_limits, simdata_opt_swalls, simdata_trees, simdata_agents)
+d1,d2,d3,d4 = world_simulation()
+world_animation.sim_animation(d1,d2,d3,d4)

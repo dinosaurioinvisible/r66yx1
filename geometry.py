@@ -105,7 +105,14 @@ def force_angle(angle):
     else:
         return angle
 
-
+def force_angle_degrees(angle):
+    # the same but for the animation
+    if angle > 360:
+        return angle-360
+    if angle < 0:
+        return angle+360
+    else:
+        return angle
 
 
 
