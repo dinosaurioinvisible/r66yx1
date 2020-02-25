@@ -6,31 +6,33 @@ import tree
 import agent
 
 class Sensors:
-    def __init__(self, olf_angle=90, olf_range=20\
-    , ir_angle=45, ray_length=40, n_rays=4, beam_spread=135\
-    , com_range=20):
+    def __init__(self, olf_angle=90, olf_range=25\
+    , ir_angle=60, ray_length=40, n_rays=4, beam_spread=120\
+    , aud_angle=90, aud_range=50):
         # init
-        self.ir_angles = [np.radians(ir_angle), geometry.force_angle(np.radians(-ir_angle))]
+        self.ir_angles = [geometry.force_angle(np.radians(-ir_angle)), geometry.force_angle(np.radians(ir_angle))]
         self.ray_length = ray_length
         self.n_rays = n_rays
         self.ray_sep = beam_spread/(n_rays-1)
-        self.olf_angle = olf_angle
+        self.olf_angles =[geometry.force_angle(np.radians((-olf_angle/2))), geometry.force_angle(np.radians((olf_angle/2)))]
         self.olf_range = olf_range
-        self.com_range = com_range
+        self.aud_angles = [geometry.force_angle(np.radians(-aud_angle)), geometry.force_angle(np.radians(aud_angle))]
+        self.aud_range = aud_range
 
-    def read_env(self, x, y, r, o, objects):
-        ir = self.read_irs(x, y, r, o,objects)
+    def read_env(self, x, y, o, r, objects):
+        ir = self.read_irs(x, y, o, r, objects)
         ir1 = sum(ir[0])
         ir2 = sum(ir[1])
-        olf = self.read_olf(x, y, o, objects)
-        com = self.read_com(x, y, o, r, objects)
-        env_data = np.array([ir1,ir2,olf,com])
+        olf = self.read_olf(x, y, o, r, objects)
+        aud = self.read_aud(x, y, o, r, objects)
+        aud1, aud2 = aud[0], aud[1]
+        env_data = [ir1, ir2, olf, aud1, aud2]
         return env_data
 
     ########################################
 
     # read data from ir sensors
-    def read_irs(self, x, y, r, o, objects):
+    def read_irs(self, x, y, o, r, objects):
         ir_reading = []
         for ir_angle in self.ir_angles:
             ir = []
@@ -97,40 +99,49 @@ class Sensors:
 
     # olfactory-like sensor
     # search trees within sensing area in polar coordinates [dist, angle]
-    def read_olf(self, x, y, o, objects):
+    def read_olf(self, x, y, o, r, objects):
+        olf_x = x + r*np.cos(o)
+        olf_y = y + r*np.sin(o)
         min_dist = self.olf_range
         trees = [tx for tx in objects if type(tx)==tree.Tree]
         for tx in trees:
-            dist = np.linalg.norm(np.array([tx.x,tx.y])-np.array([x,y]))
+            dist = np.linalg.norm(np.array([tx.x,tx.y])-np.array([olf_x,olf_y]))
             if dist <= min_dist:
                 if self.in_o_range_fx(tx, x, y, o):
                     min_dist = dist
-        olf_val = (1/np.exp(min_dist/self.olf_range))
+        olf_val = (1/np.exp(min_dist/self.olf_range))**2
         return olf_val
 
     # fx to check if tree is within the polar range
     def in_o_range_fx(self, tx, x, y, o):
         # line betweem B (tree) and A (sensor)
-        ba_line = [tx.x, tx.y] - [x,y]
+        ba_line = np.array([tx.x, tx.y]) - np.array([x,y])
         # angle between the line and the horizontal axis
         ba_angle = geometry.force_angle(np.arctan2(ba_line[1], ba_line[0]))
-        angle_range = [geometry.force_angle(o-self.olf_angle), geometry.force_angle(o+self.olf_angle)]
+        angle_range = [geometry.force_angle(o+self.olf_angles[0]), geometry.force_angle(o+self.olf_angles[1])]
         if ba_angle > angle_range[0] and ba_angle < angle_range[1]:
             return True
         return False
 
     ########################################
 
-    # communication sensor (temporal)
-    def read_com(self, x, y, o, r, objects):
-        com_val = 0
-        min_dist = self.com_range
-        agents = [ax for ax in objects if type(ax)==agent.Agent]
-        for ax in agents:
-            dist = np.linalg.norm(np.array([ax.x,ax.y])-np.array([x,y]))
-            if dist <= min_dist:
-                com_val = ax.com
-        return com_val
+    # auditory sensors, one in each side
+    def read_aud(self, x, y, o, r, objects):
+        aud_vals = []
+        for aud_angle in self.aud_angles:
+            ao = geometry.force_angle(o+aud_angle)
+            ax = x + r*np.cos(ao)
+            ay = y + r*np.sin(ao)
+            min_dist = self.aud_range
+            aud_val = 0
+            agents = [ag for ag in objects if type(ag)==agent.Agent]
+            for ag in agents:
+                dist = np.linalg.norm(np.array([ag.x,ag.y])-np.array([ax,ay]))
+                if dist <= min_dist:
+                    # the com output from agent weighted by the distance
+                    aud_val = ag.com*(1/np.exp(min_dist/self.aud_range))**2
+            aud_vals.append(aud_val)
+        return aud_vals
 
 
 

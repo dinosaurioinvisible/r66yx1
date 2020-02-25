@@ -18,14 +18,12 @@ class World:
     , n_robots=3\
     , energy=1000):
         # init
-        self.energy = energy
         self.xmax = xmax
         self.ymax = ymax
         self.n_walls = n_walls
         self.n_trees = n_trees
         self.n_robots = n_robots
-        # info
-        self.objects = []
+        self.energy = energy
         self.allocate()
 
     def allocate(self):

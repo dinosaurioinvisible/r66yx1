@@ -38,23 +38,24 @@ class Agent:
         self.sensors = sensors.Sensors()
         self.net = evol_net.RNN()
         # SM array
-        self.state = []
+        self.state = None
         # for animation
-        self.params = [self.r, self.sensors.ray_length, self.sensors.ir_angles, self.sensors.olf_range, self.sensors.olf_angle, self.sensors.com_range]
-        self.data = [self.x, self.y, self.o, self.energy]
+        self.ps = [self.sensors.ray_length, self.sensors.ir_angles, self.sensors.olf_range, self.sensors.olf_angles, self.sensors.aud_range/2, self.sensors.aud_angles]
+        self.states = []
+        self.positions = []
 
     def act(self, objects):
         self.energy -= 1
-        # sm state = [ir1, ir2, olf, com_in, vel, e]
-        env_input = self.sensors.read_env(self.x, self.y, self.r, self.o, objects)
-        int_input = np.array([self.velocity/self.max_speed, self.energy/100])
-        self.state = np.concatenate((env_input, int_input))
+        # sm state = [ir1, ir2, olf, aud1, aud2, e]
+        self.state = self.sensors.read_env(self.x, self.y, self.o, self.r, objects)
+        self.state.append(self.energy)
+        self.states.append(self.state)
+        self.positions.append([self.x, self.y, self.o])
         # controller
         lw, rw, com = self.net.action(self.state)
         self.communicate(com)
         self.move(lw, rw)
         self.feed(objects)
-        self.data.append([self.x, self.y, self.o, self.energy])
 
     def move(self, lw, rw):
         # update x, y, or
@@ -78,7 +79,8 @@ class Agent:
         for tx in trees:
             dist = np.linalg.norm(np.array([tx.x,tx.y])-np.array([self.x,self.y]))
             if dist <= self.feed_range:
-                e = tx.feeding_fx()
+                feed_rate = self.feed_rate*(1/dist)
+                e = tx.feeding_fx(feed_rate)
                 self.energy += e
 
     def communicate(self, com):
