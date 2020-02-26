@@ -1,12 +1,14 @@
 
 import numpy as np
 import geometry
+from shapely.geometry import Point
+from shapely.geometry.polygon import Polygon
 import world
 import tree
 import agent
 
 class Sensors:
-    def __init__(self, olf_angle=90, olf_range=25\
+    def __init__(self, olf_angle=120, olf_range=20\
     , ir_angle=60, ray_length=40, n_rays=4, beam_spread=120\
     , aud_angle=90, aud_range=50):
         # init
@@ -98,30 +100,31 @@ class Sensors:
     ########################################
 
     # olfactory-like sensor
-    # search trees within sensing area in polar coordinates [dist, angle]
     def read_olf(self, x, y, o, r, objects):
         olf_x = x + r*np.cos(o)
         olf_y = y + r*np.sin(o)
+        olf_val = 0
         min_dist = self.olf_range
         trees = [tx for tx in objects if type(tx)==tree.Tree]
         for tx in trees:
-            dist = np.linalg.norm(np.array([tx.x,tx.y])-np.array([olf_x,olf_y]))
-            if dist <= min_dist:
-                if self.in_o_range_fx(tx, x, y, o):
-                    min_dist = dist
-        olf_val = (1/np.exp(min_dist/self.olf_range))**2
+            tree_loc = Point(tx.x, tx.y)
+            tree_space = tree_loc.buffer(tx.r)
+            # coordinates for polygon rather than area of a circle
+            olf_angle1 = geometry.force_angle(o+self.olf_angles[0])
+            v1x = olf_x + self.olf_range*np.cos(olf_angle1)
+            v1y = olf_y + self.olf_range*np.sin(olf_angle1)
+            xfront = olf_x + self.olf_range*np.cos(o)
+            yfront = olf_y + self.olf_range*np.sin(o)
+            olf_angle2 = geometry.force_angle(o+self.olf_angles[1])
+            v2x = olf_x + self.olf_range*np.cos(olf_angle2)
+            v2y = olf_y + self.olf_range*np.sin(olf_angle2)
+            olf_domain = Polygon([(olf_x,olf_y),(v1x,v1y),(xfront,yfront),(v2x,v2y)])
+            if olf_domain.intersects(tree_loc):
+            #dist = -tx.r + np.linalg.norm(np.array([tx.x,tx.y])-np.array([olf_x,olf_y]))
+                dist = olf_domain.distance(tree_space)
+                if dist <= min_dist:
+                    olf_val = (1/np.exp(min_dist/self.olf_range))**2
         return olf_val
-
-    # fx to check if tree is within the polar range
-    def in_o_range_fx(self, tx, x, y, o):
-        # line betweem B (tree) and A (sensor)
-        ba_line = np.array([tx.x, tx.y]) - np.array([x,y])
-        # angle between the line and the horizontal axis
-        ba_angle = geometry.force_angle(np.arctan2(ba_line[1], ba_line[0]))
-        angle_range = [geometry.force_angle(o+self.olf_angles[0]), geometry.force_angle(o+self.olf_angles[1])]
-        if ba_angle > angle_range[0] and ba_angle < angle_range[1]:
-            return True
-        return False
 
     ########################################
 
