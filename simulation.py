@@ -1,28 +1,13 @@
 
 import numpy as np
 import world
-import world_animation
 
 #TODO
-# urgency could also modify the shape of the food sensor, but for an energy cost
-# printable urgency and energy
-# urgency fx, to define speed
-# parameter/variable to differentiate lw and rw speed
-# parameter/variable to alter irval
-# compute for all ray_spread values (5 in the original)
+# attention? SM based attention?
+# energy
 # innner wall could rotate clockwise
-# ir input should see obstacles and food (classify)?
-# the input from sensors should concider current position?
-# make space circular?
-# anticipate collisions -> RNN
-# connect ir values to motor behaviour
-# toto > 1. reactive rules > 2. landmarks > 3. distributed map of environment
-# fixation of reacting rules as patterns (habits)
-# ir input -> net -> output motor
-# subsumption: avoid > wander > explore
-# avoid robot-robot collisions > just put data
 
-def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=5, n_agents=3):
+def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=10, n_agents=3):
     tx = 0
     world_limits = [xmax, ymax]
     simworld = world.World(xmax, ymax, n_walls, n_trees, n_agents)
@@ -47,7 +32,3 @@ def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=5, n_agents=3
 #             for simrobot in simdata:
 #                 print(simrobot[dataline])
 #     return simdata, parameters
-
-# run
-d1,d2,d3,d4 = world_simulation()
-world_animation.sim_animation(d1,d2,d3,d4)

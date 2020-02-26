@@ -53,12 +53,21 @@ class World:
             t = tree.Tree(ax,ay)
             self.trees.append(t)
         # robots
-        for n in range(self.n_robots):
-            ax = np.random.randint(0,self.xmax)
-            ay = np.random.randint(0,self.ymax)
-            a = agent.Agent(ax,ay)
-            self.agents.append(a)
-        self.objects = self.walls+self.trees+self.agents
+        nr = 0
+        while nr < self.n_robots:
+            add = True
+            ax = np.random.randint(10,self.xmax-10)
+            ay = np.random.randint(10,self.ymax-10)
+            # simple check to avoid superposition with trees
+            for t in self.trees:
+                if np.linalg.norm(np.array([ax,ay])-np.array([t.x,t.y])) < 10:
+                    add = False
+            if add:
+                ag = agent.Agent(ax,ay)
+                self.agents.append(ag)
+                nr += 1
+        # keep data
+        self.objects = self.walls+self.opt_walls+self.trees+self.agents
 
     def update(self):
         # energy of trees
@@ -68,7 +77,7 @@ class World:
         for agent in self.agents:
             objects = [o for o in self.objects if o!=agent]
             agent.act(objects)
-        self.objects = self.walls+self.trees+self.agents
+        self.objects = self.walls+self.opt_walls+self.trees+self.agents
 
 
 
