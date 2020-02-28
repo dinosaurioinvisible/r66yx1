@@ -6,8 +6,7 @@ from shapely.geometry import LineString
 from shapely.geometry.polygon import Polygon
 import sensors
 import evol_net
-import tree
-import world
+
 # import motor
 # import body
 
@@ -26,21 +25,22 @@ import world
 
 class Agent:
     def __init__(self, x=100, y=100, o=0\
-    , energy=500\
-    , r=2.5, max_speed=5\
-    , feed_range=10, feed_rate=5):
+    , genotype=None\
+    , energy=2000):
         # init
-        self.energy = energy
         self.x = x; self.y = y; self.o = o
-        self.r = r; self.max_speed = max_speed
-        self.wheels_sep = r
-        self.velocity = 0
-        self.feed_range = feed_range
-        self.feed_rate = feed_rate
+        self.energy = energy
+        self.max_speed = 5
+        # from genotype
+        self.genotype = genotype
+        self.r = self.genotype.r
+        self.wheels_sep = self.genotype.r
+        self.feed_range = self.genotype.feed_range
+        self.feed_rate = self.genotype.feed_rate
         self.com = np.random.rand()
         # modules
-        self.sensors = sensors.Sensors()
-        self.net = evol_net.RNN()
+        self.sensors = sensors.Sensors(olf_angle=self.genotype.olf_angle, olf_range=self.genotype.olf_range, ir_angle=self.genotype.ir_angle, ray_length=self.genotype.ray_length, n_rays=self.genotype.n_rays, beam_spread=self.genotype.beam_spread, aud_angle=self.genotype.aud_angle, aud_range=self.genotype.aud_range)
+        self.net = evol_net.RNN(n_input=self.genotype.n_in, n_hidden=self.genotype.n_hidden, n_output=self.genotype.n_out, upper_t=self.genotype.ut, lower_t=self.genotype.lt, veto_t=self.genotype.vt, W=self.genotype.W, V=self.genotype.V)
         # SM array
         self.state = None
         # for animation
@@ -66,9 +66,9 @@ class Agent:
         # update x, y, or
         lw = lw*self.max_speed
         rw = rw*self.max_speed
-        self.velocity = (lw+rw)/2
-        dx = self.velocity * np.cos(self.o)
-        dy = self.velocity * np.sin(self.o)
+        velocity = (lw+rw)/2
+        dx = velocity * np.cos(self.o)
+        dy = velocity * np.sin(self.o)
         do = np.radians((lw-rw)/self.wheels_sep)
         # update
         if self.energy > 0:
@@ -83,24 +83,24 @@ class Agent:
         pos = Point(self.x, self.y)
         body = pos.buffer(self.r)
         contact = False
-        for object in objects:
-            if type(object) == world.Wall:
-                wall = LineString([(object.xmin,object.ymin),(object.xmax,object.ymax)])
-                if body.intersects(wall):
-                    contact = True
-            else:
-                obj_center = Point(object.x, object.y)
-                obj_body = obj_center.buffer(object.r)
-                if body.intersects(obj_body):
-                    contact = True
+        for w in objects["walls"]:
+            wall = LineString([(w.xmin,w.ymin),(w.xmax,w.ymax)])
+            if body.intersects(wall):
+                contact = True
+        round_objects = objects["trees"]+objects["agents"]
+        for obj in round_objects:
+            obj_center = Point(obj.x, obj.y)
+            obj_body = obj_center.buffer(obj.r)
+            if body.intersects(obj_body):
+                contact = True
         if contact:
             self.x -= dx*2
             self.y -= dy*2
-            self.energy -= 2
+            self.energy -= 5
 
     def feed(self, objects):
         # feed if tree is near
-        trees = [x for x in objects if type(x)==tree.Tree]
+        trees = objects["trees"]
         for tx in trees:
             dist = 1 #self.r + tx.r + np.linalg.norm(np.array([tx.x,tx.y])-np.array([self.x,self.y]))
             if dist <= self.feed_range:

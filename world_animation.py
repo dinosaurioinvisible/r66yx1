@@ -79,10 +79,8 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
             olf_val = agents[enum].states[i][2]
             if olf_val > 0:
                 olf_domain[enum].set_visible(True)
-                # olf_domain[enum].fill = True
             else:
                 olf_domain[enum].set_visible(False)
-                olf_domain[enum].fill = False
 
             # aud domain (circles)
             for n in range(len(aud_domain[enum])):
@@ -90,13 +88,10 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
                 aud_x = x + agents[enum].r*np.cos(aud_o)
                 aud_y = y + agents[enum].r*np.sin(aud_o)
                 aud_domain[enum][n].center = (aud_x, aud_y)
-                # signal
+                # auditory signal
                 aud_val = agents[enum].states[i][3+n]
                 if aud_val > 0:
-                    print("aud")
-                    print(aud_val)
                     aud_domain[enum][n].set_visible(True)
-                    import pdb; pdb.set_trace()
                 else:
                     aud_domain[enum][n].set_visible(False)
 
@@ -112,7 +107,7 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
                 vis_domain[enum][n].theta1 = vis_o1
                 vis_domain[enum][n].theta2 = vis_o2
                 vis_domain[enum][n]._recompute_path()
-                # aud signals
+                # visual signals
                 vis_val = agents[enum].states[i][n]
                 if vis_val > 0:
                     vis_domain[enum][n].set_visible(True)
@@ -121,17 +116,17 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
 
             # check energy values
             energy = agents[enum].states[i][5]
-            if energy > 25:
+            if energy > 100:
                 agent_obj.set_color("blue")
                 agent_obj.fill = True
-            if 0 < energy <= 25:
+            if 0 < energy <= 100:
                 agent_obj.set_color("red")
             if energy <= 0:
                 agent_obj.set_color("black")
                 agent_obj.fill = False
                 olf_domain[enum].set_visible(False)
-                # aud_domain[enum][0].set_visible = False
-                # aud_domain[enum][1].set_visible = False
+                aud_domain[enum][0].set_visible = False
+                aud_domain[enum][1].set_visible = False
                 vis_domain[enum][0].set_visible(False)
                 vis_domain[enum][1].set_visible(False)
             all_aud = [aud for audx in aud_domain for aud in audx]
@@ -149,7 +144,13 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
 
 
 # run
-d1,d2,d3,d4 = simulation.world_simulation()
+t = 500
+xmax = 500
+ymax = 500
+n_walls = 5
+n_trees = 10
+n_agents = 10
+d1,d2,d3,d4 = simulation.world_simulation(t,xmax,ymax,n_walls,n_trees,n_agents)
 sim_animation(d1,d2,d3,d4)
 
 

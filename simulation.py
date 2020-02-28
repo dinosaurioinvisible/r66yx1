@@ -1,20 +1,19 @@
 
 import numpy as np
 import world
+from tqdm import tqdm
 
 #TODO
 # attention? SM based attention?
 # energy
 # innner wall could rotate clockwise
 
-def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=10, n_agents=3):
-    tx = 0
+def world_simulation(t=100, xmax=250, ymax=250, n_walls=5, n_trees=10, genotypes=[]):
     world_limits = [xmax, ymax]
     simworld = world.World(xmax, ymax, n_walls, n_trees, n_agents)
-    while tx < t:
+    for tx in tqdm(range(t)):
         simworld.update()
-        tx += 1
-    return world_limits, simworld.opt_walls, simworld.trees, simworld.agents
+    return world_limits, simworld.walls[4:], simworld.trees, simworld.agents
 
 # def runsim(t=100, print_data=False):
 #     tx = 0
