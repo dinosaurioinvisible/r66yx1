@@ -72,7 +72,6 @@ class RNN:
         m2 = m2_e - m2_h
         com = eo[0][-5]
         # print("\nt={}: m1={}, m2={}".format(len(self.e_states)-1,m1,m2))
-        #  import pdb; pdb.set_trace()
         return m1, m2, com
 
     def transfer_fx(self, x):
