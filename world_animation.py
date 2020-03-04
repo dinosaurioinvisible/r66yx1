@@ -10,8 +10,9 @@ import simulation
 # agent ps = [ir_range, ir_angles, olf_range, olf_angles, aud_range, aud_angles]
 # agent states = [ir1, ir2, olf, aud1, aud2, e]
 # agent positions = [x, y, o]
+# agent feeding_states = [Bool]
 
-def sim_animation(limits, walls, trees, agents, past=True, start=True):
+def sim_animation(limits, walls, trees, agents):
     # defs
     fig = plt.figure()
     ax = plt.axes(xlim=(0,limits[0]), ylim=(0,limits[1]), aspect="equal")
@@ -21,19 +22,22 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
     olf_domain = []
     aud_domain = []
     vis_domain = []
+    feed_domain = []
     # agent objects
     for agent in agents:
         # create objects
         ag = plt.Circle((agent.positions[0][0],agent.positions[0][1]), radius=agent.r, color="blue", fill=True)
         agent_objs.append(ag)
-        olf = Wedge((0,0), r=agent.ps[2], theta1=0, theta2=0, color="purple", fill=False, visible=True)
+        olf = Wedge((0,0), r=agent.genotype.olf_range, theta1=0, theta2=0, color="purple", fill=False, visible=True)
         olf_domain.append(olf)
-        aud_left = plt.Circle((0,0), radius=agent.ps[4], color="red", fill=False, visible=False)
-        aud_right = plt.Circle((0,0), radius=agent.ps[4], color="red", fill=False, visible=False)
+        aud_left = plt.Circle((0,0), radius=agent.genotype.aud_range, color="red", fill=False, visible=False)
+        aud_right = plt.Circle((0,0), radius=agent.genotype.aud_range, color="red", fill=False, visible=False)
         aud_domain.append([aud_left, aud_right])
-        ir_left = Wedge((0,0), r=agent.ps[0], theta1=0, theta2=0, color="orange", fill=False, visible=True)
-        ir_right = Wedge((0,0), r=agent.ps[0], theta1=0, theta2=0, color="orange", fill=False, visible=True)
+        ir_left = Wedge((0,0), r=agent.genotype.ray_length, theta1=0, theta2=0, color="orange", fill=False, visible=True)
+        ir_right = Wedge((0,0), r=agent.genotype.ray_length, theta1=0, theta2=0, color="orange", fill=False, visible=True)
         vis_domain.append([ir_left, ir_right])
+        feed = plt.Circle((0,0), radius=(agent.feed_range+agent.r), color="green", fill=False, visible=False)
+        feed_domain.append(feed)
 
     def init():
         # optional walls
@@ -54,7 +58,9 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
         for ir in vis_domain:
             for irx in ir:
                 ax.add_patch(irx)
-        return agent, olf, audx, irx,
+        for feed in feed_domain:
+            ax.add_patch(feed)
+        return agent, olf, audx, irx, feed,
 
     def animate(i):
         # for each agent in the list of animated objects
@@ -65,6 +71,7 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
             y = agents[enum].positions[i][1]
             # agent (circle)
             agent_obj.center = (x, y)
+            agent_obj.set_color("blue")
 
             # olf domain (wedge)
             olf_x = x + agents[enum].r*np.cos(np.radians(o))
@@ -114,13 +121,18 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
                 else:
                     vis_domain[enum][n].set_visible(False)
 
+            # feeding
+            if agents[enum].feeding_states[i] == True:
+                feed.center = (x,y)
+                feed.set_visible(True)
+            else:
+                feed.set_visible(False)
+
             # check energy values
             energy = agents[enum].states[i][5]
-            if energy > 100:
-                agent_obj.set_color("blue")
-                agent_obj.fill = True
             if 0 < energy <= 100:
-                agent_obj.set_color("red")
+                agent_obj.set_color("grey")
+                agent_obj.fill = False
             if energy <= 0:
                 agent_obj.set_color("black")
                 agent_obj.fill = False
@@ -132,7 +144,7 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
             all_aud = [aud for audx in aud_domain for aud in audx]
             all_vis = [vis for visx in vis_domain for vis in visx]
 
-        return tuple(agent_objs)+tuple(olf_domain)+tuple(all_aud)+tuple(all_vis)
+        return tuple(agent_objs)+tuple(olf_domain)+tuple(all_aud)+tuple(all_vis)+tuple(feed_domain)
 
     anim = animation.FuncAnimation(fig, animate,
                                         init_func=init,
@@ -144,14 +156,14 @@ def sim_animation(limits, walls, trees, agents, past=True, start=True):
 
 
 # run
-t = 500
-xmax = 500
-ymax = 500
-n_walls = 5
-n_trees = 10
-n_agents = 10
-d1,d2,d3,d4 = simulation.world_simulation(t,xmax,ymax,n_walls,n_trees,n_agents)
-sim_animation(d1,d2,d3,d4)
+# t = 500
+# xmax = 500
+# ymax = 500
+# n_walls = 5
+# n_trees = 10
+# n_agents = 10
+# d1,d2,d3,d4 = simulation.world_simulation(t,xmax,ymax,n_walls,n_trees,n_agents)
+# sim_animation(d1,d2,d3,d4)
 
 
 
