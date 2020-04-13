@@ -23,6 +23,9 @@ import evol_net
 #
 # dp/dt = B(p,m,e)  # body: body & motors & environment
 
+# TODO
+# error grows with less energy
+
 class Agent:
     def __init__(self, x=100, y=100, o=0\
     , genotype=None\
@@ -39,52 +42,53 @@ class Agent:
         self.feed_rate = self.genotype.feed_rate
         self.com = np.random.rand()
         # modules
-        self.sensors = sensors.Sensors(olf_angle=self.genotype.olf_angle, olf_range=self.genotype.olf_range, ir_angle=self.genotype.ir_angle, ray_length=self.genotype.ray_length, n_rays=self.genotype.n_rays, beam_spread=self.genotype.beam_spread, aud_angle=self.genotype.aud_angle, aud_range=self.genotype.aud_range)
+        self.sensors = sensors.Sensors(s_points=self.genotype.s_points, ir_angle=self.genotype.ir_angle, ray_length=self.genotype.ray_length, beam_spread=self.genotype.beam_spread, olf_angle=self.genotype.olf_angle, olf_range=self.genotype.olf_range, aud_angle=self.genotype.aud_angle, aud_range=self.genotype.aud_range)
         self.net = evol_net.RNN(n_input=self.genotype.n_in, n_hidden=self.genotype.n_hidden, n_output=self.genotype.n_out, upper_t=self.genotype.ut, lower_t=self.genotype.lt, veto_t=self.genotype.vt, W=self.genotype.W, V=self.genotype.V)
         self.genotype.W = self.net.W
         self.genotype.V = self.net.V
-        # SM array
+        # SM state = [ir1, ir2, olf, aud1, aud2, e]
         self.state = None
-        # for animation
-        self.ps = [self.sensors.ray_length, self.sensors.ir_angles, self.sensors.olf_range, self.sensors.olf_angles, self.sensors.aud_range/2, self.sensors.aud_angles]
+        # data
         self.states = []
         self.positions = []
+        self.body_states = []
         self.feeding_states = []
 
     def act(self, objects):
-        self.energy -= 1
-        # sm state = [ir1, ir2, olf, aud1, aud2, e]
-        self.state = self.sensors.read_env(self.x, self.y, self.o, self.r, objects)
-        self.state.append(self.energy)
-        self.states.append(self.state)
-        self.positions.append([self.x, self.y, self.o])
-        # controller
-        lw, rw, com = self.net.action(self.state)
-        self.com = com
-        self.move(lw, rw, objects)
-        self.feeding = False
-        if self.state[2] > 0:
+        # if "alive"
+        if self.energy > 0:
+            self.energy -= 1
+            # sensory information
+            self.state = self.sensors.read_env(self.x, self.y, self.o, self.r, objects)
+            self.state.append(self.energy)
+            # controller response
+            lw, rw, com = self.net.action(self.state)
+            self.com = com
+            self.move(lw, rw, objects)
+            # feed
             self.feed(objects)
+        else:
+            self.energy = 0
+        # record data: internal states
+        self.states.append(self.state)
+        # record data: body and feeding
+        self.positions.append([self.x, self.y, self.o])
         self.feeding_states.append(self.feeding)
 
-
     def move(self, lw, rw, objects):
-        # update x, y, or
+        # compute dx, dy, do
         lw = lw*self.max_speed
         rw = rw*self.max_speed
-        velocity = (lw+rw)/2
-        dx = velocity * np.cos(self.o)
-        dy = velocity * np.sin(self.o)
+        vel = (lw+rw)/2
+        dx = vel * np.cos(self.o)
+        dy = vel * np.sin(self.o)
         do = np.radians((lw-rw)/self.wheels_sep)
         # update
-        # print("from x={}, y={}, o={}".format(self.x,self.y,self.o))
-        if self.energy > 0:
-            self.x += dx
-            self.y += dy
-            self.o = geometry.force_angle(self.o+do)
-            self.energy -= 1
-            self.bouncing_fx(dx, dy, objects)
-        # print("to x={}, y={}, o={}".format(self.x,self.y,self.o))
+        self.x += dx
+        self.y += dy
+        self.o = geometry.force_angle(self.o+do)
+        self.energy -= 1
+        self.bouncing_fx(dx, dy, objects)
 
     def bouncing_fx(self, dx, dy, objects):
         # so objects don't traspass each other
@@ -107,6 +111,37 @@ class Agent:
             self.energy -= 10
 
     def feed(self, objects):
+        # "mouth" location
+        fx = self.x + self.r*np.cos(self.o)
+        fy = self.y + self.r*np.sin(self.o)
+        # feeding area: arc
+        arc_start = self.o - np.radians(self.feeding_angle/2)
+        arc_end = self.o + np.radians(self.feeding_angle/2)
+        # force counter-clockwise
+        if arc_start > arc_end:
+            arc_end += np.radians(360)
+        # get arc angle points and force angles
+        arc_points = np.linspace(arc_start, arc_end, self.genotype.s_points)
+        arc_angles = np.array([geometry.force_angle(oi) for oi in arc_points])
+        # get the arc coordinates and create polygon
+        arc_x = fx + self.olf_range*np.cos(arc_angles)
+        arc_y = fy + self.olf_range*np.sin(arc_angles)
+        feeding_coords = [(fx,fy)]
+        [feeding_coords.append((xi,yi)) for xi,yi in zip(arc_x,arc_y)]
+        feeding_area = Polygon(feeding_coords)
+        # check for trees to feed
+        feeding = False
+        trees = objects["trees"]
+        for tree in trees:
+            if feeding_area.intersects(tree):
+                feeding = True
+                feed_rate = self.feed_rate * (1/np.exp(dist/self.feed_range))
+
+
+        self.feeding_states.append([feeding_area, feeding])
+
+    def feed(self, objects):
+        self.feeding = False
         # feed if tree is near
         trees = objects["trees"]
         for tx in trees:

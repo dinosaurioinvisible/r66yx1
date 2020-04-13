@@ -34,15 +34,18 @@ def sim_animation(lifetime, limits, walls, trees, agents):
         o_line, = plt.plot([],[], color="orange")
         o_lines.append(o_line)
         # olfactory domain
-        olf = Wedge((0,0), r=agent.genotype.olf_range, theta1=0, theta2=0, color="purple", fill=False, visible=True)
+        olf, = plt.plot([],[], color="grey")
         olf_domain.append(olf)
         # auditory domain
         aud_left = plt.Circle((0,0), radius=agent.genotype.aud_range, color="red", fill=False, visible=False)
         aud_right = plt.Circle((0,0), radius=agent.genotype.aud_range, color="red", fill=False, visible=False)
         aud_domain.append([aud_left, aud_right])
         # visual domain
-        ir_left = Wedge((0,0), r=agent.genotype.ray_length, theta1=0, theta2=0, color="grey", fill=False, visible=True)
-        ir_right = Wedge((0,0), r=agent.genotype.ray_length, theta1=0, theta2=0, color="grey", fill=False, visible=True)
+        #ir_left = Wedge((0,0), r=agent.genotype.ray_length, theta1=0, theta2=0, color="grey", fill=False, visible=True)
+        #ir_right = Wedge((0,0), r=agent.genotype.ray_length, theta1=0, theta2=0, color="grey", fill=False, visible=True)
+        #vis_domain.append([ir_left, ir_right])
+        ir_left, = plt.plot([],[], color="grey")
+        ir_right, = plt.plot([],[], color="grey")
         vis_domain.append([ir_left, ir_right])
         # feeding domain
         feed = plt.Circle((0,0), radius=(agent.feed_range+agent.r), color="green", fill=False, visible=False)
@@ -59,17 +62,12 @@ def sim_animation(lifetime, limits, walls, trees, agents):
         # agents and sensors (not necessary for orientation)
         for agent in agent_objs:
             ax.add_patch(agent)
-        for olf in olf_domain:
-            ax.add_patch(olf)
         for aud in aud_domain:
             for audx in aud:
                 ax.add_patch(audx)
-        for ir in vis_domain:
-            for irx in ir:
-                ax.add_patch(irx)
         for feed in feed_domain:
             ax.add_patch(feed)
-        return agent, olf, audx, irx, feed,
+        return agent, audx, feed,
 
     def animate(i):
         # time
@@ -89,15 +87,8 @@ def sim_animation(lifetime, limits, walls, trees, agents):
             oy = y + agents[enum].r * np.sin(np.radians(o))
             o_lines[enum].set_data([x,ox],[y,oy])
 
-            # olf domain (wedge)
-            olf_x = x + agents[enum].r*np.cos(np.radians(o))
-            olf_y = y + agents[enum].r*np.sin(np.radians(o))
-            olf_o1 = geometry.force_angle_degrees(np.degrees(agents[enum].sensors.olf_angles[0])+o)
-            olf_o2 = geometry.force_angle_degrees(np.degrees(agents[enum].sensors.olf_angles[1])+o)
-            olf_domain[enum].center = (olf_x,olf_y)
-            olf_domain[enum].theta1 = olf_o1
-            olf_domain[enum].theta2 = olf_o2
-            olf_domain[enum]._recompute_path()
+            # olf domain (shapely polygon)
+            olf_domain[enum].set_data(*agents[enum].sensors.sensory_domain["olf"][i].exterior.xy)
             # olf signals
             olf_val = agents[enum].states[i][2]
             print("time: {}, location: {},{}, agent: {}, olf_val: {}".format(i,round(x,2),round(y,2),enum,olf_val))
@@ -124,19 +115,8 @@ def sim_animation(lifetime, limits, walls, trees, agents):
 
             # vis domain (wedges)
             for n in range(len(vis_domain[enum])):
-                # vis_or = agent_or + agent.sensor_or[n], ps[1]: ir_angles: [rad(-60), rad(60)]
-                vis_o = geometry.force_angle(agents[enum].positions[i][2]+agents[enum].sensors.ir_angles[n])
-                # sensor location
-                vis_x = x + agents[enum].r*np.cos(vis_o)
-                vis_y = y + agents[enum].r*np.sin(vis_o)
-                # beam_spread, start and end angles of beam
-                vis_sp = agents[enum].genotype.beam_spread/2
-                vis_o1 = geometry.force_angle_degrees(np.degrees(vis_o)-vis_sp)
-                vis_o2 = geometry.force_angle_degrees(np.degrees(vis_o)+vis_sp)
-                vis_domain[enum][n].center = (vis_x, vis_y)
-                vis_domain[enum][n].theta1 = vis_o1
-                vis_domain[enum][n].theta2 = vis_o2
-                vis_domain[enum][n]._recompute_path()
+                # get polygon
+                vis_domain[enum][n].set_data(*agents[enum].sensors.sensory_domain["vis"][i][n].exterior.xy)
                 # visual signals
                 vis_val = agents[enum].states[i][n]
                 # print("time: {}, location: {},{}, agent: {}, sensor: {}, vis_val: {}".format(i,round(x,2),round(y,2),enum,n,vis_val))
