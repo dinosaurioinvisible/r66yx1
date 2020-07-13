@@ -2,12 +2,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+plt.rcParams['animation.ffmpeg_path'] = '/Users/sol/x01/bin'
 from shapely.geometry import Point
 from shapely.geometry import LineString
 from shapely.geometry.polygon import Polygon
 
 
-def sim_animation(t, world, agents):
+def sim_animation(world, agents, t=None, video=False):
+    # time steps
+    if t==None:
+        t = len(agents[0])
     # def
     fig = plt.figure()
     ax = plt.axes(xlim=(0,world.xmax), ylim=(0,world.ymax), aspect="equal")
@@ -19,15 +23,19 @@ def sim_animation(t, world, agents):
     for agent in agents:
         ag, = plt.plot([],[], color="black")
         ags.append(ag)
-        ir1, = plt.plot([],[], color="orange")
-        ir2, = plt.plot([],[], color="orange")
-        irs.append([ir1, ir2])
+        agent_irs = []
+        for ir_n in range(agents[0].sensors.vs_n):
+            ir, = plt.plot([],[], color="orange")
+            agent_irs.append(ir)
+        irs.append(agent_irs)
         olf, = plt.plot([],[], color="yellow")
         olfs.append(olf)
         com, = plt.plot([],[], color="blue")
         coms.append(com)
         feed, = plt.plot([],[], color="grey")
         feeds.append(feed)
+    # for deleted objects from agents (when energy = 0)
+    del_agents = []
 
     # to pause the animation
     def onClick(event):
@@ -38,11 +46,14 @@ def sim_animation(t, world, agents):
         else:
             anim.event_source.start()
             anim_running = True
+        xags = agents
+        import pdb; pdb.set_trace()
 
     def init():
         # optional walls, trees and initial locations
         for wall in world.walls[4:]:
-            ax.plot([wall.xmin, wall.xmax], [wall.ymin, wall.ymax], color="black")
+            ax.plot(*wall.area.xy)
+            # ax.plot([wall.xmin, wall.xmax], [wall.ymin, wall.ymax], color="black")
         for tree in world.trees:
             # ax.plot(*tree.area.exterior.xy, color="green")
             tx = plt.Circle((tree.x, tree.y), radius=tree.r, color="green", fill=True)
@@ -52,50 +63,94 @@ def sim_animation(t, world, agents):
     def animate(i):
         time.set_text("time: "+str(i))
         # for each agent
+        print("\nt={}".format(i))
         for enum, ag in enumerate(ags):
+            # for debugging
             x = agents[enum].data.x[i]
             y = agents[enum].data.y[i]
             o = agents[enum].data.o[i]
+            ag_ax_tx = agents[enum].data.agent_ax_tx[i]
+            de = agents[enum].data.de[i]
             e = agents[enum].data.e[i]
-            print("\nt: {}".format(i))
-            print("x,y: {},{}".format(x,y))
-            print("o: {} > {}".format(o, np.degrees(o)))
-            print("energy: {}".format(e))
-            ag.set_data(*agents[enum].data.area[i].exterior.xy)
-            # ir sensors
-            for n in range(len(irs[enum])):
-                irs[enum][n].set_data(*agents[enum].data.vs_sensors[i][n].exterior.xy)
-                vx = True if agents[enum].data.env_info[i][n] != 0 else False
-                irs[enum][n].set_visible(vx)
-            all_irs = [ir for irx in irs for ir in irx]
-            # olf sensor
-            olfs[enum].set_data(*agents[enum].data.olf_sensor[i].exterior.xy)
-            vx = True if agents[enum].data.env_info[i][-1] != 0 else False
-            olfs[enum].set_visible(vx)
-            # feeding info
-            feeds[enum].set_data(*agents[enum].data.feeding_area[i].exterior.xy)
+            sm_info = agents[enum].data.sm_info[i]
+            com_out = agents[enum].data.com_out[i]
+            print("agent {} - x:{}, y:{} o:{}".format(enum+1, round(x),round(y),round(o)))
+            print("ag_ax_tx: {}, de={}, e={}".format(ag_ax_tx,round(de,2),round(e,2)))
+            print("sm_info: {} > com_out: {}".format([round(i,2) for i in sm_info],com_out))
 
-            # communication info
-            coms[enum].set_data(*agents[enum].data.com_area[i].exterior.xy)
+            # agent body area location
+            ag.set_data(*agents[enum].data.area[i].exterior.xy)
+            # for adjusting sensors index
+            enumx = enum-len(del_agents) if enum > 0 else enum
+            # if agent 0 alive and agent 2 dead: agent 1 > enumx=1
+            # if agent 0 dead and agent 2 alive: agent 1 > enumx=0
+            if enum == 1 and enumx == 0 and len(irs) == 1:
+                enumx = 1
+            # check if alive and that they objects weren't already deleted
+            if e <= 0 and ag not in del_agents:
+                # deactivate visibility
+                for ir in irs[enumx]:
+                    ir.set_visible(False)
+                #irs[enumx][0].set_visible(False)
+                #irs[enumx][1].set_visible(False)
+                olfs[enumx].set_visible(False)
+                feeds[enumx].set_visible(False)
+                coms[enumx].set_visible(False)
+                # delete objects
+                del(irs[enumx])
+                del(olfs[enumx])
+                del(feeds[enumx])
+                del(coms[enumx])
+                del_agents.append(ag)
+            # normal case
+            if e > 0:
+                # ir sensors
+                # check for an error at time=1000 (last second)
+                try:
+                    for n in range(len(irs[enumx])):
+                        irs[enumx][n].set_data(*agents[enum].data.vs_sensors[i][n].exterior.xy)
+                        vx = True if agents[enum].data.env_info[i][n] != 0 else False
+                        irs[enumx][n].set_visible(vx)
+                    all_irs = [ir for irx in irs for ir in irx]
+                except:
+                    import pdb; pdb.set_trace()
+                # olf sensor
+                olfs[enumx].set_data(*agents[enum].data.olf_sensor[i].exterior.xy)
+                vx = True if agents[enum].data.env_info[i][-1] != 0 else False
+                olfs[enumx].set_visible(vx)
+                # feeding info
+                feeds[enumx].set_data(*agents[enum].data.feeding_area[i].exterior.xy)
+                # communication info
+                coms[enumx].set_data(*agents[enum].data.com_area[i].exterior.xy)
+                com_array = np.array(agents[enum].data.com_info[i])
+                vx_com = sum(np.where(com_array!=0,1,0))
+                vx = True if vx_com != 0 else False
+                coms[enumx].set_visible(vx)
+            # in case all agents are dead
+            if len(ags) == len(del_agents):
+                all_irs = []
 
         return time, tuple(ags)+tuple(all_irs)+tuple(olfs)+tuple(coms)+tuple(feeds)
-        #return time, tuple(ags)+tuple(irs)+tuple(olfs)+tuple(coms)+tuple(feeds)
 
     fig.canvas.mpl_connect('button_press_event', onClick)
     anim = animation.FuncAnimation(fig, animate,
                                         init_func=init,
                                         frames=t,
-                                        interval=200,
+                                        interval=50,
                                         blit=False)
+    if video:
+        # writer for saving the animation
+        # xwriter = animation.PillowWriter(fps=30)
+        # xwriter = animation.ImageMagickFileWriter(fps=30)
+        # xwriter = animation.ImageMagickWriter(fps=30)
+        xwriter = animation.FFMpegWriter(fps=30)
+        anim.save("Users/sol/desktop/trials/animfile.mp4", writer=xwriter)#, fps=30)#, extra_args=["-vcodec", "libx264"])
+
     plt.show()
+    plt.close()
 
 
 
-
-import _trial
-trial = _trial.Trial()
-x = trial.trial()
-sim_animation(x[0],x[1],x[2])
 
 
 

@@ -22,7 +22,8 @@ class Data:
         self.e_states = []
         self.h_states = []
         # feeding
-        self.ax_tx = []
+        self.agent_ax_tx = []
+        self.de = []
 
     def save_ax(self, x, y, o, area, feeding_area, e):
         self.x.append(x)
@@ -47,7 +48,22 @@ class Data:
         self.e_states.append(e_states)
         self.h_states.append(h_states)
 
-    def save_feeding(self, ax_tx):
-        self.ax_tx.append(ax_tx)
+    def save_feeding(self, agent_ax_tx, de):
+        self.agent_ax_tx.append(agent_ax_tx)
+        self.de.append(de)
+
+    def fill_off(self):
+        self.vs_sensors.append([None]*len(self.vs_sensors[0]))
+        self.olf_sensor.append(None)
+        self.env_info.append([0]*len(self.env_info[0]))
+        self.com_area.append(None)
+        self.com_info.append([0]*len(self.com_info[0]))
+        self.com_out.append([None]*len(self.vs_sensors[0]))
+        self.sm_info.append([0]*len(self.sm_info[0]))
+        self.e_states.append(None)
+        self.h_states.append(None)
+        #self.agent_ax_tx.append([0]*len(self.agent_ax_tx[0]))
+        #self.de.append(0)
+
 
 #

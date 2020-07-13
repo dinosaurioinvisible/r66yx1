@@ -52,8 +52,7 @@ class RNN:
         m2 = m2_e - m2_h
         c1 = eo[0][-5]
         c2 = eo[0][-6]
-        c3 = eo[0][-7]
-        com = [c1,c2,c3]
+        com = [c1,c2]
         # print("\nt={}: m1={}, m2={}".format(len(self.e_states)-1,m1,m2))
         return m1, m2, com
 
