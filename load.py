@@ -14,7 +14,7 @@ def load(filename, anim=True, hmap=True, ret=True):
     while on == True:
         print("")
         for enum, case in enumerate(xobj.good_cases):
-            print("{} - gen: {}, energy: {}".format(enum, case[0], case[1]))
+            print("{} - gen: {}, fitness: {}".format(enum, case[0], case[1]))
         print("\"h\" for enabling/disabling heatmap, currently: {}".format("ON" if hmap else "OFF"))
         print("\"a\" for enabling/disabling animation, currently: {}".format("ON" if anim else "OFF"))
         print("\"q\" for exit")
@@ -37,7 +37,7 @@ def load(filename, anim=True, hmap=True, ret=True):
                 show_hmap = False
             # trial and animation
             if show_anim:
-                xtrial = _trial.Trial(t=1000, genotype=xgen, n_agents=3, world=None, n_trees=10, n_walls=4)
+                xtrial = _trial.Trial(t=1000, genotype=xgen, n_agents=1, world=None, n_trees=10, n_walls=4)
                 _trial_animation.sim_animation(xtrial.world, xtrial.agents, xtrial.t)
             # heatmap from selected genotype
             if show_hmap:

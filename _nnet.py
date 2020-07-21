@@ -10,7 +10,12 @@ class RNN:
         self.n_output = genotype.n_output
         self.n_net = self.n_input+self.n_hidden+self.n_output
         self.W = genotype.W
-        self.V = genotype.V
+        self.V = genotype.V        
+        # number of units for inputs
+        self.e_in = genotype.e_in
+        self.vs_n = genotype.vs_n
+        self.olf_n = genotype.olf_n
+        self.com_len = genotype.com_len
         # threshold values
         self.ut = genotype.ut
         self.lt = genotype.lt
@@ -50,11 +55,16 @@ class RNN:
         m2_h = eo[0][-1]
         m1 = m1_e - m1_h
         m2 = m2_e - m2_h
-        c1 = eo[0][-5]
-        c2 = eo[0][-6]
-        com = [c1,c2]
+        # attentional outputs
+        olf_i = -4-self.olf_n
+        olf_attn = eo[0][olf_i:-4]
+        vs_i = olf_i - self.vs_n
+        vs_attn = eo[0][vs_i:olf_i]
+        # communication
+        com_i = vs_i-self.com_len
+        com = eo[0][com_i:vs_i]
         # print("\nt={}: m1={}, m2={}".format(len(self.e_states)-1,m1,m2))
-        return m1, m2, com
+        return m1, m2, olf_attn, vs_attn, com
 
     def transfer_fx(self, x):
         # if x >= t_up : 1; if x <= t_low: 0; else: (x-t_low)/(t_up-t_low)

@@ -4,17 +4,19 @@ import random
 
 class Genotype:
     def __init__(self, r=2.5\
-        , e_in=1, energy=100, de_dt=0.1\
+        , e_in=0, energy=2000, de_dt=0.1\
         , max_speed=5, wheels_sep=4\
         , feeding_rate=2, feeding_range=10, feeding_theta=90\
         , s_points=100\
         , vs_n=4, vs_dos=[-15,-60,15,60], vs_range=50, vs_theta=30\
-        , olf_n=1, olf_range=22, olf_theta=270\
-        , com_range=33, com_len=2, signals="axb"\
-        , n_hidden=5\
+        , olf_n=1, olf_range=50, olf_theta=300\
+        , com_range=33, com_len=0, signals="axb"\
+        , n_hidden=3\
         , ut=0.5, lt=0.1, vt=0.9\
+        , noise=0.1\
         , W=[], V=[]\
         , n_motor = 4\
+        , attn = True\
         , plasticity=0):
         # agent
         self.r = r
@@ -48,10 +50,12 @@ class Genotype:
         self.ut = ut
         self.lt = lt
         self.vt = vt
+        self.noise = noise
         self.W = W
         self.V = V
         if len(W)==0 and len(V)==0:
             self.random_weights()
+        self.attn = attn
         self.plasticity = plasticity
 
     def random_weights(self):
@@ -65,13 +69,12 @@ class Genotype:
             for j in range(self.n_input, self.n_input+self.n_hidden):
                 self.W[i][j] = random.uniform(-0.75,0.75)
                 self.V[i][j] = 0
-                # self.V[i][j] = np.random.randint(2)
         # random init for hidden -> motor
         for i in range(self.n_input, self.n_input+self.n_hidden):
             for j in range(self.n_input+self.n_hidden, self.n_net):
                 self.W[i][j] = random.uniform(-0.75,0.75)
                 self.V[i][j] = 0
-                # self.V[i][j] = np.random.randint(2)
+
 
 
 

@@ -7,6 +7,8 @@ from shapely.geometry import Point
 from shapely.geometry import LineString
 from shapely.geometry.polygon import Polygon
 
+#TODO:
+
 
 def sim_animation(world, agents, t=None, video=False):
     # time steps
@@ -46,6 +48,7 @@ def sim_animation(world, agents, t=None, video=False):
         else:
             anim.event_source.start()
             anim_running = True
+        xworld = world
         xags = agents
         import pdb; pdb.set_trace()
 
@@ -80,19 +83,34 @@ def sim_animation(world, agents, t=None, video=False):
 
             # agent body area location
             ag.set_data(*agents[enum].data.area[i].exterior.xy)
+
             # for adjusting sensors index
-            enumx = enum-len(del_agents) if enum > 0 else enum
-            # if agent 0 alive and agent 2 dead: agent 1 > enumx=1
-            # if agent 0 dead and agent 2 alive: agent 1 > enumx=0
-            if enum == 1 and enumx == 0 and len(irs) == 1:
-                enumx = 1
+            if enum == 0:
+                enumx = enum
+            else:
+                # check if previous agents are alive
+                ags_e = np.array([a.data.e[i] for a in agents[:enum]])
+                ags_alive = np.where(ags_e>0,1,0)
+                # if all agents (up to here) are alive
+                if enum == sum(ags_alive):
+                    enumx = enum
+                else:
+                    # previous dead agents
+                    ags_dead = sum(np.where(ags_e<=0,1,0))
+                    enumx = enum - ags_dead
+
+            # enumx = enum-len(del_agents) if enum > 0 else enum
+            # # if agent 0 alive and agent 2 dead: agent 1 -> enumx=1
+            # # if agent 0 dead and agent 2 alive: agent 1 -> enumx=0
+            # # if agent 0 dead and agent 2 dead: agent 1 ->
+            # if enum == 1 and enumx == 0 and len(irs) == 1:
+            #     enumx = 1
+
             # check if alive and that they objects weren't already deleted
             if e <= 0 and ag not in del_agents:
                 # deactivate visibility
                 for ir in irs[enumx]:
                     ir.set_visible(False)
-                #irs[enumx][0].set_visible(False)
-                #irs[enumx][1].set_visible(False)
                 olfs[enumx].set_visible(False)
                 feeds[enumx].set_visible(False)
                 coms[enumx].set_visible(False)
@@ -105,27 +123,28 @@ def sim_animation(world, agents, t=None, video=False):
             # normal case
             if e > 0:
                 # ir sensors
-                # check for an error at time=1000 (last second)
                 try:
                     for n in range(len(irs[enumx])):
                         irs[enumx][n].set_data(*agents[enum].data.vs_sensors[i][n].exterior.xy)
-                        vx = True if agents[enum].data.env_info[i][n] != 0 else False
-                        irs[enumx][n].set_visible(vx)
+                        # vx = True if agents[enum].data.env_info[i][n] != 0 else False
+                        # irs[enumx][n].set_visible(vx)
+                        irs[enumx][n].set_visible(True)
                     all_irs = [ir for irx in irs for ir in irx]
+                    # olf sensor
+                    olfs[enumx].set_data(*agents[enum].data.olf_sensor[i].exterior.xy)
+                    # vx = True if agents[enum].data.env_info[i][-1] != 0 else False
+                    # olfs[enumx].set_visible(vx)
+                    olfs[enumx].set_visible(True)
+                    # feeding info
+                    feeds[enumx].set_data(*agents[enum].data.feeding_area[i].exterior.xy)
+                    # communication info
+                    coms[enumx].set_data(*agents[enum].data.com_area[i].exterior.xy)
+                    com_array = np.array(agents[enum].data.com_info[i])
+                    vx_com = sum(np.where(com_array!=0,1,0))
+                    vx = True if vx_com != 0 else False
+                    coms[enumx].set_visible(vx)
                 except:
                     import pdb; pdb.set_trace()
-                # olf sensor
-                olfs[enumx].set_data(*agents[enum].data.olf_sensor[i].exterior.xy)
-                vx = True if agents[enum].data.env_info[i][-1] != 0 else False
-                olfs[enumx].set_visible(vx)
-                # feeding info
-                feeds[enumx].set_data(*agents[enum].data.feeding_area[i].exterior.xy)
-                # communication info
-                coms[enumx].set_data(*agents[enum].data.com_area[i].exterior.xy)
-                com_array = np.array(agents[enum].data.com_info[i])
-                vx_com = sum(np.where(com_array!=0,1,0))
-                vx = True if vx_com != 0 else False
-                coms[enumx].set_visible(vx)
             # in case all agents are dead
             if len(ags) == len(del_agents):
                 all_irs = []
