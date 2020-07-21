@@ -9,13 +9,14 @@ import os
 
 
 class Evolve():
-    def __init__(self, n_gen=66, n_groups=10, n_trials=10\
+    def __init__(self, n_gen=33, n_groups=10, n_trials=10\
         , genotype=None\
-        , n_agents=3\
+        , n_agents=1\
         , n_trees=10\
         , trial_t=1000\
         , mut_rate=0.1\
-        , anim=False):
+        , anim=False
+        , save=True):
         # groups of agents
         self.n_gen = n_gen
         self.n_groups = n_groups
@@ -101,12 +102,12 @@ class Evolve():
                 _trial_animation.sim_animation(xtrial.world, xtrial.agents, self.trial_t)
 
             # next generation (assuming clonal approach)
-            # 1: best genotype
+            # best genotype replication
             self.genotypes = [best[1]]
-            # 3: best genotype mutations
-            for n in range(3):
+            # best genotype mutations
+            for n in range(4):
                 self.mutate(best[1])
-            # rest (6): breeding through roulette type selection
+            # rest: breeding through roulette type selection
             sorted_best = sorted(groups_data, key=lambda x:x[0], reverse=True)[:int(self.n_groups/3)]
             parents = [i for i in sorted_best if i[0] > 0]
             if len(parents) < 2:
@@ -116,7 +117,7 @@ class Evolve():
                 self.breed(parents)
 
         # "alarm" after ending
-        os.system("osascript -e \"set Volume 10\" ")
+        os.system("osascript -e \"set Volume 5\" ")
         os.system("open -a vlc ~/desktop/hadouken.mp4")
         # os.system("open -a vlc ~/desktop/brigth-engelberts-free-me-now.mp3")
 
@@ -129,8 +130,8 @@ class Evolve():
                 if random.uniform(0,1)<self.mut_rate:
                     wx[i][j] += random.uniform(-0.1,0.1)
         # check no w[i][j] goes out of [-1,1]
-        np.where(wx<-1, -1, wx)
-        np.where(wx>1, 1, wx)
+        wx = np.where(wx<-1, -1, wx)
+        wx = np.where(wx>1, 1, wx)
         # veto weights
         vx = xgenotype.V
         for i in range(len(vx)):
@@ -140,8 +141,8 @@ class Evolve():
                 # also possible to come back to zero
                 if random.uniform(0,1)<self.mut_rate/10:
                     wx[i][j] = 0
-        np.where(vx<-1, -1, vx)
-        np.where(vx>1, 1, vx)
+        vx = np.where(vx<-1, -1, vx)
+        vx = np.where(vx>1, 1, vx)
         # thresholds
         if random.uniform(0,1)<self.mut_rate:
             ut = xgenotype.ut + random.uniform(-0.05,0.05)
@@ -204,28 +205,12 @@ class Evolve():
             if len(self.genotypes) > self.n_groups:
                 self.genotypes = self.genotypes[:self.n_groups]
 
-    # def mut_weights(self, weights):
-    #     wf = weights.flatten()
-    #     # replace values with random numbers between [-1,1] if random number is within mut_rate prob
-    #     wfx = np.array([random.uniform(-1,1) if np.random.randint(100)<100*self.mut_rate else wij for wij in wf])
-    #     W = wfx.reshape(weights.shape)
-    #     return W
-    #
-    # def mut_v_weights(self, weights):
-    #     wf = weights.flatten()
-    #     # replace values with random numbers between [-1,1] if random number is within mut_rate prob
-    #     wfx = np.array([random.uniform(-1,1) if np.random.randint(100)<100*self.mut_rate else wij for wij in wf])
-    #     # return to zero with 50% prob
-    #     wfx = np.array([0 if np.random.randint(100)<100*0.5 else wij for wij in wf])
-    #     W = wfx.reshape(weights.shape)
-    #     return W
-
 def save_obj(obj, filename="ea_exp"):
     # save into pickle
     save = False
     i = 1
     while save is not True:
-        i_filename = "{}_agents{}_groups{}_v{}.obj".format(filename, obj.n_agents, obj.n_groups, i)
+        i_filename = "{}_agents{}_groups{}_gens{}_v{}.obj".format(filename, obj.n_agents, obj.n_groups, obj.n_gen, i)
         i_path = os.path.join(os.getcwd(), i_filename)
         if os.path.isfile(i_path):
             i += 1

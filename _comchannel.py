@@ -33,10 +33,14 @@ class Com:
         com_get = ["x"]* self.com_len
         min_dist = 100
         for xa in xagents:
-            if self.com_area.intersects(xa.comchannel.com_area):
-                dist = Point(self.x,self.y).distance(Point(xa.x,xa.y))
-                if dist < min_dist:
-                    com_get = xa.com_out
+            # if the other agente is alive
+            if xa.e > 0:
+                # if both com areas intersect
+                if self.com_area.intersects(xa.comchannel.com_area):
+                    # this is to choose the closer agent signal in case there is more than one
+                    dist = Point(self.x,self.y).distance(Point(xa.x,xa.y))
+                    if dist < min_dist:
+                        com_get = xa.com_out
         self.com_info = [self.com_dict[ci] for ci in com_get]
         return self.com_info
 
