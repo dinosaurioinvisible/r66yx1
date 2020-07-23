@@ -5,18 +5,20 @@ import _trial
 import _trial_animation
 import random
 import pickle
+import time
 import os
 
 
 class Evolve():
-    def __init__(self, n_gen=33, n_groups=10, n_trials=10\
+    def __init__(self, n_gen=100, n_groups=10, n_trials=10\
         , genotype=None\
         , n_agents=1\
         , n_trees=10\
         , trial_t=1000\
         , mut_rate=0.1\
-        , anim=False
-        , save=True):
+        , anim=False\
+        , alarm=False\
+        , save=5):
         # groups of agents
         self.n_gen = n_gen
         self.n_groups = n_groups
@@ -27,6 +29,9 @@ class Evolve():
         self.mut_rate = mut_rate
         # opts
         self.anim = anim
+        self.alarm = alarm
+        self.save = save
+        self.index = "{:04}".format(int([i for i in os.listdir() if "temp" in i][-1].split("_")[1])+1)
         self.debug = False
         # opt load genotype
         if not genotype:
@@ -60,13 +65,18 @@ class Evolve():
                     print("generation: {}/{}, group: {}/{}, trial: {}/{}, agents: {}, trees:{}".format(n+1,self.n_gen, ng+1,self.n_groups, nt+1,self.n_trials, self.n_agents, n_trees))
                     # run trial
                     xtrial = _trial.Trial(t=self.trial_t, genotype=self.genotypes[ng], n_agents=self.n_agents, world=None, n_trees=n_trees)
-                    # fitness = sum of energies * how many agents are alive
-                    ags_e = np.array([ag.e for ag in xtrial.agents])
-                    living_ags = sum(np.where(ags_e>0, 1, ags_e))
-                    xft = sum(ags_e) * living_ags/self.n_agents
-                    group_fts.append(xft)
-                    for i in range(len(ags_e)):
-                        print("agent{} energy: {}".format(i+1, round(ags_e[i],2)))
+                    # NOTE: fitnness fx
+                    # regarding energy
+                    ff_e = np.array([ag.e for ag in xtrial.agents])
+                    ff_ags_e = sum(ff_e) * sum(np.where(ff_e>0, 1, ff_e))/self.n_agents
+                    # regarding trees
+                    ff_tcount = sum([sum(sum(ag.data.agent_ax_tx)) for ag in xtrial.agents])/(self.n_agents*self.trial_t)
+                    ff_trees = ff_tcount*(1+n_trees)/n_trees
+                    # fitness
+                    ft = ff_ags_e * ff_trees
+                    group_fts.append(ft)
+                    for i in range(len(ff_e)):
+                        print("agent{} energy: {}".format(i+1, round(ff_e[i],2)))
                     print("group fitness: {}".format(round(group_fts[-1],2)))
 
                 # weight trial performances for group
@@ -84,8 +94,9 @@ class Evolve():
             self.total_e += best[0]
             self.av_e = self.total_e/(n+1)
             print("average energy until now: {}".format(round(self.av_e,2)))
-            # save if good (over average)
-            if best[0] > self.av_e:
+            # save if good (over zero for now)
+            # if best[0] > self.av_e:
+            if best[0] > 0:
                 self.good_cases.append([n+1, best[0], best[1]])
                 print("group over average, added to good cases")
                 # for debugging
@@ -115,10 +126,17 @@ class Evolve():
                     self.mutate(best[1])
             else:
                 self.breed(parents)
+            # save temps
+            if len(self.good_cases) > 0 and len(self.good_cases)%self.save==0:
+                # index (assuming ordered sequence in dir)
+                self.save_sim(filename="temp")
 
-        # "alarm" after ending
-        os.system("osascript -e \"set Volume 5\" ")
-        os.system("open -a vlc ~/desktop/hadouken.mp4")
+        # save good cases
+        self.save_sim(filename="good_cases")
+        # alert
+        if self.alarm:
+            os.system("osascript -e \"set Volume 3\" ")
+            os.system("open -a vlc ~/desktop/hadouken.mp4")
         # os.system("open -a vlc ~/desktop/brigth-engelberts-free-me-now.mp3")
 
     def mutate(self, xgenotype):
@@ -127,37 +145,46 @@ class Evolve():
         # for every weight, if within mut rate, mutate from [-0.1, 0.1]
         for i in range(len(wx)):
             for j in range(len(wx[i])):
-                if random.uniform(0,1)<self.mut_rate:
-                    wx[i][j] += random.uniform(-0.1,0.1)
-        # check no w[i][j] goes out of [-1,1]
-        wx = np.where(wx<-1, -1, wx)
+                if np.random.uniform(0,1)<self.mut_rate:
+                    # wx[i][j] = 1 if wx[i][j] == 0 else 0
+                    wx[i][j] += np.random.uniform(-0.1,0.1)
+        # check no w[i][j] goes out of [0,1]
+        wx = np.where(wx<0, 0, wx)
         wx = np.where(wx>1, 1, wx)
         # veto weights
         vx = xgenotype.V
         for i in range(len(vx)):
             for j in range(len(vx[i])):
-                if random.uniform(0,1)<self.mut_rate/10:
-                    wx[i][j] += random.uniform(-0.05,0.05)
-                # also possible to come back to zero
-                if random.uniform(0,1)<self.mut_rate/10:
-                    wx[i][j] = 0
-        vx = np.where(vx<-1, -1, vx)
+                if np.random.uniform(0,1)<self.mut_rate/2:
+                    # vx[i][j] = 1 if vx[i][j] == 0 else 0
+                    vx[i][j] += random.uniform(-0.1,0.1)
+        vx = np.where(vx<0, 0, vx)
         vx = np.where(vx>1, 1, vx)
+        # reset veto matrix
+        v_reset=False
+        if np.random.uniform(0,1)<self.mut_rate:
+            v_reset = True
+        # hidden units
+        n_hidden = xgenotype.n_hidden
+        if np.random.uniform(0,1)<self.mut_rate:
+            n_hidden += np.random.choice([-1,1])
+        n_hidden = 2 if n_hidden < 2 else n_hidden
+        n_hidden = 6 if n_hidden > 6 else n_hidden
         # thresholds
-        if random.uniform(0,1)<self.mut_rate:
+        ut = xgenotype.ut
+        if np.random.uniform(0,1)<self.mut_rate:
             ut = xgenotype.ut + random.uniform(-0.05,0.05)
-        else:
-            ut = xgenotype.ut
-        if random.uniform(0,1)<self.mut_rate:
+        ut = np.random.uniform(0.5,1) if 0.5 < ut > 1 else ut
+        lt = xgenotype.lt
+        if np.random.uniform(0,1)<self.mut_rate:
             lt = xgenotype.lt + random.uniform(-0.05,0.05)
-        else:
-            lt = xgenotype.lt
-        if random.uniform(0,1)<self.mut_rate:
+        lt = np.random.uniform(0,0.4) if 0 < lt > 0.4 else lt
+        vt = xgenotype.vt
+        if np.random.uniform(0,1)<self.mut_rate:
             vt = xgenotype.vt + random.uniform(-0.05,0.05)
-        else:
-            vt = xgenotype.vt
+        vt = np.random.uniform(0.8,1) if 0.6 < vt > 1 else vt
         # generate new genotype
-        new_genotype = _genotype.Genotype(ut=ut, lt=lt, vt=vt, W=wx, V=vx)
+        new_genotype = _genotype.Genotype(n_hidden=n_hidden, ut=ut, lt=lt, vt=vt, W=wx, V=vx, v_reset=v_reset)
         self.genotypes.append(new_genotype)
 
 
@@ -191,26 +218,60 @@ class Evolve():
             vx2 = np.concatenate((p2v.flatten()[:k1],p1v.flatten()[k1:k2],p2v.flatten()[k2:]))
             vx1 = vx1.reshape(p1v.shape)
             vx2 = vx2.reshape(p2v.shape)
+            # thresholds
+            ut1 = pxs[0].ut
+            ut2 = pxs[1].ut
+            lt1 = pxs[0].lt
+            lt2 = pxs[1].lt
+            vt1 = pxs[0].vt
+            vt2 = pxs[1].vt
+            # hidden units
+            n_hu1 = wx1.shape[0]-pxs[0].n_input-pxs[0].n_output
+            n_hu2 = wx2.shape[0]-pxs[1].n_input-pxs[1].n_output
             # new genotypes
-            new_genotype1 = _genotype.Genotype(W=wx1, V=vx1)
-            new_genotype2 = _genotype.Genotype(W=wx2, V=vx2)
-            # 50% chance of mutations for each
-            for gx in [new_genotype1, new_genotype2]:
-                mx = np.random.randint(0,2)
-                if mx:
-                    self.mutate(gx)
-                else:
-                    self.genotypes.append(gx)
-            # for non even number of groups
-            if len(self.genotypes) > self.n_groups:
-                self.genotypes = self.genotypes[:self.n_groups]
+            new_genotype1 = _genotype.Genotype(n_hidden=n_hu1, ut=ut1, lt=lt1, vt=vt1, W=wx1, V=vx1)
+            new_genotype2 = _genotype.Genotype(n_hidden=n_hu2, ut=ut2, lt=lt2, vt=vt2, W=wx2, V=vx2)
+            # prob mutation only the second one
+            self.genotypes.append(new_genotype1)
+            if len(self.genotypes) == self.n_groups:
+                break
+            if np.random.choice((True,False)):
+                self.mutate(new_genotype2)
+            else:
+                self.genotypes.append(new_genotype2)
 
-def save_obj(obj, filename="ea_exp"):
+
+    def save_sim(self, filename="temp"):
+        # save into pickle
+        save = False
+        while save is not True:
+            # look for previous temps
+            idx = "{}_{}".format(filename,self.index)
+            temps = [i for i in os.listdir() if idx in i]
+            # filename
+            i_filename = "{}_agents{}_groups{}_gens{}_trials{}_t{}_cases{}.obj".format(idx, self.n_agents, self.n_groups, self.n_gen, self.n_trials, self.trial_t, len(self.good_cases))
+            i_path = os.path.join(os.getcwd(), i_filename)
+            if not os.path.isfile(i_path):
+                # save
+                with open(i_path, "wb") as exp_file:
+                    pickle.dump(self.good_cases, exp_file)
+                print("\nTemp object saved at {}".format(i_path))
+                # remove previous version
+                for temp in temps:
+                    os.remove(os.path.join(os.getcwd(),temp))
+                    print("removed previous temporal file {}".format(temp))
+                save = True
+            else:
+                filename = "{}".format(time.ctime())
+
+
+# for saving the whole simulation object, not just the good cases
+def save_obj(obj, filename="evolexp"):
     # save into pickle
     save = False
     i = 1
     while save is not True:
-        i_filename = "{}_agents{}_groups{}_gens{}_v{}.obj".format(filename, obj.n_agents, obj.n_groups, obj.n_gen, i)
+        i_filename = "{}_v{}.obj".format(filename, i)
         i_path = os.path.join(os.getcwd(), i_filename)
         if os.path.isfile(i_path):
             i += 1

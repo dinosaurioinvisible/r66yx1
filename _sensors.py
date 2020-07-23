@@ -80,8 +80,9 @@ class Sensors:
                     if dist < min_dist:
                         min_dist = dist
             if min_dist < self.vs_range[n]:
-                k = -1*((min_dist/8.5)**2)
-                val = (3371 * np.exp(k))/35000
+                # k = -1*((min_dist/8.5)**2)
+                #val = (3371 * np.exp(k))/35000
+                val = (1/np.exp(min_dist/(self.olf_range/2)))**2
             self.info.append(val)
         # "olfactory" sensor
         val = 0
@@ -92,7 +93,7 @@ class Sensors:
                 if dist < min_dist:
                     min_dist = dist
             if min_dist < self.olf_range:
-                val = (1/np.exp(min_dist/self.olf_range))**2
+                val = (1/np.exp(min_dist/(self.olf_range/2)))**2
         self.info.append(val)
         return self.info
 

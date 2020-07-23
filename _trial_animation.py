@@ -77,9 +77,9 @@ def sim_animation(world, agents, t=None, video=False):
             e = agents[enum].data.e[i]
             sm_info = agents[enum].data.sm_info[i]
             com_out = agents[enum].data.com_out[i]
-            print("agent {} - x:{}, y:{} o:{}".format(enum+1, round(x),round(y),round(o)))
-            print("ag_ax_tx: {}, de={}, e={}".format(ag_ax_tx,round(de,2),round(e,2)))
-            print("sm_info: {} > com_out: {}".format([round(i,2) for i in sm_info],com_out))
+            print("agent {} - x:{}, y:{} o:{}".format(enum+1, np.around(x,2), np.around(y,2), np.around(o,2)))
+            print("ag_ax_tx: {}, de={}, e={}".format(ag_ax_tx, np.around(de,2), np.around(e,2)))
+            print("sm_info: {} > com_out: {}".format([np.around(i,2) for i in sm_info],com_out))
 
             # agent body area location
             ag.set_data(*agents[enum].data.area[i].exterior.xy)
@@ -113,7 +113,8 @@ def sim_animation(world, agents, t=None, video=False):
                     ir.set_visible(False)
                 olfs[enumx].set_visible(False)
                 feeds[enumx].set_visible(False)
-                coms[enumx].set_visible(False)
+                if agents[enumx].com_len:
+                    coms[enumx].set_visible(False)
                 # delete objects
                 del(irs[enumx])
                 del(olfs[enumx])
@@ -138,11 +139,14 @@ def sim_animation(world, agents, t=None, video=False):
                     # feeding info
                     feeds[enumx].set_data(*agents[enum].data.feeding_area[i].exterior.xy)
                     # communication info
-                    coms[enumx].set_data(*agents[enum].data.com_area[i].exterior.xy)
-                    com_array = np.array(agents[enum].data.com_info[i])
-                    vx_com = sum(np.where(com_array!=0,1,0))
-                    vx = True if vx_com != 0 else False
-                    coms[enumx].set_visible(vx)
+                    if agents[enum].data.com_area[i]:
+                        coms[enumx].set_data(*agents[enum].data.com_area[i].exterior.xy)
+                        com_array = np.array(agents[enum].data.com_info[i])
+                        vx_com = sum(np.where(com_array!=0,1,0))
+                        vx = True if vx_com != 0 else False
+                        coms[enumx].set_visible(vx)
+                    else:
+                        coms = []
                 except:
                     import pdb; pdb.set_trace()
             # in case all agents are dead

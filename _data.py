@@ -43,9 +43,9 @@ class Data:
         self.com_info.append(com_info)
         self.com_out.append(com_out)
 
-    def save_nnet(self, sm_info, e_states, h_states):
+    def save_nnet(self, sm_info, e_state, h_states):
         self.sm_info.append(sm_info)
-        self.e_states.append(e_states)
+        self.e_states.append(e_state)
         self.h_states.append(h_states)
 
     def save_feeding(self, agent_ax_tx, de):
@@ -53,6 +53,12 @@ class Data:
         self.de.append(de)
 
     def fill_off(self):
+        self.x.append(self.x[-1])
+        self.y.append(self.y[-1])
+        self.o.append(0)
+        self.area.append(self.area[-1])
+        self.feeding_area.append(None)
+        self.e.append(0)
         self.vs_sensors.append([None]*len(self.vs_sensors[0]))
         self.olf_sensor.append(None)
         self.env_info.append([0]*len(self.env_info[0]))
@@ -62,8 +68,8 @@ class Data:
         self.sm_info.append([0]*len(self.sm_info[0]))
         self.e_states.append(None)
         self.h_states.append(None)
-        #self.agent_ax_tx.append([0]*len(self.agent_ax_tx[0]))
-        #self.de.append(0)
+        self.agent_ax_tx.append([0]*len(self.agent_ax_tx[0]))
+        self.de.append(0)
 
 
 #
