@@ -1,22 +1,21 @@
 
 import numpy as np
-import random
 
 class Genotype:
     def __init__(self, r=2.5\
-        , e_in=0, energy=2000, de_dt=0.1\
+        , e_in=0, energy=1000, de_dt=1\
         , max_speed=5, wheels_sep=4\
         , feeding_rate=2, feeding_range=10, feeding_theta=90\
         , s_points=100\
-        , vs_n=4, vs_dos=[-15,-60,15,60], vs_range=50, vs_theta=30\
-        , olf_n=1, olf_range=50, olf_theta=300\
+        , vs_n=4, vs_dos=[-15,-60,15,60], vs_range=30, vs_theta=30\
+        , olf_n=1, olf_range=30, olf_theta=300\
         , com_range=33, com_len=0, signals="axb"\
         , n_hidden=3\
-        , ut=0.5, lt=0.1, vt=0.9\
-        , noise=0.1\
-        , W=[], V=[]\
-        , n_motor = 4\
-        , attn = True\
+        , ut=0.5, lt=0, vt=0.9\
+        , nn_noise=0.1\
+        , W=[], V=[], v_reset=False\
+        , n_motor=4\
+        , attn=True\
         , plasticity=0):
         # agent
         self.r = r
@@ -47,33 +46,70 @@ class Genotype:
         self.n_input = vs_n+olf_n+e_in+com_len
         self.n_hidden = n_hidden
         self.n_output = n_motor+com_len
+        self.n_net = self.n_input+self.n_hidden+self.n_output
         self.ut = ut
         self.lt = lt
         self.vt = vt
-        self.noise = noise
+        self.nn_noise = nn_noise
         self.W = W
         self.V = V
+        # create matrices if they don't exist
         if len(W)==0 and len(V)==0:
             self.random_weights()
+        # if there is one more hidden unit
+        if self.W.shape[0] != self.n_net:
+            self.adjust_shape()
+        # activate/deactivate v matrix
+        if v_reset:
+            self.V = np.zeros((self.n_net, self.n_net))
+            self.v_reset = False
+        # just to be sure
+        self.W = np.where(self.W<0,0,self.W)
+        self.W = np.where(self.W>1,1,self.W)
+        self.V = np.where(self.V<0,0,self.V)
+        self.V = np.where(self.V>1,1,self.V)
+        # very optional ideas
         self.attn = attn
-        self.plasticity = plasticity
+        self.plastic = plastic
 
     def random_weights(self):
-        # matrices for weights (features as columns)
-        self.n_net = self.n_input+self.n_hidden+self.n_output
         # connectivity matrices
         self.W = np.zeros((self.n_net, self.n_net))
         self.V = np.zeros((self.n_net, self.n_net))
         # random init for input -> hidden
-        for i in range(self.n_input):
-            for j in range(self.n_input, self.n_input+self.n_hidden):
-                self.W[i][j] = random.uniform(-0.75,0.75)
-                self.V[i][j] = 0
-        # random init for hidden -> motor
         for i in range(self.n_input, self.n_input+self.n_hidden):
-            for j in range(self.n_input+self.n_hidden, self.n_net):
-                self.W[i][j] = random.uniform(-0.75,0.75)
-                self.V[i][j] = 0
+            for j in range(self.n_input):
+                #self.W[i][j] = 1
+                self.W[i][j] = np.random.uniform(0.1,1)
+        # random init for hidden -> hidden
+        for i in range(self.n_input, self.n_input+self.n_hidden):
+            for j in range(self.n_input, self.n_input+self.n_hidden):
+                #self.W[i][j] = 1
+                self.W[i][j] = np.random.uniform(0.1,1)
+        # random init for hidden -> motor
+        for i in range(self.n_input+self.n_hidden,self.n_net):
+            for j in range(self.n_input, self.n_input+self.n_hidden):
+                #self.W[i][j] = 1
+                self.W[i][j] = np.random.uniform(0.1,1)
+
+    def adjust_shape(self):
+        # add hidden unit
+        if self.W.shape[0] < self.n_net:
+            # insert row
+            row = np.array([np.random.uniform(0.1,1) for i in range(self.n_net-1)])
+            self.W = np.insert(self.W, self.n_input+self.n_hidden, row, axis=0)
+            self.V = np.insert(self.V, self.n_input+self.n_hidden, 0, axis=0)
+            # insert column
+            col = np.array([np.random.uniform(0.1,1) for i in range(self.n_net)])
+            self.W = np.insert(self.W, self.n_input+self.n_hidden, col, axis=1)
+            self.V = np.insert(self.V, self.n_input+self.n_hidden, 0, axis=1)
+        # remove hidden unit
+        elif self.W.shape[0] > self.n_net:
+            self.W = np.delete(self.W, self.n_input+self.n_hidden, axis=0)
+            self.W = np.delete(self.W, self.n_input+self.n_hidden, axis=1)
+            self.V = np.delete(self.V, self.n_input+self.n_hidden, axis=0)
+            self.V = np.delete(self.V, self.n_input+self.n_hidden, axis=1)
+
 
 
 

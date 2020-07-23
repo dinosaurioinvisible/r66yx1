@@ -7,7 +7,7 @@ class RNN:
         self.n_input = genotype.n_input
         self.n_hidden = genotype.n_hidden
         self.n_output = genotype.n_output
-        self.n_net = self.n_input+self.n_hidden+self.n_output
+        self.n_net = genotype.n_net
         # excitatory and inhibitory/veto connectivity matrices
         self.W = genotype.W
         self.V = genotype.V
@@ -20,7 +20,7 @@ class RNN:
         self.ut = genotype.ut
         self.lt = genotype.lt
         self.vt = genotype.vt
-        self.noise = genotype.noise
+        self.nn_noise = genotype.nn_noise
         # internal states (empty state for t=0)
         self.e_states = [np.zeros((self.n_net,1))]
         self.h_states = [np.zeros((self.n_net,1))]
@@ -69,13 +69,19 @@ class RNN:
         h_state += retro_vu
 
         # output layer (o)
-        eo = wx[self.n_input+self.n_hidden:] + wu[self.n_input+self.n_hidden:] + self.e_states[-1][self.n_input+self.n_hidden:]
-        ho = vx[self.n_input+self.n_hidden:] + vu[self.n_input+self.n_hidden:] + self.h_states[-1][self.n_input+self.n_hidden:]
+        try:
+            eo = wx[self.n_input+self.n_hidden:] + wu[self.n_input+self.n_hidden:] + self.e_states[-1][self.n_input+self.n_hidden:]
+            ho = vx[self.n_input+self.n_hidden:] + vu[self.n_input+self.n_hidden:] + self.h_states[-1][self.n_input+self.n_hidden:]
+        except:
+            import pdb; pdb.set_trace()
         # go through nodes
         oe, oh = self.neuron_fx(eo,ho)
         # propagation (all for next step in this case) shape = (n_net, 1)
-        wo = np.dot(self.W[0:self.n_net,self.n_input+self.n_hidden:], oe)
-        vo = np.dot(self.V[0:self.n_net,self.n_input+self.n_hidden:], oh)
+        try:
+            wo = np.dot(self.W[0:self.n_net,self.n_input+self.n_hidden:], oe)
+            vo = np.dot(self.V[0:self.n_net,self.n_input+self.n_hidden:], oh)
+        except:
+            import pdb; pdb.set_trace()
         # add activation and save
         e_state += wo
         h_state += vo
@@ -84,6 +90,7 @@ class RNN:
         # motor output
         m1 = oe[0]-oe[1]
         m2 = oe[2]-oe[3]
+
         # attentional outputs
         olf_i = 4 + self.olf_n
         olf_attn = oe[4:4+olf_i] #if olf_i <= len(self.n_output) else np.array([])
@@ -101,8 +108,8 @@ class RNN:
         # veto input (from inhibitory inputs)
         v = np.where(h>0, 0, 1)
         # random noise
-        noise = np.array([np.random.uniform(-self.noise,self.noise,len(x))]).T
-        x += noise
+        nn_noise = np.array([np.random.uniform(-self.nn_noise,self.nn_noise,len(x))]).T
+        x += nn_noise
         # transfer function
         x = np.where(x>=self.ut,1,x)
         x = np.where(x<=self.lt,0,x)

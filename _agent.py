@@ -46,93 +46,92 @@ class Agent:
     def update_in(self, walls, trees, xagents):
         # save starting conditions
         self.data.save_ax(self.x, self.y, self.o, self.area, self.feeding_area, self.e)
-
         # check if alive:
-        if self.e > 0:
-            # update sensors and get info
-            self.sensors.define_sensors_area(self.x, self.y, self.o, self.r)
-            env_info = self.sensors.read_environment(walls,trees,xagents)
-            # communicative input, only if activated
-            com_info = []
-            if self.com_len > 0:
-                self.comchannel.define_com_area(self.x, self.y)
-                com_info = self.comchannel.update_in(xagents)
-            # energy input (if active)
-            e_info = []
-            if self.e_in > 0:
-                ev = 1 if self.e > 200 else (-1 + self.e*self.de_dt/10)**3
-                e_info = [ev]*self.e_in
-            # define the sm vector: np array(vs1, .., vsn, olf, e, c1, c2)
-            sm_info = np.array(env_info+e_info+com_info)
+        # if self.e > 0:
+        # update sensors and get info
+        self.sensors.define_sensors_area(self.x, self.y, self.o, self.r)
+        env_info = self.sensors.read_environment(walls,trees,xagents)
+        # communicative input, only if activated
+        com_info = []
+        if self.com_len > 0:
+            self.comchannel.define_com_area(self.x, self.y)
+            com_info = self.comchannel.update_in(xagents)
+        # energy input (if active)
+        # TODO: redo
+        e_info = []
+        if self.e_in > 0:
+            ev = 1 if self.e > 200 else (-1 + self.e*self.de_dt/10)**3
+            e_info = [ev]*self.e_in
+        # define the sm vector: np array(vs1, .., vsn, olf, e, c1, c2)
+        sm_info = np.array(env_info+e_info+com_info)
+        # get response from controller
+        self.lw, self.rw, olf_attn, vs_attn, com = self.net.update(sm_info)
+        # attn (if active)
+        if self.attn:
+            self.sensors.attention_fx(olf_attn, vs_attn)
+        # comm output (if active)
+        if len(com) > 0:
+            self.com_out = self.comchannel.output_signal(com)
 
-            # get response from controller
-            self.lw, self.rw, olf_attn, vs_attn, com = self.net.update(sm_info)
-            # attn (if active)
-            if self.attn:
-                self.sensors.attention_fx(olf_attn, vs_attn)
-            # comm output (if active)
-            if len(com) > 0:
-                self.com_out = self.comchannel.output_signal(com)
-
-            # save data
-            self.data.save_sensors(self.sensors.vs_sensors, self.sensors.olf_sensor, env_info)
-            self.data.save_nnet(sm_info, self.net.e_states, self.net.h_states)
-            if len(com) > 0:
-                self.data.save_com(self.comchannel.com_area, com_info, self.com_out)
-            else:
-                self.data.save_com(None, [0], None)
-        # if dead
+        # save data
+        self.data.save_sensors(self.sensors.vs_sensors, self.sensors.olf_sensor, env_info)
+        self.data.save_nnet(sm_info, self.net.e_states[-1], self.net.h_states[-1])
+        if len(com) > 0:
+            self.data.save_com(self.comchannel.com_area, com_info, self.com_out)
         else:
-            self.data.fill_off()
+            self.data.save_com(None, [0], None)
+        # if dead
+        # else:
+        #     self.data.fill_off()
 
     def move_fx(self):
         # check if alive
-        if self.e > 0:
-            # update dx, dy, do
-            lw = self.lw*self.max_speed
-            rw = self.rw*self.max_speed
-            vel = (lw+rw)/2
-            self.dx = vel + np.cos(self.o)
-            self.dy = vel + np.sin(self.o)
-            do = np.radians((lw-rw)/self.wheels_sep)
-            # update x, y, o and body area
-            self.x += self.dx
-            self.y += self.dy
-            self.o = geometry.force_angle(self.o+do)
+        # if self.e > 0:
+        # compute changes in location (force movement if 0)
+        lw = self.lw*self.max_speed + np.random.uniform(-0.1,0.1)
+        rw = self.rw*self.max_speed + np.random.uniform(-0.1,0.1)
+        vel = (lw+rw)/2
+        # update dx, dy, do
+        self.dx = vel * np.cos(self.o)
+        self.dy = vel * np.sin(self.o)
+        do = np.radians((lw-rw)/self.wheels_sep)
+        # update x, y, o and body area
+        self.x += self.dx
+        self.y += self.dy
+        self.o = geometry.force_angle(self.o+do)
 
     def update_location(self, bounds, walls, trees, xagents):
         # check if alive
-        if self.e > 0:
-            # update position
-            self.define_body_area()
-            self.check_overlap(bounds, walls, trees, xagents)
-            self.define_feeding_area()
+        # if self.e > 0:
+        # update position
+        self.define_body_area()
+        self.check_overlap(bounds, walls, trees, xagents)
+        self.define_feeding_area()
 
     def feed_fx(self, trees):
         # check if tree is in feeding area for this agent
         trees_lx = [1 if self.feeding_area.intersects(tx.area) else 0 for tx in trees]
         # check if alive
-        if self.e < 0:
-            trees_lx = [0]*len(trees)
+        #if self.e < 0:
+        #    trees_lx = [0]*len(trees)
         return np.array(trees_lx)
 
     def update_energy(self, ag_ax_tx):
         # check if alive
-        if self.e > 0:
-            # life
-            self.e -= self.de_dt + self.damage
-            # feed according to number of agents near
-            fe = 0
-            for n_ags in ag_ax_tx:
-                fe += self.feeding_rate*(n_ags**2)
-            self.e += fe
-            self.e = 0 if self.e <= 0 else self.e
-            # save data outputs
-            de = fe - self.de_dt - self.damage
-            self.data.save_feeding(ag_ax_tx, de)
-        else:
+        # if self.e > 0:
+        # life
+        de = -(self.de_dt+self.damage)
+        # feed according to number of agents near
+        for n_ags in ag_ax_tx:
+            de += self.feeding_rate*(n_ags**2)
+        self.e += de
+        # save data outputs
+        self.data.save_feeding(ag_ax_tx, de)
+        if self.e < 0:
             self.e = 0
-            self.data.save_feeding([ag_ax_tx]*0,0)
+        # else:
+        #     self.e = 0
+        #     self.data.save_feeding([ag_ax_tx]*0,0)
 
     def define_body_area(self):
         # define body

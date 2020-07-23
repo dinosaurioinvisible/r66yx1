@@ -22,21 +22,29 @@ class Trial:
         # run trial
         for ti in tqdm(range(self.t)):
             for ax in self.agents:
-                # update sensors and nnet
-                xagents = [ag for ag in self.agents if ag!=ax]
-                ax.update_in(self.world.walls,self.world.trees,xagents)
-                # compute location
-                ax.move_fx()
+                # if alive
+                if ax.e > 0:
+                    # update sensors and nnet
+                    xagents = [ag for ag in self.agents if ag!=ax]
+                    ax.update_in(self.world.walls,self.world.trees,xagents)
+                    # compute location
+                    ax.move_fx()
+                else:
+                    ax.data.fill_off()
             # update location
             for ax in self.agents:
                 # agents in new locations
-                xagents = [ag for ag in self.agents if ag!=ax]
-                inner_walls = self.world.walls[4:]
-                ax.update_location(self.world.bounds, inner_walls, self.world.trees, xagents)
+                if ax.e > 0:
+                    xagents = [ag for ag in self.agents if ag!=ax]
+                    inner_walls = self.world.walls[4:]
+                    ax.update_location(self.world.bounds, inner_walls, self.world.trees, xagents)
             # get trees in vecinity for each agent
             ax_tx = []
             for ax in self.agents:
-                ax_trees = ax.feed_fx(self.world.trees)
+                # list of trees (1: True, 0: False)
+                ax_trees = np.array([0]*len(self.world.trees))
+                if ax.e > 0:
+                    ax_trees = ax.feed_fx(self.world.trees)
                 ax_tx.append(ax_trees)
             # matrix agents/trees
             ax_tx = np.array(ax_tx)
@@ -45,8 +53,10 @@ class Trial:
             # feed according to location
             for i in range(len(self.agents)):
                 # how many agents (relative to self) are there for each tree
-                ag_ax_tx = ax_tx[i] * sum_ax_tx
-                self.agents[i].update_energy(ag_ax_tx)
+                if self.agents[i].e > 0:
+                    ag_ax_tx = ax_tx[i] * sum_ax_tx
+                    self.agents[i].update_energy(ag_ax_tx)
+
 
     def allocate_agents(self):
         while len(self.agents) < self.n_agents:
