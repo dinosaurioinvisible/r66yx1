@@ -16,7 +16,7 @@ class Genotype:
         , W=[], V=[], v_reset=False\
         , n_motor=4\
         , attn=True\
-        , plasticity=0):
+        , plastic=0):
         # agent
         self.r = r
         self.energy = energy
