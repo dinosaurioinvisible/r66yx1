@@ -4,6 +4,7 @@ import _genotype
 import _trial
 import _trial_animation
 import random
+from copy import deepcopy
 import pickle
 import time
 import os
@@ -18,7 +19,7 @@ class Evolve():
         , mut_rate=0.1\
         , anim=False\
         , alarm=False\
-        , save=5):
+        , save=10):
         # groups of agents
         self.n_gen = n_gen
         self.n_groups = n_groups
@@ -31,29 +32,25 @@ class Evolve():
         self.anim = anim
         self.alarm = alarm
         self.save = save
-        self.index = "{:04}".format(int([i for i in os.listdir() if "temp" in i][-1].split("_")[1])+1)
-        self.debug = False
         # opt load genotype
         if not genotype:
             self.genotypes = [_genotype.Genotype() for i in range(self.n_groups)]
         else:
             self.genotypes = [genotype for i in range(self.n_groups)]
-        # for saving cases
-        self.total_e = 0
-        self.av_e = 0
-        self.max_e = 0
+        # for saving cases (create temp file)
         self.good_cases = []
+        self.index = "{:04}".format(int([i for i in os.listdir() if "temp" in i][-1].split("_")[1])+1)
+        self.description = "{}v{}o{}e{}c".format(self.genotypes[0].vs_n,self.genotypes[0].olf_n,self.genotypes[0].e_in,self.genotypes[0].com_len)
+        self.save_sim(filename="temp")
         # run
         self.simulation()
+
 
     def simulation(self):
         # for each generation
         for n in range(self.n_gen):
             print("\n")
             groups_data = []
-            # raise difficulty (less trees)
-            # tx_lv = int(n/10)
-            # n_trees = self.n_trees - tx_lv
             # randomly select number of trees
             n_trees = int(random.uniform(1,self.n_trees+1))
             # for each group:
@@ -78,66 +75,70 @@ class Evolve():
                     for i in range(len(ff_e)):
                         print("agent{} energy: {}".format(i+1, round(ff_e[i],2)))
                     print("group fitness: {}".format(round(group_fts[-1],2)))
-
                 # weight trial performances for group
                 sorted_fts = sorted(group_fts, reverse=True)
                 ft_sum = 0
                 for i in range(self.n_trials):
+                    # NOTE: sorted fts ???
                     ft_sum += (i+1)*group_fts[i]
                 w_ft = 2/(self.n_trials*(self.n_trials+1)) * ft_sum
+                # save group data
                 groups_data.append([w_ft, xtrial.genotype])
 
-            # get best group
-            best = sorted(groups_data, key=lambda x:x[0], reverse=True)[0]
-            print("\nbest group weighted fitness: {}".format(round(best[0],2)))
-            # print average energy
-            self.total_e += best[0]
-            self.av_e = self.total_e/(n+1)
-            print("average energy until now: {}".format(round(self.av_e,2)))
-            # save if good (over zero for now)
-            # if best[0] > self.av_e:
-            if best[0] > 0:
-                self.good_cases.append([n+1, best[0], best[1]])
-                print("group over average, added to good cases")
-                # for debugging
-                if self.debug and n+1>=10:
-                    os.system("osascript -e \"set Volume 10\" ")
-                    os.system("open -a vlc ~/desktop/hadouken.mp4")
-                    _trial_animation.sim_animation(xtrial.world, xtrial.agents, self.trial_t)
-                    import pdb; pdb.set_trace()
-            # print good cases
-            if len(self.good_cases) > 0:
-                print("good cases = {})".format([(i[0],round(i[1],2)) for i in self.good_cases]))
+            # print info for generation and get best group
+            print("\ngeneration groups results:")
+            for gi in range(len(groups_data)):
+                print("group {} fitness: {}".format(gi+1,round(groups_data[gi][0],2)))
+            sorted_groups = sorted(groups_data, key=lambda x:x[0], reverse=True)
+            best_group = sorted_groups[0]
+            print("best group weighted fitness: {}".format(round(best_group[0],2)))
+            # save
+            self.good_cases.append([n, best_group[0], best_group[1]])
+            best_cases = sorted(self.good_cases, key=lambda x:x[1], reverse=True)[:5]
+            print("\nbest cases until now:")
+            for bc in best_cases:
+                print("generation: {}, fitness: {}".format(bc[0],round(bc[1],2)))
+            # for debugging
+            # os.system("osascript -e \"set Volume 10\" ")
+            # os.system("open -a vlc ~/desktop/hadouken.mp4")
+            # _trial_animation.sim_animation(xtrial.world, xtrial.agents, self.trial_t)
+            # import pdb; pdb.set_trace()
             # animation
             if self.anim:
                 _trial_animation.sim_animation(xtrial.world, xtrial.agents, self.trial_t)
-
-            # next generation (assuming clonal approach)
-            # best genotype replication
-            self.genotypes = [best[1]]
-            # best genotype mutations
-            for n in range(4):
-                self.mutate(best[1])
-            # rest: breeding through roulette type selection
-            sorted_best = sorted(groups_data, key=lambda x:x[0], reverse=True)[:int(self.n_groups/3)]
-            parents = [i for i in sorted_best if i[0] > 0]
-            if len(parents) < 2:
-                while len(self.genotypes) < self.n_groups:
-                    self.mutate(best[1])
-            else:
-                self.breed(parents)
-            # save temps
-            if len(self.good_cases) > 0 and len(self.good_cases)%self.save==0:
+            # save temp
+            if len(self.good_cases)%self.save==0:
                 # index (assuming ordered sequence in dir)
                 self.save_sim(filename="temp")
 
-        # save good cases
+            #NOTE: genetic selection
+            # reset genotypes for new generation
+            self.genotypes = []
+            # best genotype replication (egoistical approach)
+            self.genotypes.append(deepcopy(best_group[1]))
+            # best genotype mutations (half-1 of new generation)
+            for ng in range(int(self.n_groups/2)-1):
+                new = self.mutate(best_group[1])
+                self.genotypes.append(new)
+            # remaining new half (use only the best current half)
+            parents = [i for i in sorted_groups if i[0] > 0]
+            # in case there are no 2 parents (initial generations)
+            if len(parents) < 2:
+                parents = sorted_groups
+            # breed through roulette type selection (pairs)
+            while len(self.genotypes) < self.n_groups:
+                new12 = self.breed(parents)
+                self.genotypes.extend(new12)
+
+        # save, alert and end
         self.save_sim(filename="good_cases")
-        # alert
         if self.alarm:
-            os.system("osascript -e \"set Volume 3\" ")
-            os.system("open -a vlc ~/desktop/hadouken.mp4")
-        # os.system("open -a vlc ~/desktop/brigth-engelberts-free-me-now.mp3")
+            try:
+                os.system("osascript -e \"set Volume 3\" ")
+                os.system("open -a vlc ~/desktop/brigth-engelberts-free-me-now.mp3")
+                # os.system("open -a vlc ~/desktop/hadouken.mp4")
+            except:
+                pass
 
     def mutate(self, xgenotype):
         # connectivity weights
@@ -185,63 +186,65 @@ class Evolve():
         vt = np.random.uniform(0.8,1) if 0.6 < vt > 1 else vt
         # generate new genotype
         new_genotype = _genotype.Genotype(n_hidden=n_hidden, ut=ut, lt=lt, vt=vt, W=wx, V=vx, v_reset=v_reset)
-        self.genotypes.append(new_genotype)
+        return new_genotype
 
 
     def breed(self, parents):
         overall_ft = sum([gf[0] for gf in parents])
         # choose 2 individuals through roulette type selection
-        while len(self.genotypes) < self.n_groups:
-            pxs = []
-            for xparent in range(2):
-                acum = 0
-                rsel = random.uniform(0,overall_ft)
-                for px in parents:
-                    acum += px[0]
-                    if rsel <= acum:
-                        # append genotype
-                        pxs.append(px[1])
-                        break
-            # crossover
-            p1w = pxs[0].W
-            p2w = pxs[1].W
-            p1v = pxs[0].V
-            p2v = pxs[1].V
-            k1 = np.random.randint(1,len(p1w)/2)
-            k2 = np.random.randint(len(p1w)/2,len(p1w))
-            wx1 = np.concatenate((p1w.flatten()[:k1],p2w.flatten()[k1:k2],p1w.flatten()[k2:]))
-            wx2 = np.concatenate((p2w.flatten()[:k1],p1w.flatten()[k1:k2],p2w.flatten()[k2:]))
-            wx1 = wx1.reshape(p1w.shape)
-            wx2 = wx2.reshape(p2w.shape)
-            # veto connections
-            vx1 = np.concatenate((p1v.flatten()[:k1],p2v.flatten()[k1:k2],p1v.flatten()[k2:]))
-            vx2 = np.concatenate((p2v.flatten()[:k1],p1v.flatten()[k1:k2],p2v.flatten()[k2:]))
-            vx1 = vx1.reshape(p1v.shape)
-            vx2 = vx2.reshape(p2v.shape)
-            # thresholds
-            ut1 = pxs[0].ut
-            ut2 = pxs[1].ut
-            lt1 = pxs[0].lt
-            lt2 = pxs[1].lt
-            vt1 = pxs[0].vt
-            vt2 = pxs[1].vt
-            # hidden units
-            n_hu1 = wx1.shape[0]-pxs[0].n_input-pxs[0].n_output
-            n_hu2 = wx2.shape[0]-pxs[1].n_input-pxs[1].n_output
-            # new genotypes
-            new_genotype1 = _genotype.Genotype(n_hidden=n_hu1, ut=ut1, lt=lt1, vt=vt1, W=wx1, V=vx1)
+        # while len(self.genotypes) < self.n_groups:
+        pxs = []
+        for xparent in range(2):
+            acum = 0
+            rsel = random.uniform(0,overall_ft)
+            for px in parents:
+                acum += px[0]
+                if rsel <= acum:
+                    # append genotype
+                    pxs.append(px[1])
+                    break
+        # crossover
+        p1w = pxs[0].W
+        p2w = pxs[1].W
+        p1v = pxs[0].V
+        p2v = pxs[1].V
+        k1 = np.random.randint(1,len(p1w)/2)
+        k2 = np.random.randint(len(p1w)/2,len(p1w))
+        wx1 = np.concatenate((p1w.flatten()[:k1],p2w.flatten()[k1:k2],p1w.flatten()[k2:]))
+        wx2 = np.concatenate((p2w.flatten()[:k1],p1w.flatten()[k1:k2],p2w.flatten()[k2:]))
+        wx1 = wx1.reshape(p1w.shape)
+        wx2 = wx2.reshape(p2w.shape)
+        # veto connections
+        vx1 = np.concatenate((p1v.flatten()[:k1],p2v.flatten()[k1:k2],p1v.flatten()[k2:]))
+        vx2 = np.concatenate((p2v.flatten()[:k1],p1v.flatten()[k1:k2],p2v.flatten()[k2:]))
+        vx1 = vx1.reshape(p1v.shape)
+        vx2 = vx2.reshape(p2v.shape)
+        # thresholds
+        ut1 = pxs[0].ut
+        ut2 = pxs[1].ut
+        lt1 = pxs[0].lt
+        lt2 = pxs[1].lt
+        vt1 = pxs[0].vt
+        vt2 = pxs[1].vt
+        # hidden units
+        n_hu1 = wx1.shape[0]-pxs[0].n_input-pxs[0].n_output
+        n_hu2 = wx2.shape[0]-pxs[1].n_input-pxs[1].n_output
+        # new genotypes
+        new_genotypes = []
+        new_genotype1 = _genotype.Genotype(n_hidden=n_hu1, ut=ut1, lt=lt1, vt=vt1, W=wx1, V=vx1)
+        if np.random.choice((True,False)):
+            new_genotype1 = self.mutate(new_genotype1)
+        new_genotypes.append(new_genotype1)
+        # for uneven groups
+        if len(self.genotypes) < self.n_groups:
             new_genotype2 = _genotype.Genotype(n_hidden=n_hu2, ut=ut2, lt=lt2, vt=vt2, W=wx2, V=vx2)
-            # prob mutation only the second one
-            self.genotypes.append(new_genotype1)
-            if len(self.genotypes) == self.n_groups:
-                break
             if np.random.choice((True,False)):
-                self.mutate(new_genotype2)
-            else:
-                self.genotypes.append(new_genotype2)
+                new_genotype2 = self.mutate(new_genotype2)
+            new_genotypes.append(new_genotype2)
+        return new_genotypes
 
 
-    def save_sim(self, filename="temp"):
+    def save_sim(self, dirname="objs", filename="temp"):
         # save into pickle
         save = False
         while save is not True:
@@ -249,30 +252,31 @@ class Evolve():
             idx = "{}_{}".format(filename,self.index)
             temps = [i for i in os.listdir() if idx in i]
             # filename
-            i_filename = "{}_agents{}_groups{}_gens{}_trials{}_t{}_cases{}.obj".format(idx, self.n_agents, self.n_groups, self.n_gen, self.n_trials, self.trial_t, len(self.good_cases))
-            i_path = os.path.join(os.getcwd(), i_filename)
+            i_filename = "{}_{}_agents{}_groups{}_gens{}_trials{}_t{}_cases{}.obj".format(idx, self.description, self.n_agents, self.n_groups, self.n_gen, self.n_trials, self.trial_t, len(self.good_cases))
+            dirpath = os.path.join(os.getcwd(), dirname)
+            i_path = os.path.join(dirpath, i_filename)
             if not os.path.isfile(i_path):
                 # save
                 with open(i_path, "wb") as exp_file:
                     pickle.dump(self.good_cases, exp_file)
-                print("\nTemp object saved at {}".format(i_path))
+                print("\n{} object saved at: \n{}".format(filename, i_path))
                 # remove previous version
                 for temp in temps:
                     os.remove(os.path.join(os.getcwd(),temp))
-                    print("removed previous temporal file {}".format(temp))
+                    print("removed previous temporal file: \n{}".format(temp))
                 save = True
             else:
                 filename = "{}".format(time.ctime())
 
-
 # for saving the whole simulation object, not just the good cases
-def save_obj(obj, filename="evolexp"):
+def save_obj(obj, dirname="objs", filename="evolexp"):
     # save into pickle
     save = False
     i = 1
     while save is not True:
         i_filename = "{}_v{}.obj".format(filename, i)
-        i_path = os.path.join(os.getcwd(), i_filename)
+        dirpath = os.path.join(os.getcwd(), dirname)
+        i_path = os.path.join(dirpath, i_filename)
         if os.path.isfile(i_path):
             i += 1
         else:
