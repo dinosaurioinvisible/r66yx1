@@ -8,8 +8,8 @@ class Genotype:
         , feeding_rate=2, feeding_range=10, feeding_theta=90\
         , s_points=100\
         , vs_n=4, vs_dos=[-15,-60,15,60], vs_range=30, vs_theta=30\
-        , olf_n=1, olf_range=30, olf_theta=300\
-        , com_range=33, com_len=0, signals="axb"\
+        , olf_n=3, olf_range=50, olf_theta=300\
+        , com_range=33, com_len=0, signals="uxa", com_lt=-0.2, com_ut=0.2\
         , n_hidden=3\
         , ut=0.5, lt=0, vt=0.9\
         , nn_noise=0.1\
@@ -42,10 +42,14 @@ class Genotype:
         self.com_range = com_range
         self.com_len = com_len
         self.signals = signals
+        self.com_ut = com_ut
+        self.com_lt = com_lt
         # nnet
         self.n_input = vs_n+olf_n+e_in+com_len
         self.n_hidden = n_hidden
         self.n_output = n_motor+com_len
+        if attn:
+            self.n_output += vs_n+int((olf_n+1)/(olf_n+1))        
         self.n_net = self.n_input+self.n_hidden+self.n_output
         self.ut = ut
         self.lt = lt

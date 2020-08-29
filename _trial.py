@@ -81,3 +81,6 @@ class Trial:
                     break
             if add:
                 self.agents.append(agent)
+
+
+#

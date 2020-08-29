@@ -1,17 +1,25 @@
 import os
 import pickle
 import _trial
+import min_trial
 import _trial_animation
+import min_animation
 import matplotlib.pyplot as plt
 import numpy as np
 
 
-def load(n_agents=2, anim=True, hmap=True, ret=True):
+def load(wdir_name="min_objs", n_agents=1, n_trees=10, trial_time=100, anim=True, hmap=False, ret=False):
     # choose file menu
-    objs = [i for i in os.listdir() if ".obj" in i]
+    try:
+        wdir = os.path.join(os.getcwd(), wdir_name)
+    except:
+        print("working directory not found")
+        wdir = os.getcwd()
+    objs = [i for i in os.listdir(wdir) if ".obj" in i]
     select = True
     while select == True:
         on = True
+        print("\n")
         for enum, obj_filename in enumerate(objs):
             print("{} : {}".format(enum, obj_filename))
         print("\"q\" to quit")
@@ -20,25 +28,39 @@ def load(n_agents=2, anim=True, hmap=True, ret=True):
             select = False
         else:
             try:
-                nobj = int(n_in)
-                obj_path = os.path.join(os.getcwd(), obj_filename)
+                n_obj = int(n_in)
+                n_obj_filename = objs[n_obj]
+                obj_path = os.path.join(wdir, n_obj_filename)
                 with open(obj_path, "rb") as ea_exp:
                     xobj = pickle.load(ea_exp)
                 try:
+                    # old, when saving the whole ea object
                     cases = xobj.good_cases
                 except:
+                    # object = cases
                     cases = xobj
+                # just to be sure
+                print("\nobject file: {}".format(obj_filename))
             except:
                 print("invalid input")
                 on = False
             # display menu
             while on == True:
+                # check if clonal or normal GA
+                clonal = True if len(cases[0]) == 1 else False
                 print("")
                 for enum, case in enumerate(cases):
-                    print("{} - gen: {}, fitness: {}".format(enum, case[0], case[1]))
-                print("\"p\" to add an agent \"r\" to remove one, currently{}".format(n_agents))
+                    if clonal:
+                        print("{} - gen: {}, fitness: {}".format(enum, case[0], round(case[1],2)))
+                    else:
+                        ax_e = [ag[1] for ag in cases[enum]]
+                        print("gen: {}, e: {}".format(enum, np.around(ax_e,2)))
+                print("\n")
                 print("\"h\" for enabling/disabling heatmap, currently: {}".format("ON" if hmap else "OFF"))
                 print("\"a\" for enabling/disabling animation, currently: {}".format("ON" if anim else "OFF"))
+                print("\"p\" to add an agent \"r\" to remove one, currently: {}".format(n_agents))
+                print("\"pt\" to add an agent \"rt\" to remove one, currently: {}".format(n_trees))
+                print("\"tt\" for changing trial timesteps, currently: {}".format(trial_time))
                 print("\"q\" for exit")
                 n_in = input("\nshow? : ")
                 if n_in=="q" or n_in=="quit":
@@ -48,6 +70,16 @@ def load(n_agents=2, anim=True, hmap=True, ret=True):
                 elif n_in == "r":
                     n_agents -= 1
                     n_agents = 1 if n_agents < 1 else n_agents
+                elif n_in == "pt":
+                    n_trees += 1
+                elif n_in == "rt":
+                    n_trees -= 1
+                    n_trees = 1 if n_trees < 1 else n_trees
+                elif n_in == "tt":
+                    try:
+                        trial_time = int(input("\ntimesteps? : "))
+                    except:
+                        print("invalid input")
                 elif n_in == "a":
                     anim = False if anim == True else True
                 elif n_in == "h":
@@ -55,7 +87,11 @@ def load(n_agents=2, anim=True, hmap=True, ret=True):
                 else:
                     try:
                         nx = int(n_in)
-                        xgen = cases[nx][2]
+                        if clonal:
+                            xgen = cases[nx][2]
+                            xft = round(cases[nx][1],2)
+                        else:
+                            xgen = [gn[0] for gn in cases[nx]]
                         show_anim = anim
                         show_hmap = hmap
                     except:
@@ -64,8 +100,12 @@ def load(n_agents=2, anim=True, hmap=True, ret=True):
                         show_hmap = False
                     # trial and animation
                     if show_anim:
-                        xtrial = _trial.Trial(t=1000, genotype=xgen, n_agents=n_agents, world=None, n_trees=10, n_walls=4)
-                        _trial_animation.sim_animation(xtrial.world, xtrial.agents, xtrial.t)
+                        if clonal:
+                            xtrial = _trial.Trial(t=trial_time, genotype=xgen, n_agents=n_agents, world=None, n_trees=n_trees, n_walls=4)
+                            _animation.sim_animation(xtrial.world, xtrial.agents, xtrial.t, xft)
+                        else:
+                            xtrial = min_trial.Trial(t=trial_time, genotypes=xgen, world=None, n_trees=n_trees, n_walls=4)
+                            min_animation.sim_animation(xtrial.world, xtrial.agents, xtrial.t)
                     # heatmap from selected genotype
                     if show_hmap:
                         weights = xgen.W
@@ -111,3 +151,5 @@ def load(n_agents=2, anim=True, hmap=True, ret=True):
                         plt.show()
     if ret:
         return xobj
+
+load()

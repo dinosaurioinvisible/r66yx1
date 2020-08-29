@@ -14,7 +14,10 @@ class Wall:
         self.area = LineString([(self.xmin,self.ymin),(self.xmax,self.ymax)])
 
 class Tree:
-    def __init__(self, x, y, r=5, energy=1000):
+    def __init__(self, x, y, r=5, energy=10000):
+        # r=2.5 base
+        # r=5 for world_size=1000
+        # r=12.5 for one tree only experiments
         self.x = x
         self.y = y
         self.r = r

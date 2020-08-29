@@ -7,10 +7,9 @@ from shapely.geometry import Point
 from shapely.geometry import LineString
 from shapely.geometry.polygon import Polygon
 
-#TODO:
+#TODO: animation continues from 999 to 0, but does not reset
 
-
-def sim_animation(world, agents, t=None, video=False):
+def sim_animation(world, agents, t=None, video=False, ft=None):
     # time steps
     if t==None:
         t = len(agents[0])
@@ -21,10 +20,12 @@ def sim_animation(world, agents, t=None, video=False):
     time = ax.text(world.xmax/2, world.ymax+10,str("time: 0"),ha="left",va="top")
     anim_running = True
     # plot basics for agents
-    ags = []; olfs = []; coms = []; irs = []; feeds = []
+    ags=[]; trajs=[]; olfs=[]; coms=[]; irs=[]; feeds=[]
     for agent in agents:
         ag, = plt.plot([],[], color="black")
         ags.append(ag)
+        traj, = plt.plot([],[], color="grey")
+        trajs.append(traj)
         agent_irs = []
         for ir_n in range(agents[0].sensors.vs_n):
             ir, = plt.plot([],[], color="orange")
@@ -34,12 +35,12 @@ def sim_animation(world, agents, t=None, video=False):
         olfs.append(olf)
         com, = plt.plot([],[], color="blue")
         coms.append(com)
-        feed, = plt.plot([],[], color="grey")
+        feed, = plt.plot([],[], color="blue")
         feeds.append(feed)
     # for deleted objects from agents (when energy = 0)
     del_agents = []
 
-    # to pause the animation
+    # to pause the animation and get data
     def onClick(event):
         nonlocal anim_running
         if anim_running:
@@ -64,27 +65,72 @@ def sim_animation(world, agents, t=None, video=False):
         return True
 
     def animate(i):
-        time.set_text("time: "+str(i))
-        # for each agent
+        # print time and fitness (plot and terminal)
+        if ft:
+            time.set_text("time: {}, fitness: {}".format(i,ft))
+        else:
+            time.set_text("time: "+str(i))
         print("\nt={}".format(i))
+        # check if at least some agent is alive, if not stop
+        if len(ags) == len(del_agents):
+            import pdb; pdb.set_trace()
+
+        # for each agent
         for enum, ag in enumerate(ags):
-            # for debugging
-            x = agents[enum].data.x[i]
-            y = agents[enum].data.y[i]
+            # for checking/debugging
+            # location (xt, yt) meanwhile, old problem with the np.arrays copies
+            x = agents[enum].data.area[i].centroid.x
+            y = agents[enum].data.area[i].centroid.y
+            # x = agents[enum].data.x[i]
+            # y = agents[enum].data.y[i]
             o = agents[enum].data.o[i]
-            ag_ax_tx = agents[enum].data.agent_ax_tx[i]
-            de = agents[enum].data.de[i]
             e = agents[enum].data.e[i]
-            sm_info = agents[enum].data.sm_info[i]
-            com_out = agents[enum].data.com_out[i]
-            print("agent {} - x:{}, y:{} o:{}".format(enum+1, np.around(x,2), np.around(y,2), np.around(o,2)))
-            print("ag_ax_tx: {}, de={}, e={}".format(ag_ax_tx, np.around(de,2), np.around(e,2)))
-            print("sm_info: {} > com_out: {}".format([np.around(i,2) for i in sm_info],com_out))
+            print("agent {} - x:{}, y:{}, o:{}".format(enum+1, np.around(x,2), np.around(y,2), np.around(o,2)))
+
+            # print information (if alive)
+            if e > 0:
+                # feeding
+                ag_ax_tx = agents[enum].data.agent_ax_tx[i]
+                de = agents[enum].data.de[i]
+                print("ag_ax_tx: {}, de={}, e={}".format(ag_ax_tx, np.around(de,2), np.around(e,2)))
+                # sm inputs/outputs
+                # for old versions:
+                try:
+                    vs_in = agents[enum].data.vs_info[i]
+                    olf_in = agents[enum].data.olf_info[i]
+                    vs_attn = agents[enum].data.vs_attn[i]
+                    olf_attn = agents[enum].data.olf_attn[i]
+                except:
+                    sm_info = agents[enum].data.sm_info[i]
+                    # vision & olfact
+                    vs_n = agents[enum].genotype.vs_n
+                    olf_n = agents[enum].genotype.olf_n
+                    # input (vis, olf, e, com)
+                    vs_in = np.around(sm_info[0:vs_n],2)
+                    olf_in = np.around(sm_info[vs_n:vs_n+olf_n],2)
+                    # inverted order output (olf, vis, e, com)
+                    olf_attn = np.around(agents[enum].data.e_states[i][4:4+olf_n].T,2)
+                    vs_attn = np.around(agents[enum].data.e_states[i][4+olf_n:4+olf_n+vs_n].T,2)
+                print("sm inputs:")
+                print("vision={}, attn outputs={}".format(vs_in, vs_attn))
+                print("olfact={}, attn outputs={}".format(olf_in, olf_attn))
+                # energy
+                if agents[enum].e_in > 0:
+                    e_n = olf_n + agents[enum].e_in
+                    e_info = np.around(sm_info[olf_n:e_n],2)
+                    print("energy={}".format(e_info))
+                # communication (if active)
+                if agents[enum].com_len > 0:
+                    com_in = np.around(sm_info[-agents[enum].com_len:],2)
+                    com_out = agents[enum].data.com_out[i]
+                    print("com_in={}, com_out={}".format(com_in, com_out))
+            else:
+                print("death...")
 
             # agent body area location
             ag.set_data(*agents[enum].data.area[i].exterior.xy)
 
-            # for adjusting sensors index
+            # for adjusting sensors indexes
             if enum == 0:
                 enumx = enum
             else:
@@ -99,32 +145,35 @@ def sim_animation(world, agents, t=None, video=False):
                     ags_dead = sum(np.where(ags_e<=0,1,0))
                     enumx = enum - ags_dead
 
-            # enumx = enum-len(del_agents) if enum > 0 else enum
-            # # if agent 0 alive and agent 2 dead: agent 1 -> enumx=1
-            # # if agent 0 dead and agent 2 alive: agent 1 -> enumx=0
-            # # if agent 0 dead and agent 2 dead: agent 1 ->
-            # if enum == 1 and enumx == 0 and len(irs) == 1:
-            #     enumx = 1
-
-            # check if alive and that they objects weren't already deleted
+            # check if alive and that their objects weren't already deleted
             if e <= 0 and ag not in del_agents:
                 # deactivate visibility
                 for ir in irs[enumx]:
                     ir.set_visible(False)
                 olfs[enumx].set_visible(False)
                 feeds[enumx].set_visible(False)
-                if agents[enumx].com_len:
-                    coms[enumx].set_visible(False)
                 # delete objects
                 del(irs[enumx])
                 del(olfs[enumx])
                 del(feeds[enumx])
-                del(coms[enumx])
+                # the same but for optional com
+                if agents[enumx].com_len:
+                    coms[enumx].set_visible(False)
+                    del(coms[enumx])
+                # list as removed (agent)
                 del_agents.append(ag)
+
             # normal case
+            all_irs = []
             if e > 0:
-                # ir sensors
                 try:
+                    # trajectory
+                    # xt = agents[enumx].data.x[:i]
+                    # yt = agents[enumx].data.y[:i]
+                    xt = [a.centroid.x for a in agents[enum].data.area[:i]]
+                    yt = [a.centroid.y for a in agents[enum].data.area[:i]]
+                    trajs[enumx].set_data(xt,yt)
+                    # ir sensors
                     for n in range(len(irs[enumx])):
                         irs[enumx][n].set_data(*agents[enum].data.vs_sensors[i][n].exterior.xy)
                         # vx = True if agents[enum].data.env_info[i][n] != 0 else False
@@ -145,15 +194,15 @@ def sim_animation(world, agents, t=None, video=False):
                         vx_com = sum(np.where(com_array!=0,1,0))
                         vx = True if vx_com != 0 else False
                         coms[enumx].set_visible(vx)
-                    else:
-                        coms = []
                 except:
+                    # just in case, for debugging
                     import pdb; pdb.set_trace()
-            # in case all agents are dead
-            if len(ags) == len(del_agents):
-                all_irs = []
+                # stop in the last timestep (temporal i hope)
+                if i == t:
+                    print("last timestep")
+                    import pdb; pdb.set_trace()
 
-        return time, tuple(ags)+tuple(all_irs)+tuple(olfs)+tuple(coms)+tuple(feeds)
+        return time, tuple(ags)+tuple(trajs)+tuple(all_irs)+tuple(olfs)+tuple(coms)+tuple(feeds)
 
     fig.canvas.mpl_connect('button_press_event', onClick)
     anim = animation.FuncAnimation(fig, animate,

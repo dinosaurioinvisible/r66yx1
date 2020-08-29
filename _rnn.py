@@ -51,7 +51,6 @@ class RNN:
         retro_vx = vx[:self.n_input].copy()
         retro_vx.resize((self.n_net,1))
         h_state += retro_vx
-
         # hidden layer (u)
         eu = wx[self.n_input:self.n_input+self.n_hidden] + self.e_states[-1][self.n_input:self.n_input+self.n_hidden]
         hu = self.h_states[-1][self.n_input:self.n_input+self.n_hidden]
@@ -69,19 +68,13 @@ class RNN:
         h_state += retro_vu
 
         # output layer (o)
-        try:
-            eo = wx[self.n_input+self.n_hidden:] + wu[self.n_input+self.n_hidden:] + self.e_states[-1][self.n_input+self.n_hidden:]
-            ho = vx[self.n_input+self.n_hidden:] + vu[self.n_input+self.n_hidden:] + self.h_states[-1][self.n_input+self.n_hidden:]
-        except:
-            import pdb; pdb.set_trace()
+        eo = wx[self.n_input+self.n_hidden:] + wu[self.n_input+self.n_hidden:] + self.e_states[-1][self.n_input+self.n_hidden:]
+        ho = vx[self.n_input+self.n_hidden:] + vu[self.n_input+self.n_hidden:] + self.h_states[-1][self.n_input+self.n_hidden:]
         # go through nodes
         oe, oh = self.neuron_fx(eo,ho)
         # propagation (all for next step in this case) shape = (n_net, 1)
-        try:
-            wo = np.dot(self.W[0:self.n_net,self.n_input+self.n_hidden:], oe)
-            vo = np.dot(self.V[0:self.n_net,self.n_input+self.n_hidden:], oh)
-        except:
-            import pdb; pdb.set_trace()
+        wo = np.dot(self.W[0:self.n_net,self.n_input+self.n_hidden:], oe)
+        vo = np.dot(self.V[0:self.n_net,self.n_input+self.n_hidden:], oh)
         # add activation and save
         e_state += wo
         h_state += vo
@@ -90,17 +83,19 @@ class RNN:
         # motor output
         m1 = oe[0]-oe[1]
         m2 = oe[2]-oe[3]
-
-        # attentional outputs
-        olf_i = 4 + self.olf_n
-        olf_attn = oe[4:4+olf_i] #if olf_i <= len(self.n_output) else np.array([])
-        vs_i = olf_i + self.vs_n
-        vs_attn = oe[olf_i:vs_i] #if vs_i <= len(self.n_output) else np.array([])
+        # attentional outputs (vector, not matrices)
+        # vision attn
+        vs_i = 4+self.vs_n
+        vs_attn = oe[4:vs_i].T[0]
+        # olf attn (1 if active, indepedently of how many neurons)
+        olf_i = vs_i+int((self.vs_n+1)/(self.vs_n+1))
+        olf_attn = oe[vs_i:olf_i][0]
         # communication
-        com_i = vs_i + self.com_len
-        com = oe[vs_i:com_i] #if com_i <= len(self.n_output) else np.array([])
+        com_i = olf_i + self.com_len
+        com = oe[vs_i:com_i].T[0] #if com_i <= len(self.n_output) else np.array([])
         # whole output (y)
-        return m1, m2, olf_attn, vs_attn, com
+        # return as vector (not matrix)
+        return m1[0], m2[0], vs_attn, olf_attn, com
 
     def neuron_fx(self, x, h):
         # veto output (from excitatory inputs)
