@@ -11,11 +11,11 @@ import os
 
 class Evolve():
     def __init__(self, genotypes=None
-        , n_gen=200
-        , n_agents=50
-        , n_trials=7
-        , select_ratio=10
-        , trial_t=1000
+        , n_gen=120
+        , n_agents=35
+        , n_trials=10
+        , select_ratio=7
+        , trial_t=1500
         , world_size=1000
         , n_trees=10
         , n_walls=4
@@ -47,7 +47,7 @@ class Evolve():
             dirname = "min_objs"
             self.dir_path = os.path.join(os.getcwd(),dirname)
             try:
-                self.index = "{:04}".format(int([i for i in os.listdir(self.dir_path) if "temp" in i][-1].split("_")[1])+1)
+                self.index = "{:04}".format(int(sorted([i for i in os.listdir(self.dir_path) if ".obj" in i])[-1].split("_")[1])+1)
             except:
                 self.index = "0000"
             self.description = "{}v{}o{}e{}c".format(self.genotypes[0].vs_n,self.genotypes[0].olf_n,self.genotypes[0].e_n,self.genotypes[0].com_n)
@@ -185,8 +185,16 @@ class Evolve():
         # mutate weights and thresholds
         for nx in px.network:
             for i in range(len(nx.wx)):
+                # eliminate
+                if np.random.uniform(0,1)<self.mut_rate/3:
+                    nx.wx[i] = 0
+                # reset
+                if np.random.uniform(0,1)<self.mut_rate/3:
+                    nx.wx[i] = np.random.uniform(-0.5,1)
+                # change weight
                 if np.random.uniform(0,1)<self.mut_rate:
                     nx.wx[i] += np.random.uniform(-0.1,0.1)
+            # thresholds
             if np.random.uniform(0,1)<self.mut_rate:
                 nx.lt += np.random.uniform(-0.05,0.05)
             if np.random.uniform(0,1)<self.mut_rate:

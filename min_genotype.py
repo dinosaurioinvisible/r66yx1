@@ -1,12 +1,14 @@
 
 import numpy as np
 
+#TODO: hacer angulos automaticos para vs_n y olf_n
+
 class Genotype:
     def __init__(self, str_gen=None
         , r=2.5, max_speed=5, wheels_sep=4, motor_n=2
-        , energy=1000, de_dt=1, e_n=1
-        , f_rate=5, f_range=10, f_theta=90
-        , vs_n=2, vs_loc=[-30,30], vs_range=25, vs_theta=90
+        , energy=1000, de_dt=1, e_n=0
+        , f_rate=10, f_range=10, f_theta=90
+        , vs_n=8, vs_range=25#, vs_loc=[-30,30], vs_range=25, vs_theta=90
         , olf_n=2, olf_loc=[-60,60], olf_range=35, olf_theta=180
         , com_n=0, com_range=25, com_theta=360, com_signals="lxh", com_lt=0.25, com_ut=0.75
         , n_hidden=3, network=None):
@@ -29,9 +31,10 @@ class Genotype:
             # sensors
             # sensors: vision
             self.vs_n = vs_n
-            self.vs_loc = vs_loc
+            self.vs_loc = np.array([30+(180*i)/(self.vs_n/2) for i in range(int(self.vs_n/2))])
+            self.vs_loc = np.concatenate((self.vs_loc*-1, self.vs_loc))
             self.vs_range = vs_range
-            self.vs_theta = vs_theta
+            self.vs_theta = 360/self.vs_n
             # sensors: olfact
             self.olf_n = olf_n
             self.olf_loc = olf_loc
