@@ -1,0 +1,120 @@
+TypeError: undefined is not a constructor (evaluating 'r.urlAvatar.includes("ugc.ecn")')
+
+  https://static.emol.cl/emol50/js/funcionesComun.min.js?v=26:1
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:2 in j
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:2 in fireWith
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:4 in x
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:4 in b
+TypeError: undefined is not a constructor (evaluating 'a[o].urlAvatar.includes("ugc.ecn")')
+
+  https://static.emol.cl/emol50/js/funcionesComun.min.js?v=26:1
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:2 in j
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:2 in fireWith
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:4 in x
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:4 in b
+TypeError: undefined is not a constructor (evaluating 'a[o].urlAvatar.includes("ugc.ecn")')
+
+  https://static.emol.cl/emol50/js/funcionesComun.min.js?v=26:1
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:2 in j
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:2 in fireWith
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:4 in x
+  https://static.emol.cl/emol50/js/jquery-1.11.2.min.js:4 in b
+
+Ingresar | Registrarse
+
+Deportes
+Santiago: Lunes 08 de abril del 2019 | Actualizado 23:28
+
+Noticias
+Economía
+Deportes
+Espectáculos
+Tendencias
+Autos
+Servicios
+
+
+
+Portada
+Fútbol
+Tenis
+Motores
+Otros Deportes
+Todas
+Especiales
+Fútbol Chileno
+  
+"¿Bruce Lee?": Mira el golazo con que joven futbolista chileno deslumbró en PortugalFelipe Villagrán maravilló a todos en un partido del Braga, su equipo, por la serie Sub 23 del fútbol luso. 28 de Enero de 2019 | 18:00 | Redactado por Claudio Ortega, Emol 48
+
+Golazo.
+
+PantallazoSANTIAGO.- "¿Bruce Lee o Felipe Villagrán?". Así presenta el SC Braga de Portugal en sus redes sociales el golazo de un joven futbolista chileno.
+
+El elenco luso divulgó en su cuenta de Twitter un video de la gran anotación de Felipe Villagrán, delantero nacional de 21 años que milita en la Sub 23.
+
+El volante criollo se lució con una espectacular pirueta para marcar en el minuto 58 del partido del Braga ante el CD Feirense.
+
+Sin pensarlo dos veces, el chileno tomó el balón el aire y con una patada a la karateca lo clavó en un ángulo sorprendiendo a todos los presentes.
+
+Villagrán se formó en Universidad de Chile y en 2015 emprendió vuelo a Portugal para sumarse al Alcanenense. Más tarde fichó por el Varzim SC para ahora colocarse la camiseta del Braga.
+
+
+ ¿Encontraste algún error? Avísanos
+
+
+ ¡Bienvenido #ComentaristaEmol! Te invitamos a opinar y debatir respecto al contenido de esta noticia. En Emol valoramos todos los comentarios respetuosos y constructivos y nos guardamos el derecho a no contar con las opiniones agresivas y ofensivas. Cuéntanos qué piensas y sé parte de la conversación.
+
+Comenta esta noticia:
+Inicia sesión para interactuar y debatir sobre los temas noticiosos.48 ComentariosOrdenar por: Más recientes 
+Ingresar | Registrarse
+|48|4
+Carlos Perez
+Lo destacable de la noticia es que juega en el Braga, luego de Porto, Benfica, Sporting de Lisboa es considerado de los mejores clubes de Portugal. Y con 21 años eso es de nombrar. 
+6 3 Hace 2 meses
+Veronica de la Fuente
+No le alcanza ni para Baby lee 
+25 3 Hace 2 meses
+Akira Devalpo
+Veronica de la Fuente jjjj wena
+1 1 Hace 2 meses Ver más (1)
+Antauro Quispe
+he visto mejores en la liga de tacna
+21 9 Hace 2 meses
+Andres Vasquez
+Antauro Quispe Viejo cincuentón Fome, te quedaste pegado con el humor callejero que se ríe de los peruanos. A muchos les gusta el humor irónico e inteligente, a ti te basta con Los Atletas de Risa.
+11 12 Hace 2 meses
+Antauro Quispe
+Andres Vasquez yo no hago humor solo cuento historias reales
+18 2 Hace 2 meses Ver más (2) Ver más (3)
+Alan Muller
+Felipe es nacido en Chile, pero tiene doble nacionalidad , Peruano, excelente Gol, esta para portar nuestra Camiseta . 
+2 3 Hace 2 meses
+Felipe BoltEstados Unidos de América
+Alan Muller es nacido y criado en chile, por lo tanto no tiene doble nacionalidad
+2 1 Hace 2 meses
+Javier Antonio Meneses Pontigo
+Bruce Lee, la princesa Leía, yo leo y tú lees
+2 0 Hace 2 meses
+Jose Miguel Ossandon Vasquez
+Golazo, envidioso el que piense lo contrario 
+1 0 Hace 2 meses
+Alejandro SalimIrlanda
+En el pasaje frente de mi casa. Haciamos mejores goles .. Y lo unico que sacamos de ahi.. Es que el vecino nos moje el poste que lo usamos de arco para que no juguemos... Eso es jugar
+0 1 Hace 2 meses
+Sikerih Melo
+Shiii..no da ni pa....la ultima rabona de fu man chu..
+1 1 Hace 2 meses
+Sargento VenegasAntofagasta
+fome.el.gol. eso queria.desir
+2 1 Hace 2 meses
+Seba ValenzuelaÑuñoa
+Golazo! !
+0 1 Hace 2 meses Cargar 10 Comentarios más Ver términos y condiciones de Emol Social
+  
+   
+   
+  
+   
+
+
+ 
