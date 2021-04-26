@@ -1,4 +1,6 @@
 
+import numpy as np
+
 def force_angle(angle, unit="rad"):
     # force angle between valid values
     if unit == "rad":
@@ -12,5 +14,5 @@ def force_angle(angle, unit="rad"):
     # double check
     if angle > max or angle < 0:
         print("\nsomething's wrong with the angle!\n")
-        import import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
     return angle

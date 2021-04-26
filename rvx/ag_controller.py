@@ -10,10 +10,12 @@ class Controller:
         self.thresholds = genotype.thresholds
         # decaying factors (ga if fires, gb otherwise)
         self.ga = genotype.ga
-        selg.gb = genotype.gb
+        self.gb = genotype.gb
         # hidden layer
-        self.net_state = np.random.uniform(0,1,genotype.nhidden)
+        self.net_state = np.random.uniform(0,1,genotype.n_hidden)
         self.net_out = None
+        # output to wheels
+        self.motor_out = np.array([0,0])
 
     def update(self,env_info):
         # env input
@@ -27,5 +29,6 @@ class Controller:
         # motor layer and output
         motor_in = np.dot(self.net_out,self.wx_out)
         mx = np.where(motor>0,1,0)
-        motor_output = (mx[0]-mx[1], mx[2]-mx[3])
-        return motor_output
+        lm,rm = np.asarray([mx[0]-mx[1],mx[2]-mx[3]])
+        self.motor_out = np.array([lm,rm])
+        return self.motor_out
