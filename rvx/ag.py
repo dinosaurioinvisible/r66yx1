@@ -6,17 +6,22 @@ import ag_sensors
 import ag_controller
 
 class Agent:
-    def __init__(self,genotype,x=100,y=100,o=0,e=100,dt=1,worldx=1000,worldy=1000):
+    def __init__(self,genotype,x=100,y=100,o=0,e=100,
+        dt=1,worldx=1000,worldy=1000):
         # simulation parameters & initial conditions
         self.worldx=worldx
         self.worldy=worldy
         self.dt=dt
-        self.x=x; self.y=y; self.o=o
+        self.x=x; self.y=y
+        self.o=force_angle(np.radians(o))
         self.e=e
         # agent parameters
+        self.max_e=100
         self.area = None
         self.r = genotype.r
+        self.fx = None; self.fy = None
         self.f_range = genotype.f_range
+        self.f_area = None
         self.max_speed = genotype.max_speed
         self.wheels_sep = genotype.wheels_sep
         self.define_body()
@@ -28,39 +33,41 @@ class Agent:
         self.data = AgentData(genotype,x,y,o,e,self.controller.net_state)
 
     def update(self,env):
-        # sensor input from environment [[agents],[trees]]
-        self.sensors.update(self.x,self.y,self.o,env)
+        # sensor info from environment [[agents],[trees]] + energy [0:1]
+        ls,rs = self.sensors.update(self.x,self.y,self.o,env)
+        es = max(0,min(1,(self.max_e-self.e)/self.max_e))
+        ag_info = np.concatenate((ls,[es],rs))
         # get motor response from controller
-        lm,rm = self.controller.update(self.sensors.env_info)
-        # agent motion and feeding
-        self.action_fx(lm,rm,env)
+        lm,rm = self.controller.update(ag_info)
+        # pos, sensors, controller at time t
         self.data.save(self.x,self.y,self.o,self.e,self.sensors,self.controller)
+        # agent motion and feeding towards t+1
+        self.action_fx(lm,rm,env)
+        self.e -= 1
 
     def action_fx(self,lm,rm,env):
         # conver to speed
-        ls = lm*self.max_speed #* np.random.uniform(0.9,1.1)
-        rs = rm*self.max_speed #* np.random.uniform(0.9,1.1)
-        vel = (ls+rs)/2
+        lw = lm*self.max_speed * np.random.uniform(0.95,1.05)
+        rw = rm*self.max_speed * np.random.uniform(0.95,1.05)
+        vel = (lw+rw)/2
         # new position (sin/cos are relative to o+do)
-        do = (ls-rs)*self.dt/self.wheels_sep
+        do = (lw-rw)*self.dt/self.wheels_sep
         self.o = force_angle(self.o+do)
         dx = vel*np.sin(self.o)*self.dt
         dy = vel*np.cos(self.o)*self.dt
         self.x += dx
         self.y += dy
-        print("ls,rs = [{},{}] vel={}, do={}, o={}, x={}, y={}".format(ls,rs,vel,round(np.degrees(force_angle(do))),round(np.degrees(force_angle(self.o))),round(self.x),round(self.y)))
+        # print("ls,rs = [{},{}] vel={}, do={}, o={}, x={}, y={}".format(ls,rs,vel,round(np.degrees(force_angle(do))),round(np.degrees(force_angle(self.o))),round(self.x),round(self.y)))
         self.define_body()
         # feeding and avoid overlapping (bounce back)
         for tree in env[1]:
             if self.area.intersects(tree.area):
                 self.x -= dx
                 self.y -= dy
-                self.o = force_angle(self.o*np.random.uniform(0.9,1.1))
+                self.o = force_angle(self.o+np.random.uniform(-1,1))
                 self.define_body()
             if self.f_area.intersects(tree.area):
-                if tree.e >= 5:
-                    self.e += 3
-                    tree.e -= 3
+                self.e += 2
         # update body area
         self.define_body()
 
@@ -78,10 +85,10 @@ class Agent:
         loc = Point(self.x,self.y)
         self.area = loc.buffer(self.r)
         # feeding area
-        fx = self.x + (self.r+self.f_range/2)*np.cos(self.o)
-        fy = self.y + (self.r+self.f_range/2)*np.sin(self.o)
+        fx = self.x + (self.r+self.f_range/2)*np.sin(self.o)
+        fy = self.y + (self.r+self.f_range/2)*np.cos(self.o)
         floc = Point(fx,fy)
-        self.f_area = floc.buffer(self.f_range)
+        self.f_area = floc.buffer(self.f_range/2)
 
 
 class AgentData:
@@ -103,10 +110,10 @@ class AgentData:
         self.o = np.array([o0])
         self.e = np.array([e0])
         # sensors
-        self.irs = [[]]
-        self.env_info = np.array([0]*gt.n_input)
+        self.irs = [[None]]
         # controller
-        self.net_state = net0
+        self.net_state = net0.T[0]
+        self.ag_info = np.array([0]*gt.n_input)
         self.net_out = np.array([0]*gt.n_hidden)
         self.motor_out = np.array([0,0])
 
@@ -115,10 +122,12 @@ class AgentData:
         self.y = np.append(self.y,y)
         self.o = np.append(self.o,o)
         self.e = np.append(self.e,e)
+        # sensors areas for animation
         self.irs.append([ir.area for ir in sensors.ir_sensors])
-        self.env_info = np.vstack((self.env_info,sensors.env_info))
-        #self.net_state = np.vstack((self.net_state,controller.net_state))
-        #self.net_out = np.vstack((self.net_out,controller.net_out))
+        # info from controller
+        self.net_state = np.vstack((self.net_state,controller.net_state.T))
+        self.ag_info = np.vstack((self.ag_info,controller.ag_info.T))
+        self.net_out = np.vstack((self.net_out,controller.net_out.T))
         self.motor_out = np.vstack((self.motor_out,controller.motor_out))
 
 

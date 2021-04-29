@@ -5,14 +5,21 @@ import matplotlib.animation as animation
 from shapely.geometry import Point
 from shapely.geometry import LineString
 from shapely.geometry import Polygon
+import ag_trial
 import time
 
-def trial_animation(trial, save=False):
-    # nrows, ncols
-    #fig = plt.figure(figsize=[10,10])
-    fig = plt.figure()
-    ax1 = fig.add_subplot(1,1,1)
+def trial_animation(ob,save=False):
+    # check for trial or genotype
+    if isinstance(ob,ag_trial.Trial):
+        trial = ob
+    else:
+        trial = ag_trial.Trial()
+        trial.run_trial(ob)
 
+    # define figure
+    fig = plt.figure() #plt.figure(figsize=[10,10])
+    # nrows, ncols
+    ax1 = fig.add_subplot(1,1,1)
     fig.suptitle("{}".format("simple agent trial", ha="center", va="center"))
     time = fig.text(0.5,0.92,"time=0")
     ax1.set_title("simple agent")
@@ -20,11 +27,13 @@ def trial_animation(trial, save=False):
     ax1.set_ylim(0,trial.worldy)
     ax1.set_aspect("equal")
 
+    # create plot objects
     agents = []
     trajs = []
     irs = []
+    fas = []
     for i in range(len(trial.agents)):
-        ag, = ax1.plot([],[],color="blue")
+        ag, = ax1.plot([],[],color="black")
         agents.append(ag)
         traj, = ax1.plot([],[],color="grey")
         trajs.append(traj)
@@ -33,6 +42,8 @@ def trial_animation(trial, save=False):
             ir, = ax1.plot([],[],color="orange")
             ag_irs.append(ir)
         irs.append(ag_irs)
+        fa, = ax1.plot([],[],color="blue")
+        fas.append(fa)
 
     # to pause the animation and check data
     anim_running = True
@@ -52,25 +63,34 @@ def trial_animation(trial, save=False):
     def init():
         for tree in trial.trees:
             ax1.plot(*tree.area.exterior.xy, color="green")
-
         return True
 
     # animation
     def animate(i):
         # according to number of savings
-        time.set_text("time={}".format(i))
+        time.set_text("time={}".format(i+1))
         # agent
         for enum,ag in enumerate(trial.agents):
+            # agent body
             agent_loc = Point(ag.data.x[i],ag.data.y[i])
             agent_body = agent_loc.buffer(ag.data.r)
             agents[enum].set_data(*agent_body.exterior.xy)
-            trajs[enum].set_data(ag.data.x[:i],ag.data.y[:i])
+            # trajectory
+            trajs[enum].set_data(ag.data.x[:i+1],ag.data.y[:i+1])
+            # ir sensors
             ix = [ir for ir in ag.data.irs[i] if ir]
             for n_ir,ir in enumerate(ix):
                 irs[enum][n_ir].set_data(*ir.exterior.xy)
+            # feeding areas
+            fx = ag.data.x[i] + (ag.data.r+ag.data.f_range/2)*np.sin(ag.data.o[i])
+            fy = ag.data.y[i] + (ag.data.r+ag.data.f_range/2)*np.cos(ag.data.o[i])
+            floc = Point(fx,fy)
+            f_area = floc.buffer(ag.data.f_range/2)
+            fas[enum].set_data(*f_area.exterior.xy)
+        # same tuple for all irs of all agents
         all_irs = [ir for irx in irs for ir in irx]
 
-        return tuple(agents),tuple(trajs),tuple(all_irs)
+        return tuple(agents),tuple(trajs),tuple(all_irs),tuple(fas)
 
     fig.canvas.mpl_connect('button_press_event', onClick)
     anim = animation.FuncAnimation(fig, animate,
