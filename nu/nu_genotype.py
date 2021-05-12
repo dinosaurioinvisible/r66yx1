@@ -1,17 +1,20 @@
 
 import numpy as np
+from nu_fx import arr2int
 
 class Genotype:
-    def __init__(self,map=None,flex=0):
+    def __init__(self,responses=None,flex=0):
         self.flex = flex
-        self.map = map
-        if self.map == None:
-            self.map = self.new_map()
+        self.basal_responses = responses
+        if not self.basal_responses:
+            self.basal_responses = self.set_responses()
+        self.basal_sts, self.basal_txs = self.set_cycles()
 
-    def new_map(self):
+    def set_responses(self):
         # map: gl_in -> gl_response
-        variations = True
+        variations = False
         variations2 = False
+        membrane_gt = False
         gt = [None]*512
         a1 = np.array([0,0,1,1,0,1,0,1,1])
         a2 = np.array([1,0,0,0,1,1,1,1,0])
@@ -27,8 +30,9 @@ class Genotype:
         aei2468 = [1,3,5,7]
         # membrane cell that can be on
         mvij = [[[0,0],[4,0]],[[0,4],[4,4]],[[0,0],[0,4]],[[4,0],[4,4]]]
-        aevijc = [[[1,1],[3,1]],[[1,3],[3,3]],[[1,1],[3,3]],[[3,1],[3,3]]]
+        aevijc = [[[1,1],[3,1]],[[1,3],[3,3]],[[1,1],[1,3]],[[3,1],[3,3]]]
         aeviji = [[0,6],[2,8],[0,2],[6,8]]
+        # cases where 2 membrane cells can be on
         mvij2 = [[0,1],[0,3],[1,0],[3,0]]
         aevij2 = [[1,1],[1,3],[1,1],[3,1]]
         aevij2i = [0,2,0,2]
@@ -53,8 +57,9 @@ class Genotype:
                 em = 0 if at[ai][ei] == 1 else 1
                 gt[eb] = [at[ai+1][ei],em,em]
             # membrane
-            for mi in range(1,8):
-                gt[mi] = [0,0,0]
+            if membrane_gt:
+                for mi in range(0,8):
+                    gt[mi] = [0,0,0]
             # known viable membrane variations
             if variations:
                 for [vi,vj] in mvij[ai]:
@@ -78,5 +83,18 @@ class Genotype:
                     em = 0 if at[ai][ei] == 1 else 1
                     gt[eb] = [at[ai+1][ei],em,em]
         return gt
+
+    def set_cycles(self):
+        bsts = []
+        btrs = []
+        a = np.array([0,0,1,1,0,1,0,1,1])
+        b = np.array([1,0,0,0,1,1,1,1,0])
+        # for each cycle
+        for do in range(4):
+            c1,c2 = arr2int(a,b,rot=do)
+            c3,c4 = arr2int(a,b,rot=do,transp=True)
+            bsts.extend([c1,c2,c3,c4])
+            btrs.extend([[c1,c2],[c2,c3],[c3,c4],[c4,c1]])
+        return bsts,btrs
 
 Genotype()

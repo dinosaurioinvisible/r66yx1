@@ -74,8 +74,26 @@ def xupdate(self,env):
             # update signal
             new_domain[i][j] = sig
             # update orientation and motion intention
+        # membrane
+        for ei,[i,j] in enumerate(self.me_ij):
+            me_in = np.sum(gl_domain[i-1:i+2,j-1:j+2])
+            if ei==0 or ei==4 or ei==11 or ei==15:
+                th = 1
+            elif ei==2 or ei==7 or ei==8 or ei==13:
+                th = 3
+            else:
+                th =2
+            new_domain[i][j] = 1 if me_in > th else 0
 
-
+#self.me_ij = xy_around(3,3,r=2,inv=True,ext=True)
+# membrane, fixed o
+self.eos[0:4] = 0
+for mi in [4,9,14,19]:
+    self.eos[mi] = 1
+self.eos[21:] = 2
+for mi in [5,10,15,20]:
+    self.eos[mi] = 3
+    
 '''
 # south-east
 se1 = [[0,0,1],[1,0,1],[0,1,1]]
