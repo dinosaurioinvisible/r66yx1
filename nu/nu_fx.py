@@ -18,6 +18,19 @@ def xy_around(x,y,r=1,inv=False,ext=False):
             del(axy[int(size*dr+1):int(size*(dr+1)-1)])
     return np.asarray(axy)
 
+'''group common vals in array'''
+def arr2group(x,vals=4,xmax=False,bin=False):
+    gi = []
+    for vi in range(0,vals):
+        gi.append(np.sum(np.where(x==vi,1,0)))
+    if xmax:
+        xmi = sorted([[xvi,xi] for xi,xvi in enumerate(gi)])[-1][1]
+        if bin:
+            xbi = [int(i) for i in np.binary_repr(xmi,2)]
+            return xbi
+        return xmi
+    return gi
+
 '''internal versus external input for membrane'''
 def membrane_fx(domain):
     mdomain=np.zeros((7,7))
@@ -28,7 +41,8 @@ def membrane_fx(domain):
         mdomain[i][1] += np.sum(domain[i-1:i+2,0])-np.sum(domain[max(2,i-1):min(i+2,5),2])
         mdomain[i][5] += np.sum(domain[i-1:i+2,6])-np.sum(domain[max(2,i-1):min(i+2,5),4])
     membrane = np.where(mdomain[1:6,1:6]>0,1,0)
-    return membrane
+    msums = np.where(np.asarray([np.sum(membrane[0,:]),np.sum(membrane[:,4]),np.sum(membrane[4,:]),np.sum(membrane[:,0])])>0,1,0)
+    return membrane,list(msums)
 
 '''convert array into int'''
 def arr2int(a,b=[],rot=None,transp=False):
@@ -54,3 +68,18 @@ def arr2int(a,b=[],rot=None,transp=False):
         xb = int(''.join(b.flatten().astype(int).astype(str)),2)
         return xa,xb
     return xa
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###

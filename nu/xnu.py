@@ -85,6 +85,24 @@ def xupdate(self,env):
                 th =2
             new_domain[i][j] = 1 if me_in > th else 0
 
+    def motion_fx(self,motion):
+        # east/west
+        mx = motion[1] - motion[3]
+        # north/south
+        my = motion[0] - motion[2]
+        # dominant orientation
+        #ox = np.sum(np.where(self.eos==1,1,0))-np.sum(np.where(self.eos==3,1,0))
+        #oy = np.sum(np.where(self.eos==0,1,0))-np.sum(np.where(self.eos==2,1,0))
+        #do = ox if abs(ox) > abs(oy) else oy
+        # chose the higher and compare to threshold
+        if max(abs(mx),abs(my)) > self.mt:
+            if abs(mx) > abs(my):
+                self.j += mx/abs(mx)
+            else:
+                self.i -= my/abs(my)
+        self.hi.append(deepcopy(self.i))
+        self.hj.append(deepcopy(self.j))
+
 #self.me_ij = xy_around(3,3,r=2,inv=True,ext=True)
 # membrane, fixed o
 self.eos[0:4] = 0
@@ -93,7 +111,7 @@ for mi in [4,9,14,19]:
 self.eos[21:] = 2
 for mi in [5,10,15,20]:
     self.eos[mi] = 3
-    
+
 '''
 # south-east
 se1 = [[0,0,1],[1,0,1],[0,1,1]]
