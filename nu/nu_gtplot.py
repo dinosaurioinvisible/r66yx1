@@ -10,16 +10,21 @@ def netplot(glx,xy="states",arrows=False):
     if xy=="responses":
         for bi,ri in zip(glx.hb,glx.hr):
             gx.add_node(bi,pos=(ri,bi))
+        gx.add_edges_from(glx.txs)
     elif xy=="states":
-        for tx in glx.txs:
-            gx.add_node(tx[1],pos=(tx[0],tx[1]))
-    gx.add_edges_from(glx.txs)
+        for ti,tx in enumerate(glx.txs):
+            gx.add_node(ti,pos=(tx[0],tx[1]))
+            if ti>0:
+                gx.add_edge(ti-1,ti)
 
     # graph: edges
     xedges,yedges = [],[]
     for edge in gx.edges():
-        x0,y0 = gx.nodes[edge[0]]['pos']
-        x1,y1 = gx.nodes[edge[1]]['pos']
+        try:
+            x0,y0 = gx.nodes[edge[0]]['pos']
+            x1,y1 = gx.nodes[edge[1]]['pos']
+        except:
+            import pdb; pdb.set_trace()
         xedges.extend([x0,x1,None])
         yedges.extend([y0,y1,None])
     edge_trace = go.Scatter(x=xedges,y=yedges,
@@ -53,7 +58,7 @@ def netplot(glx,xy="states",arrows=False):
     # plot graph
     graph = go.Figure(data=[edge_trace,node_trace],
                     layout=go.Layout(
-                    title="genotype graph mapping",
+                    title="genotype graph mapping, timesteps={}, recurrences={}".format(len(glx.txs),glx.recs),
                     titlefont_size=16,
                     showlegend=False,
                     #hovermode='closest',
