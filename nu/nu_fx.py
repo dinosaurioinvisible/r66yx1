@@ -31,18 +31,45 @@ def arr2group(x,vals=4,xmax=False,bin=False):
         return xmi
     return gi
 
-'''internal versus external input for membrane'''
-def membrane_fx(domain):
+'''membrane signaling reaction'''
+def membrane_fx(domain,me_ij=[],msum=0):
     mdomain=np.zeros((7,7))
-    for j in range(1,6):
-        mdomain[1][j] += np.sum(domain[0,j-1:j+2])-np.sum(domain[2,max(2,j-1):min(j+2,5)])
-        mdomain[5][j] += np.sum(domain[6,j-1:j+2])-np.sum(domain[4,max(2,j-1):min(j+2,5)])
-    for i in range(1,6):
-        mdomain[i][1] += np.sum(domain[i-1:i+2,0])-np.sum(domain[max(2,i-1):min(i+2,5),2])
-        mdomain[i][5] += np.sum(domain[i-1:i+2,6])-np.sum(domain[max(2,i-1):min(i+2,5),4])
-    membrane = np.where(mdomain[1:6,1:6]>0,1,0)
-    msums = np.where(np.asarray([np.sum(membrane[0,:]),np.sum(membrane[:,4]),np.sum(membrane[4,:]),np.sum(membrane[:,0])])>0,1,0)
-    return membrane,list(msums)
+    # reacts if any external cell is active
+    if len(me_ij)>0:
+        domain[1:6,1:6] = 0
+        for [i,j] in me_ij:
+            if np.sum(domain[i-1:i+2,j-1:j+2]) > 0:
+                mdomain[i][j] = 1
+        membrane = mdomain[1:6,1:6]
+    # reacts if external input > internal input
+    else:
+        for j in range(1,6):
+            mdomain[1][j] += np.sum(domain[0,j-1:j+2])-np.sum(domain[2,max(2,j-1):min(j+2,5)])
+            mdomain[5][j] += np.sum(domain[6,j-1:j+2])-np.sum(domain[4,max(2,j-1):min(j+2,5)])
+        for i in range(1,6):
+            mdomain[i][1] += np.sum(domain[i-1:i+2,0])-np.sum(domain[max(2,i-1):min(i+2,5),2])
+            mdomain[i][5] += np.sum(domain[i-1:i+2,6])-np.sum(domain[max(2,i-1):min(i+2,5),4])
+        membrane = np.where(mdomain[1:6,1:6]>0,1,0)
+    # sum as 4 walls
+    if msum==4:
+        me = np.where(np.asarray([np.sum(membrane[0,:]),np.sum(membrane[:,4]),np.sum(membrane[4,:]),np.sum(membrane[:,0])])>0,1,0)
+        msx = arr2int(me)
+    # sum as corners + walls
+    elif msum==8:
+        ml = np.sum(membrane[1:4,0])
+        mr = np.sum(membrane[1:4,4])
+        mu = np.sum(membrane[0,1:4])
+        md = np.sum(membrane[4,1:4])
+        mul = membrane[0][0]
+        mur = membrane[0][4]
+        mdl = membrane[4][0]
+        mdr = membrane[4][4]
+        me = np.where(np.asarray([mul,mu,mur,ml,mr,mdl,md,mdr])>0,1,0)
+        msx = arr2int(me)
+    # sum as a whole
+    else:
+        msx = np.sum(membrane)
+    return membrane,msx
 
 '''convert array into int'''
 def arr2int(a,b=[],rot=None,transp=False):
@@ -62,7 +89,7 @@ def arr2int(a,b=[],rot=None,transp=False):
     if rot:
         a = np.rot90(a.reshape(dim,dim),rot)
         if ab:
-            b = np.rot90(a.reshape(dim,dim),rot)
+            b = np.rot90(b.reshape(dim,dim),rot)
     xa = int(''.join(a.flatten().astype(int).astype(str)),2)
     if ab:
         xb = int(''.join(b.flatten().astype(int).astype(str)),2)

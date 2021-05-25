@@ -10,26 +10,37 @@ import networkx as nx
 def glx_anim(glx,world,show=True,save=False):
 
     # fig and subplots: nrows, ncols, index
-    fig = plt.figure()
+    fig = plt.figure(figsize=(10,10))
     ax1 = fig.add_subplot(2,2,1)
     ax2 = fig.add_subplot(2,2,2)
-    ax3 = fig.add_subplot(2,1,2)
+    ax3 = fig.add_subplot(2,2,3)
+    ax4 = fig.add_subplot(2,2,4)
 
-    fname = "glx recs={}".format(glx.recs)
+    fname = "glx timesteps={}, known dashes={}, cycles={}".format(len(glx.states),len(glx.kdp),len(glx.cycles))
     fig.suptitle("{}".format(fname),ha="center",va="center")
     time = fig.text(0.5,0.95,"",ha="center",va="center")
 
-    # for the map of cycles
+    # transitions during trial
     ax3.set_xlim(0,512)
     ax3.set_ylim(0,512)
     transitions=[]
-    for tx in glx.txs:
-        txo = plt.Circle((tx[0],tx[1]),radius=10,color="orange",fill=True,visible=False)
-        ax3.add_artist(txo)
-        transitions.append(txo)
-    hta,htb = zip(*glx.txs)
-    ht0, = ax3.plot([],[],color="grey",linestyle="dashed")
-    ht, = ax3.plot([],[],color="black",linestyle="dashed")
+    for hi in range(len(glx.hs)-1):
+        tst = plt.Circle((glx.hs[hi],glx.hs[hi+1]),radius=5,color="blue",fill=True,visible=False)
+        ax3.add_artist(tst)
+        transitions.append(tst)
+    tx0, = ax3.plot([],[],color="grey",linestyle="dashed")
+    tx1, = ax3.plot([],[],color="black",linestyle="dashed")
+
+    # graph of cycles
+    gx = nx.DiGraph()
+    for i,tx in enumerate(glx.txs):
+        if tx==[0,0,0,0]:
+            gx.remove_edge(glx.txs[i-1][0],glx.txs[i-1][1])
+        else:
+            gx.add_node(tx[0],pos=(tx[0],tx[1]))
+            gx.add_edge(tx[0],tx[1])
+    nx.draw_networkx(gx,ax=ax4,node_size=10,alpha=0.25)
+    # nx.draw(gx,ax=ax4)
 
     # to pause the animation and check data
     anim_running = True
@@ -50,20 +61,20 @@ def glx_anim(glx,world,show=True,save=False):
     palette = np.array([[255,255,255],[0,0,255],[255,0,0],[0,255,0],[0,0,0]])
 
     def init():
-        # trial response mapping
-        for btx in glx.txs[:16]:
-            bti = plt.Circle((btx[0],btx[1]),radius=5,color="blue",fill=True)
-            ax3.add_artist(bti)
-        # for i in range(0,4):
-        #     for ci in range(1,5):
-        #         btxi = ax3.plot(hta[:i*ci],htb[:i*ci],color="blue",linestyle="dashed")
+        # loops nodes and edges
+        # for cycle in glx.cycles:
+        #     loop = cycle+[cycle[:2]]
+        #     for ci in range(len(cycle)-2):
+        #         node = plt.Circle((loop[ci],loop[ci+1]),radius=10,color="orange",fill=True)
+        #         ax3.add_artist(node)
+        #         edge = ax3.plot([loop[ci],loop[ci+1]],[loop[ci+1],loop[ci+2]],color="orange",linestyle="dashed")
         return True
 
     def animate(i):
         # title
         time.set_text("time={}/{}".format(i,len(glx.states)-1))
         # update
-        if len(glx.states) > i:
+        if i < len(glx.states):
             # glider imshow (if world objects: 4=black)
             wi = world*4
             # (0:off, 1:memb off, 2: memb on, 3:core on)
@@ -79,15 +90,15 @@ def glx_anim(glx,world,show=True,save=False):
             # gl domain
             gl_rgb = palette[gi.astype(int)]
             gl_domain = ax2.imshow(gl_rgb)
-            # map of cycles
-            t0,t1 = max(0,i-2),max(0,i-1)
-            ht0.set_data([hta[t0],hta[t1]],[htb[t0],htb[t1]])
-            ht.set_data([hta[t1],hta[i]],[htb[t1],htb[i]])
-            transitions[t1].set_color("orange")
-            transitions[i].set_visible(True)
-            transitions[i].set_color("black")
+            # transition path
+            if i < len(transitions):
+                transitions[i].set_visible(True)
+            if 0 < i < len(transitions):
+                tx1.set_data([glx.hs[i-1:i+1]],[glx.hs[i:i+2]])
+            if i > 1:
+                tx0.set_data([glx.hs[i-2:i]],[glx.hs[i-1:i+1]])
 
-        return gl_nav,gl_domain,tuple(transitions),ht0,ht
+        return gl_nav,gl_domain,tuple(transitions),tx0,tx1
 
     # call for onClick and for the animation
     fig.canvas.mpl_connect('button_press_event',onClick)

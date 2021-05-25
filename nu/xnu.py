@@ -112,6 +112,54 @@ self.eos[21:] = 2
 for mi in [5,10,15,20]:
     self.eos[mi] = 3
 
+# membrane reacts-to-all (exterior) version
+self.st = np.zeros((7,7))
+gl_domain[2:5,2:5] = 0
+for [i,j] in self.me_ij:
+    if np.sum(gl_domain[i-1:i+2,j-1:j+2]) > 0:
+        self.st[i][j] = 1
+self.st = self.st[1:6,1:6]
+
+# general response
+# init
+go = arr2group(self.eos,xmax=True,bin=True)
+gr = [0]+go+[0]*4
+gl_r0 = arr2int(np.asarray(gr))
+self.grs.append(gl_r0)
+# update
+go = arr2group(self.eos,xmax=True,bin=True)
+gl_response = arr2int(np.asarray(gxy+go+gms))
+self.grs.append(gl_response)
+
+
+# arrows
+if arrows:
+    for edge in gx.edges():
+        graph.add_annotation(
+            x = gx.nodes[edge[1]]['pos'][0],
+            y = gx.nodes[edge[1]]['pos'][1],
+            ax = gx.nodes[edge[0]]['pos'][0],
+            ay = gx.nodes[edge[0]]['pos'][1],
+            xref="x",
+            yref="y",
+            axref="x",
+            ayref="y",
+            showarrow=True,
+            arrowhead=3,arrowsize=3,arrowwidth=1,arrowcolor="black")
+
+# # plot graph
+# graph = go.Figure(data=[edge_trace,node_trace],
+#                 layout=go.Layout(
+#                 title="genotype graph mapping, timesteps={}, recurrences={}".format(len(glx.txs),glx.recs),
+#                 titlefont_size=16,
+#                 showlegend=False,
+#                 #hovermode='closest',
+#                 margin=dict(b=20,l=10,r=10,t=30),
+#                 xaxis=dict(showgrid=False,zeroline=False,showticklabels=True),
+#                 yaxis=dict(showgrid=False,zeroline=False,showticklabels=True)))
+# graph.show()
+
+
 '''
 # south-east
 se1 = [[0,0,1],[1,0,1],[0,1,1]]

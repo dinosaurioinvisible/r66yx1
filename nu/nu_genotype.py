@@ -5,20 +5,19 @@ from copy import deepcopy
 
 '''initialized only with the 4 known cycles info'''
 class Genotype:
-    def __init__(self,new_gt=False,glx=None,flex=0):
+    def __init__(self,glx=None,flex=0):
         # init new
-        if new_gt:
+        if not glx:
             # known element responses (in->out)
-            self.rps = set_responses()
+            self.egt = set_responses()
             # known core transitions between states
-            self.txs,self.grs = set_cycles()
-        # for the evol alg
-        elif glx:
-            self.rps = deepcopy(glx.rps)
-            self.txs = deepcopy(glx.txs)
-            self.grs = deepcopy(glx.grs)
+            self.txs = set_cycles()
+            # known dash patterns (empty space only for new gliders)
+            self.kdp = [0]
         else:
-            raise Exception("no genotype")
+            self.egt = deepcopy(glx.egt)
+            self.txs = deepcopy(glx.txs)
+            self.kdp = deepcopy(glx.kdp)
         # prob of different output (error?)
         self.flex = flex
 
@@ -27,7 +26,8 @@ def set_responses():
     variations = False
     variations2 = False
     membrane_gt = False
-    gt = [None]*512
+    # gt = [None]*512
+    gt = {}
     a1 = np.array([0,0,1,1,0,1,0,1,1])
     a2 = np.array([1,0,0,0,1,1,1,1,0])
     a3 = np.array([0,1,0,0,0,1,1,1,1])
@@ -51,7 +51,7 @@ def set_responses():
     aevij2c = [[1,2],[1,2],[2,1],[2,1]]
     aevij2ci = [1,1,3,3]
     aevij2co = [0,0,3,3]
-    # for very state of A
+    # for every state of A
     for ai in range(len(at)-1):
         xa = np.zeros((5,5))
         xa[1:4,1:4] = at[ai].reshape(3,3)
@@ -98,8 +98,8 @@ def set_responses():
 
 def set_cycles():
     # bsts = []
+    # bgrs = []
     btrs = []
-    bgrs = []
     a = np.array([0,0,1,1,0,1,0,1,1])
     b = np.array([1,0,0,0,1,1,1,1,0])
     # for each cycle
@@ -107,13 +107,13 @@ def set_cycles():
         c1,c2 = arr2int(a,b,rot=do)
         c3,c4 = arr2int(a,b,rot=do,transp=True)
         # bsts.extend([c1,c2,c3,c4])
-        btrs.extend([[c1,c2],[c2,c3],[c3,c4],[c4,c1]])
-        o1r,o1l = [int(o) for o in np.binary_repr(((1-do)%4),2)]
-        o3r,o3l = [int(o) for o in np.binary_repr(((1+do+1)%4),2)]
-        r1,r2 = arr2int(np.asarray([1,o1r,o1l,0,0,0,0]),np.asarray([0,o1r,o1l,0,0,0,0]))
-        r3,r4 = arr2int(np.asarray([1,o3r,o3l,0,0,0,0]),np.asarray([0,o3r,o3l,0,0,0,0]))
-        bgrs.extend([r1,r2,r3,r4])
-    return btrs,bgrs
+        btrs.extend([[c1,c2],[c2,c3],[c3,c4],[c4,c1],[0,0,0,0]])
+        # o1r,o1l = [int(o) for o in np.binary_repr(((1-do)%4),2)]
+        # o3r,o3l = [int(o) for o in np.binary_repr(((1+do+1)%4),2)]
+        # r1,r2 = arr2int(np.asarray([1,o1r,o1l,0,0,0,0]),np.asarray([0,o1r,o1l,0,0,0,0]))
+        # r3,r4 = arr2int(np.asarray([1,o3r,o3l,0,0,0,0]),np.asarray([0,o3r,o3l,0,0,0,0]))
+        # bgrs.extend([r1,r2,r3,r4])
+    return btrs
 
 def set_combined_os():
     cos = []
