@@ -32,14 +32,22 @@ def glx_anim(glx,world,show=True,save=False):
     tx1, = ax3.plot([],[],color="black",linestyle="dashed")
 
     # graph of cycles
-    gx = nx.DiGraph()
-    for i,tx in enumerate(glx.txs):
-        if tx==[0,0,0,0]:
-            gx.remove_edge(glx.txs[i-1][0],glx.txs[i-1][1])
-        else:
-            gx.add_node(tx[0],pos=(tx[0],tx[1]))
-            gx.add_edge(tx[0],tx[1])
-    nx.draw_networkx(gx,ax=ax4,node_size=10,alpha=0.25)
+    gk = nx.DiGraph()
+    for cxi in glx.cycles:
+        for i,cx in enumerate(cxi):
+            gk.add_node(cx,pos=(cx,???))
+            if i>0:
+                gk.add_edge(cxi[i-1],cx)
+    nx.draw_networkx(gk,ax=ax4,node_size=10,alpha=0.25)
+
+    # graph of transitions
+    # gx = nx.DiGraph()
+    # for txi in glx.txs:
+    #     for i,tx in enumerate(txi):
+    #         gx.add_node(tx,pos=(tx,???))
+    #         if i>0:
+    #             gx.add_edge(txi[i-1],tx)
+    # nx.draw_networkx(gx,ax=ax4,node_size=10,alpha=0.25)
     # nx.draw(gx,ax=ax4)
 
     # to pause the animation and check data

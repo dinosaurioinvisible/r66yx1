@@ -33,9 +33,7 @@ class Trial:
                 # allocate and update glider
                 gl_domain[1:6,1:6] += gl.st
                 gl.update(gl_domain)
-        gl.kdp.append(self.dash)
-        gl.txs.append([0,0,0,0])
-        gl.analize()
+        gl.fin(self.dash)
         # visualization and return data
         if plot:
             netplot(gl)

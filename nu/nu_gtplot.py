@@ -11,12 +11,11 @@ def netplot(glx,arrows=False):
 
     # genotype network graph
     gx = nx.DiGraph()
-    for i,tx in enumerate(glx.txs):
-        if tx==[0,0,0,0]:
-            gx.remove_edge(glx.txs[i-1][0],glx.txs[i-1][1])
-        else:
-            gx.add_node(tx[0],pos=(tx[0],tx[1]))
-            gx.add_edge(tx[0],tx[1])
+    for txi in glx.txs:
+        for i,tx in enumerate(txi):
+            gx.add_node(glx,pos=(tx,???))
+            if i>0:
+                gx.add_edge(txi[i-1],tx)
     # behavior/environment
     bx = nx.DiGraph()
     beh = [512*a+b for a,b in zip(glx.hm,glx.hs)]
