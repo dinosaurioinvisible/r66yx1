@@ -2,7 +2,6 @@
 import numpy as np
 from copy import deepcopy
 from nu_fx import *
-import networkx as nx
 
 class Glider:
     def __init__(self,genotype,st0=1,x0=25,y0=25):
@@ -10,9 +9,9 @@ class Glider:
         self.egt = genotype.egt
         self.txs = genotype.txs
         self.kdp = genotype.kdp
+        self.cycles = genotype.cycles
         self.st = np.zeros(25)
         self.eos = np.zeros(9)
-        self.cycles = []
         # pos (orientation: 0=north, 1=east, 2=south, 3=west)
         self.i = x0
         self.j = y0
@@ -25,10 +24,11 @@ class Glider:
         self.hi = [x0]
         self.hj = [y0]
         self.states = []
-        self.hs = []
-        self.he = []
-        self.hm = []
-        self.ho = []
+        self.hs = []        # states (int repr)
+        self.he = []        # environment (int repr)
+        self.hm = []        # motor (1/0)
+        self.ho = []        # orientations (int repr)
+        self.hcycles = []   # list of sts
         self.set_cfg(st0)
 
     '''update every element for a new global state'''
@@ -49,13 +49,15 @@ class Glider:
             if rm+lm==2:
                 core_xy[self.eos.astype(int)[ei]] += 1
         # update membrane, whole glider and motion
-        self.st,msx = membrane_fx(gl_domain,self.me_ij,msum=8)
+        self.st,msx = membrane_fx(gl_domain,self.me_ij,mx="dash")
         self.st[1:4,1:4] = core_st.reshape(3,3)
         # save data
         self.states.append(self.st)
         gbi = arr2int(core_st)
         self.hs.append(gbi)
         self.he.append(msx)
+        if msx not in self.kdp:
+            self.kdp.append(msx)
         # system's motion reaction
         self.gl_motion(core_xy)
 
@@ -80,24 +82,45 @@ class Glider:
         self.ho.append(mo)
 
     '''count cycles'''
-    def fin(self,dash=None):
+    def fin(self):
         # trial transitions
         self.txs.append(self.hs)
-        # dash pattern passed
-        if dash:
-            self.kdp.append(dash)
-        # cycles
-        gx = nx.Graph()
-        for txi in self.txs:
-            for i,tx in enumerate(txi):
-                gx.add_node(tx,pos=(tx,???))
-                if i>0:
-                    gx.add_edge(txi[i-1],tx)
-        # self.cycles = list(nx.simple_cycles(gx))
-        self.cycles = nx.cycle_basis(gx)
+        # known cycles
+        for cx in self.cycles:
+            cy = False
+            cycle = np.zeros(len(self.hs))
+            for i in range(len(self.hs)-len(cx)):
+                sti = self.hs[i:i+len(cx)]
+                if cx==sti:
+                    cy = True
+                    cycle[i:i+len(cx)] = cx
+            if cy:
+                self.hcycles.append(cycle)
+        # new cycles
+        for wsize in range(3,8):
+            # last window (wsize=3): 94,95,96 compared with 97,98,99
+            for wi in range(len(self.hs)-wsize*2):
+                cy_sts = None
+                cycle = np.zeros(len(self.hs))
+                window_sts = self.hs[wi:wi+wsize]
+                for sti in range(wi+wsize,len(self.hs)-wsize):
+                    cy = False
+                    gl_sts = self.hs[sti:sti+wsize]
+                    if window_sts==gl_sts:
+                        cy = True
+                        cycle[sti:sti+wsize] = gl_sts
+                        cy_sts = window_sts
+                if cy:
+                    self.hcycles.append(cycle)
+                    new = True
+                    for known_cycle in self.cycles:
+                        if cy_sts==known_cycle:
+                            new = False
+                    if new:
+                        self.cycles.append(cy_sts)
 
     '''allocate glider starting from some known cfg'''
-    def set_cfg(st0):
+    def set_cfg(self,st0):
         # initial signalings
         if st0==1:
             act=[11,17,8,13,18] # east (south)
@@ -123,7 +146,6 @@ class Glider:
         self.states.append(self.st)
         gbi = arr2int(self.st[1:4,1:4].flatten())
         self.hs.append(gbi)
-
 
 
 

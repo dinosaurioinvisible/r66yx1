@@ -32,7 +32,7 @@ def arr2group(x,vals=4,xmax=False,bin=False):
     return gi
 
 '''membrane signaling reaction'''
-def membrane_fx(domain,me_ij=[],msum=0):
+def membrane_fx(domain,me_ij=[],mx=None):
     mdomain=np.zeros((7,7))
     # reacts if any external cell is active
     if len(me_ij)>0:
@@ -50,12 +50,17 @@ def membrane_fx(domain,me_ij=[],msum=0):
             mdomain[i][1] += np.sum(domain[i-1:i+2,0])-np.sum(domain[max(2,i-1):min(i+2,5),2])
             mdomain[i][5] += np.sum(domain[i-1:i+2,6])-np.sum(domain[max(2,i-1):min(i+2,5),4])
         membrane = np.where(mdomain[1:6,1:6]>0,1,0)
+    if not mx:
+        return membrane
+    # sum of all active external cells
+    if mx=="all":
+        msx = np.sum(membrane)
     # sum as 4 walls
-    if msum==4:
+    if mx==4:
         me = np.where(np.asarray([np.sum(membrane[0,:]),np.sum(membrane[:,4]),np.sum(membrane[4,:]),np.sum(membrane[:,0])])>0,1,0)
         msx = arr2int(me)
     # sum as corners + walls
-    elif msum==8:
+    if mx==8:
         ml = np.sum(membrane[1:4,0])
         mr = np.sum(membrane[1:4,4])
         mu = np.sum(membrane[0,1:4])
@@ -66,9 +71,17 @@ def membrane_fx(domain,me_ij=[],msum=0):
         mdr = membrane[4][4]
         me = np.where(np.asarray([mul,mu,mur,ml,mr,mdl,md,mdr])>0,1,0)
         msx = arr2int(me)
-    # sum as a whole
-    else:
-        msx = np.sum(membrane)
+    # get encountered dash (only for 1 wall)
+    if mx=="dash":
+        d0 = domain[0,:]
+        d1 = domain[:,6]
+        d2 = domain[6,:]
+        d3 = domain[:,0]
+        dm = [d0,d1,d2,d3]
+        di = np.asarray([np.sum(dx) for dx in dm]).argmax()
+        msx = arr2int(dm[di])
+    if not mx:
+        raise Exception("mx argument unknown")
     return membrane,msx
 
 '''convert array into int'''

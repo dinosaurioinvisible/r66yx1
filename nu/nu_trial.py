@@ -11,7 +11,6 @@ class Trial:
         self.tt = tt
         self.xmax = xmax
         self.ymax = ymax
-        self.dash = None
         self.world = None
         if auto:
             gtx = Genotype(gt)
@@ -33,7 +32,7 @@ class Trial:
                 # allocate and update glider
                 gl_domain[1:6,1:6] += gl.st
                 gl.update(gl_domain)
-        gl.fin(self.dash)
+        gl.fin()
         # visualization and return data
         if plot:
             netplot(gl)
@@ -45,7 +44,6 @@ class Trial:
     def set_world(self,mode="dashes",dash=0,r=5):
         # assuming starting cfg: south-east
         self.world = np.zeros((self.xmax,self.ymax))
-        self.dash = dash
         y0 = int(self.ymax/2)
         x0 = int(self.xmax/2)
         # set vertical dashed wall for controlled dash trials

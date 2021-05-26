@@ -120,6 +120,10 @@ for [i,j] in self.me_ij:
         self.st[i][j] = 1
 self.st = self.st[1:6,1:6]
 
+#cxi = cx==sti
+#if cxi.astype(np.ndarray).all():
+
+
 # general response
 # init
 go = arr2group(self.eos,xmax=True,bin=True)
@@ -130,6 +134,30 @@ self.grs.append(gl_r0)
 go = arr2group(self.eos,xmax=True,bin=True)
 gl_response = arr2int(np.asarray(gxy+go+gms))
 self.grs.append(gl_response)
+
+
+# known cycles
+for cx in self.cycles:
+    cy = False
+    cycle = np.zeros(len(self.hs))
+    for i in range(len(self.hs)-len(cx)):
+        sti = self.hs[i:i+len(cx)]
+        if cx==sti:
+            cy = True
+            cycle[i:i+len(cx)] = cx
+    if cy:
+        cycles.append(cycle)
+
+
+# cycles (no pos needed)
+gx = nx.Graph()
+for txi in self.txs:
+    for i,tx in enumerate(txi):
+        gx.add_node(tx)
+        if i>0:
+            gx.add_edge(txi[i-1],tx)
+# self.cycles = list(nx.simple_cycles(gx))
+self.cycles = nx.cycle_basis(gx)
 
 
 # arrows

@@ -12,12 +12,14 @@ class Genotype:
             self.egt = set_responses()
             # known core transitions between states
             self.txs = set_cycles()
+            self.cycles = deepcopy(self.txs)
             # known dash patterns (empty space only for new gliders)
             self.kdp = [0]
         else:
             self.egt = deepcopy(glx.egt)
             self.txs = deepcopy(glx.txs)
             self.kdp = deepcopy(glx.kdp)
+            self.cycles = deepcopy(glx.cycles)
         # prob of different output (error?)
         self.flex = flex
 
@@ -108,7 +110,7 @@ def set_cycles():
         c3,c4 = arr2int(a,b,rot=do,transp=True)
         # bsts.extend([c1,c2,c3,c4])
         # btrs.extend([[c1,c2],[c2,c3],[c3,c4],[c4,c1],[0,0,0,0]])
-        btrs.append([c1,c2,c3,c4,c1])
+        btrs.append([c1,c2,c3,c4])
         # o1r,o1l = [int(o) for o in np.binary_repr(((1-do)%4),2)]
         # o3r,o3l = [int(o) for o in np.binary_repr(((1+do+1)%4),2)]
         # r1,r2 = arr2int(np.asarray([1,o1r,o1l,0,0,0,0]),np.asarray([0,o1r,o1l,0,0,0,0]))

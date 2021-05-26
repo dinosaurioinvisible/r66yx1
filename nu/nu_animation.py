@@ -7,48 +7,86 @@ import matplotlib.animation as animation
 import plotly.graph_objects as go
 import networkx as nx
 
-def glx_anim(glx,world,show=True,save=False):
+def glx_anim(glx,world,show=True,save=False,autoclose=0):
 
     # fig and subplots: nrows, ncols, index
-    fig = plt.figure(figsize=(10,10))
-    ax1 = fig.add_subplot(2,2,1)
-    ax2 = fig.add_subplot(2,2,2)
-    ax3 = fig.add_subplot(2,2,3)
-    ax4 = fig.add_subplot(2,2,4)
+    fig = plt.figure(figsize=(15,10))
+    ax1 = fig.add_subplot(3,2,1)    # glider
+    ax2 = fig.add_subplot(3,2,2)    # glider zoom
+    ax3 = fig.add_subplot(3,2,3)    # genotype transitions
+    ax4 = fig.add_subplot(3,2,4)    # trial transitions
+    ax5 = fig.add_subplot(3,2,5)    # gt cycles
+    ax6 = fig.add_subplot(3,2,6)    # trial cycles
 
-    fname = "glx timesteps={}, known dashes={}, cycles={}".format(len(glx.states),len(glx.kdp),len(glx.cycles))
+    tt = len(glx.states)
+    fname = "glx timesteps={}, known dashes={}, cycles={}".format(tt,len(glx.kdp),len(glx.cycles))
     fig.suptitle("{}".format(fname),ha="center",va="center")
     time = fig.text(0.5,0.95,"",ha="center",va="center")
+    ax1.title.set_text("glider")
+    ax2.title.set_text("zoom")
+    ax3.title.set_text("genotype transitions")
+    ax4.title.set_text("trial transitions")
+    ax5.title.set_text("genotype cycles")
+    ax6.title.set_text("trial cycles")
 
-    # transitions during trial
-    ax3.set_xlim(0,512)
-    ax3.set_ylim(0,512)
-    transitions=[]
-    for hi in range(len(glx.hs)-1):
-        tst = plt.Circle((glx.hs[hi],glx.hs[hi+1]),radius=5,color="blue",fill=True,visible=False)
-        ax3.add_artist(tst)
-        transitions.append(tst)
-    tx0, = ax3.plot([],[],color="grey",linestyle="dashed")
-    tx1, = ax3.plot([],[],color="black",linestyle="dashed")
+    # ax3: gt transitions (graph)
+    gx = nx.DiGraph()
+    for txi in glx.txs:
+        for i,tx in enumerate(txi):
+            gx.add_node(tx)
+            if i>0:
+                gx.add_edge(txi[i-1],tx)
+    nx.draw_networkx(gx,ax=ax3,node_size=10,alpha=0.5)
 
-    # graph of cycles
+    # ax4: trial transitions (animated)
+    ax4.set_xlim(0,525)
+    ax4.set_ylim(0,525)
+    # nodes
+    txs = []
+    for i,sti in enumerate(glx.hs):
+        if i>0:
+            tx = plt.Circle((glx.hs[i-1],glx.hs[i]),radius=5,color="orange",fill=True,visible=False)
+            ax4.add_artist(tx)
+            txs.append(tx)
+    # looping nodes
+    for i,cx in enumerate(glx.cycles):
+        cx = cx+[cx[0]]
+        if i>0:
+            tx = plt.Circle((glx.hs[i-1],glx.hs[i]),radius=7,color="blue",fill=False,visible=True)
+            ax4.add_artist(tx)
+    # edges
+    tx0, = ax4.plot([],[],color="grey",linestyle="dashed")
+    tx1, = ax4.plot([],[],color="black",linestyle="dashed")
+
+    # ax5: gt cycles (graph)
     gk = nx.DiGraph()
     for cxi in glx.cycles:
         for i,cx in enumerate(cxi):
-            gk.add_node(cx,pos=(cx,???))
+            gk.add_node(cx)
             if i>0:
                 gk.add_edge(cxi[i-1],cx)
-    nx.draw_networkx(gk,ax=ax4,node_size=10,alpha=0.25)
+    nx.draw_networkx(gk,ax=ax5,node_size=10,alpha=0.5)
 
-    # graph of transitions
-    # gx = nx.DiGraph()
-    # for txi in glx.txs:
-    #     for i,tx in enumerate(txi):
-    #         gx.add_node(tx,pos=(tx,???))
-    #         if i>0:
-    #             gx.add_edge(txi[i-1],tx)
-    # nx.draw_networkx(gx,ax=ax4,node_size=10,alpha=0.25)
-    # nx.draw(gx,ax=ax4)
+    # ax6: trial cycles (regular plt)
+    ax6.plot(glx.hs, label="trial loops",color="black")
+    colors = ["purple","blue","green","orange","red"]
+    # for ci,cx in enumerate(glx.hcycles):
+        #cg = np.zeros(len(glx.hs))
+        #for i in range(len(glx.hs)-len(cx)):
+        #    sti = glx.hs[i:i+len(cx)]
+        #    if cx==sti:
+        #        cg[i:i+len(cx)] = cx
+        #if np.sum(cg)>0:
+    for cx in glx.hcycles:
+        cxlen=0
+        for i in cx:
+            if i!=0:
+                cxlen+=1
+            if cxlen>1 and i==0:
+                break
+        color = colors[cxlen-3]
+        ax6.plot(cx,color=color,label="{}".format(cxlen))
+    ax6.legend()
 
     # to pause the animation and check data
     anim_running = True
@@ -69,20 +107,12 @@ def glx_anim(glx,world,show=True,save=False):
     palette = np.array([[255,255,255],[0,0,255],[255,0,0],[0,255,0],[0,0,0]])
 
     def init():
-        # loops nodes and edges
-        # for cycle in glx.cycles:
-        #     loop = cycle+[cycle[:2]]
-        #     for ci in range(len(cycle)-2):
-        #         node = plt.Circle((loop[ci],loop[ci+1]),radius=10,color="orange",fill=True)
-        #         ax3.add_artist(node)
-        #         edge = ax3.plot([loop[ci],loop[ci+1]],[loop[ci+1],loop[ci+2]],color="orange",linestyle="dashed")
         return True
 
     def animate(i):
-        # title
-        time.set_text("time={}/{}".format(i,len(glx.states)-1))
+        time.set_text("time={}/{}".format(i,tt-1))
         # update
-        if i < len(glx.states):
+        if i < tt:
             # glider imshow (if world objects: 4=black)
             wi = world*4
             # (0:off, 1:memb off, 2: memb on, 3:core on)
@@ -99,19 +129,19 @@ def glx_anim(glx,world,show=True,save=False):
             gl_rgb = palette[gi.astype(int)]
             gl_domain = ax2.imshow(gl_rgb)
             # transition path
-            if i < len(transitions):
-                transitions[i].set_visible(True)
-            if 0 < i < len(transitions):
-                tx1.set_data([glx.hs[i-1:i+1]],[glx.hs[i:i+2]])
-            if i > 1:
-                tx0.set_data([glx.hs[i-2:i]],[glx.hs[i-1:i+1]])
+            if i < len(txs):
+                txs[i].set_visible(True)
+                if i > 0:
+                    tx1.set_data([glx.hs[i-1:i+1]],[glx.hs[i:i+2]])
+                if i > 1:
+                    tx0.set_data([glx.hs[i-2:i]],[glx.hs[i-1:i+1]])
 
-        return gl_nav,gl_domain,tuple(transitions),tx0,tx1
+        return gl_nav,gl_domain,tuple(txs),tx0,tx1
 
     # call for onClick and for the animation
     fig.canvas.mpl_connect('button_press_event',onClick)
     anim=animation.FuncAnimation(fig, animate,
-            init_func=init, frames=len(glx.states),
+            init_func=init, frames=tt,
             interval=1000, blit=False, repeat=True)
 
     if save:
@@ -123,8 +153,12 @@ def glx_anim(glx,world,show=True,save=False):
             # normally because of system required updates
             print('\ncouldn\'t save animation...\n')
     if show:
-        plt.show()
-    plt.close("all")
+        if autoclose>0:
+            plt.show(block=False)
+            plt.pause(autoclose)
+            plt.close("all")
+        else:
+            plt.show()
 
 
 ###
