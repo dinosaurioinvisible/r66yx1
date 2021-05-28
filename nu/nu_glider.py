@@ -97,7 +97,7 @@ class Glider:
             if cy:
                 self.hcycles.append(cycle)
         # new cycles
-        for wsize in range(3,8):
+        for wsize in range(4,8):
             # last window (wsize=3): 94,95,96 compared with 97,98,99
             for wi in range(len(self.hs)-wsize*2):
                 cy_sts = None

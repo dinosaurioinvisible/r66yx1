@@ -70,13 +70,6 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     # ax6: trial cycles (regular plt)
     ax6.plot(glx.hs, label="trial loops",color="black")
     colors = ["purple","blue","green","orange","red"]
-    # for ci,cx in enumerate(glx.hcycles):
-        #cg = np.zeros(len(glx.hs))
-        #for i in range(len(glx.hs)-len(cx)):
-        #    sti = glx.hs[i:i+len(cx)]
-        #    if cx==sti:
-        #        cg[i:i+len(cx)] = cx
-        #if np.sum(cg)>0:
     for cx in glx.hcycles:
         cxlen=0
         for i in cx:

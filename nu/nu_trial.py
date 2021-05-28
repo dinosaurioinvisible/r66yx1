@@ -7,24 +7,28 @@ from nu_animation import glx_anim
 from nu_gtplot import netplot
 
 class Trial:
-    def __init__(self,tt=100,xmax=50,ymax=50,auto=False,gt=None,mode="dashes",dash=127):
-        self.tt = tt
-        self.xmax = xmax
-        self.ymax = ymax
-        self.world = None
+    def __init__(self,tt=100,xmax=50,ymax=50,auto=False,st0=1,xy0=True,gtx=None,mode=None,dash=0,anim=True,plot=True):
+        self.tt=tt
+        self.xmax=xmax
+        self.ymax=ymax
+        self.world=None
         if auto:
-            gtx = Genotype(gt)
-            self.set_world(mode,dash)
-            self.dash_trial(gtx,plot=True,anim=True)
+            self.dash_trial(gtx,st0,xy0,mode,dash,anim,plot)
 
-    '''basic trial for specific dash patterns and single glider'''
-    def dash_trial(self,gt,plot=False,anim=False):
-        # initialize glider
-        gl = Glider(gt,x0=int(self.xmax/2),y0=int(self.ymax/2))
+    '''default trial: st0=SE, single glider, dashed wall world'''
+    def run(self,gtx,st0=1,xy0=True,mode="dashes",dash=1,anim=False,plot=False):
+        # initialize world and glider
+        if xy0:
+            x0,y0=int(self.xmax/2),int(self.ymax/2)
+        else:
+            x0=np.random.randint(10,self.xmax-10)
+            y0=np.random.randint(10,self.xmax-10)
+        self.set_world(st0,x0,y0,mode,dash)
+        gl = Glider(gtx,st0,x0,y0)
         # run trial
         for ti in range(self.tt):
             # get world domain
-            gl_domain = deepcopy(self.world[int(gl.i-3):int(gl.i+4),int(gl.j-3):int(gl.j+4)])
+            gl_domain = deepcopy(self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4))
             # if world object within glider domain (collision) it dies
             if np.sum(gl_domain[1:6,1:6]):
                 return
@@ -41,11 +45,9 @@ class Trial:
         return gl
 
     '''create world and allocate dash patterns'''
-    def set_world(self,mode="dashes",dash=0,r=5):
-        # assuming starting cfg: south-east
-        self.world = np.zeros((self.xmax,self.ymax))
-        y0 = int(self.ymax/2)
-        x0 = int(self.xmax/2)
+    def set_world(self,x0,y0,st0=1,mode="dashes",dash=1,r=5):
+        # empty world
+        self.world = np.zeros((self.xmax,self.ymax)).astype(int)
         # set vertical dashed wall for controlled dash trials
         if mode=="dashes":
             # wall location, expected y at contact (upper-left membrane)
@@ -65,8 +67,8 @@ class Trial:
             self.world[:,y0-r] = dashed_wall[:self.ymax]
         # normal distribution: 1 if val higher/lower than sd, 0 otherwise
         elif mode=="full":
-            self.world = np.random.normal(0,1,size(self.xmax,self.ymax))
-            self.world = np.where(self.world>1,1,np.where(self.world<-1,1,0))
+            self.world = np.random.normal(0,1,size=(self.xmax,self.ymax))
+            self.world = np.where(self.world>1.25,1,np.where(self.world<-1.25,1,0))
             # leave the surroundings empty
             self.world[x0-5:x0+6,y0-5:y0+5] = 0
         # bounds
