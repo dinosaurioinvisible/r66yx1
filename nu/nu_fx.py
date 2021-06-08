@@ -84,6 +84,40 @@ def membrane_fx(domain,me_ij=[],mx=None):
         raise Exception("mx argument unknown")
     return membrane,msx
 
+'''convert (2) active borders of matrix to int (clockwise)'''
+def ext2int(ma):
+    mx = np.zeros(11)
+    # ext membrane/walls values (clockwise)
+    ma_arrs = [ma[0,:],ma[:,-1],np.rot90(ma,2)[0,:],np.rot90(ma,2)[:,-1]]
+    ma_wx = [i for i,a in enumerate(ma_arrs) if np.sum(a)>0]
+    # assuming a max of 2 consecutive walls interaction
+    if len(ma_wx)==0:
+        return 0
+    # array start from the first wall clockwise 01,12,23,30
+    elif len(ma_wx)==1:
+        wxs = [3,0] if ma_wx==[3] else [ma_wx[0],ma_wx[0]+1]
+    elif len(ma_wx)==2:
+        wxs = [3,0] if ma_wx==[0,3] else ma_wx
+    # should be common, as corners count for 2 different walls
+    elif len(ma_wx)==3:
+        # center + higher left or right (consecutive walls)
+        ma_wx = [2,3,0] if ma_wx==[0,2,3] else ma_wx
+        wl = np.sum(ma_arrs[ma_wx[0]])
+        wr = np.sum(ma_arrs[ma_wx[2]])
+        # so in case of wl==wr: wr
+        wxs = ma_wx[:2] if wl>wr else ma_wx[1:]
+    else:
+        ma_sx = [(np.sum(mi),i) for i,mi in enumerate(ma_arrs)]
+        wi,wj = sorted(ma_sx)[2:]
+        wxs = wj[1],wi[1] if wj[0]>wi[0] and wj[1]==3 else wi[1],wj[1]
+    # wall starting index
+    mx[:2] = [int(i) for i in np.binary_repr(wxs[0],2)]
+    # individual element values for those 2 walls
+    mx[2:] = np.concatenate((ma_arrs[ma_wx[0]],ma_arrs[ma_wx[1]][1:]))
+    # int representation
+    mx_int = arr2int(mx)
+    return mx_int
+
 '''convert array into int'''
 def arr2int(a,b=[],rot=None,transp=False):
     # check for second array

@@ -27,6 +27,63 @@ class Element:
         mx = 1 if (rm+lm)>1 else 0
         return mx
 
+    # ax4: trial transitions (animated)
+    ax4.set_xlim(0,525)
+    ax4.set_ylim(0,525)
+    # nodes
+    txs = []
+    for i,sti in enumerate(glx.hs):
+        if i>0:
+            tx = plt.Circle((glx.hs[i-1],glx.hs[i]),radius=5,color="orange",fill=True,visible=False)
+            ax4.add_artist(tx)
+            txs.append(tx)
+    # looping nodes
+    for i,cx in enumerate(glx.cycles):
+        cx = cx+[cx[0]]
+        if i>0:
+            tx = plt.Circle((glx.hs[i-1],glx.hs[i]),radius=7,color="blue",fill=False,visible=True)
+            ax4.add_artist(tx)
+    # edges
+    tx0, = ax4.plot([],[],color="grey",linestyle="dashed")
+    tx1, = ax4.plot([],[],color="black",linestyle="dashed")
+
+
+'''search for new loops (possible cycles)'''
+def gl_loops(self):
+    # look for loops in states
+    for window_size in range(3,11):
+        # sliding window
+        for w0 in range(len(self.sts)-window_size):
+            loop = False
+            window_sts = self.sts[w0:w0+window_size]
+            # check if loops
+            if window_sts[0]==window_sts[-1]:
+                # check that it isn't an iteration over the same loop
+                iter = False
+                for wi,window_st in enumerate(window_sts[1:-1]):
+                    if window_st==window_sts[0]:
+                        xloop = window_sts[:wi+1]
+                        iloop = window_sts[wi+1:(wi+1)*2]
+                        if xloop==iloop:
+                            iter = True
+                            break
+                # check for loop cycles
+                if not iter:
+                    loop = window_sts[:-1]
+                    loop_cycle = np.zeros(len(self.sts))
+                    loop_cycle[w0:w0+window_size-1] = loop
+                    # if it repeats during the remaining of the trial
+                    n_loops = 1
+                    for st0 in range(w0+window_size,len(self.sts)-window_size):
+                        trial_window = self.sts[st0:st0+window_size-1]
+                        if loop==trial_window:
+                            loop_cycle[st0:st0+window_size-1] = loop
+                            n_loops += 1
+                    self.loops.append(loop_cycle)
+                    # append to cycles if appears more than once
+                    if n_loops>1 and loop not in self.cycles:
+                        self.cycles.append(loop)
+
 '''update according to re-oriented input'''
 def xupdate(self,env):
     self.motion = [0]*4
@@ -102,6 +159,64 @@ def xupdate(self,env):
                 self.i -= my/abs(my)
         self.hi.append(deepcopy(self.i))
         self.hj.append(deepcopy(self.j))
+
+    def fin(self):
+        # trial transitions
+        self.txs.append(self.hs)
+        # known cycles
+        for cx in self.cycles:
+            cy = False
+            cycle = np.zeros(len(self.hs))
+            for i in range(len(self.hs)-len(cx)):
+                sti = self.hs[i:i+len(cx)]
+                if cx==sti:
+                    cy = True
+                    cycle[i:i+len(cx)] = cx
+            if cy:
+                self.hcycles.append(cycle)
+        # new cycles
+        for wsize in range(2,11):
+            # last window (wsize=3): 94,95,96 compared with 97,98,99
+            for wi in range(len(self.hs)-wsize*2):
+                # check if window states form a loop
+                window_sts = self.hs[wi:wi+wsize]
+                cy_sts = None
+                cycle = np.zeros(len(self.hs))
+                # compare sts to remaining trial sts
+                for sti in range(wi+wsize,len(self.hs)-wsize):
+                    cy = False
+                    gl_sts = self.hs[sti:sti+wsize]
+                    if window_sts==gl_sts:
+                        cy = True
+                        cycle[sti:sti+wsize] = gl_sts
+                        cy_sts = window_sts
+                if cy:
+                    self.hcycles.append(cycle)
+                    new = True
+                    for known_cycle in self.cycles:
+                        if cy_sts==known_cycle:
+                            new = False
+                    if new:
+                        self.cycles.append(cy_sts)
+
+'''convert the borders of some matrix to int'''
+def ext2int(ma):
+    ma_arrs = [ma[0,:],map[:,-1],ma[-1,:],ma[:,0]]
+    ma_ints = [arr2int(mi) if np.sum(mi)>0 else 0 for mi in ma_arrs]
+    base_len = len(ma_arrs[0])
+    base = 2**base_len
+    bi = 0
+    # index number according to every combination (0,01,012,0123,...,2,23,3)
+    for mi in ma_ints:
+        mx = base*bi+mi if mi>0 else mx
+        bi += 1
+        for mj in ma_ints[i+1:base_len]:
+            mx = base*bi+mj if mj>0 else mx
+            bi += 1
+            for mk in ma_ints[j+1:base_len]:
+                mx = base*bi+mk if mk>0 else mx
+                bi += 1
+    return mx
 
 #self.me_ij = xy_around(3,3,r=2,inv=True,ext=True)
 # membrane, fixed o

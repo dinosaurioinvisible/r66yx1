@@ -2,24 +2,32 @@
 import numpy as np
 from nu_fx import arr2int
 from copy import deepcopy
+from collections import defaultdict
 
 '''initialized only with the 4 known cycles info'''
 class Genotype:
     def __init__(self,glx=None,flex=0):
         # init new
         if not glx:
-            # known element responses (in->out)
+            # elements' responses (determined from gt)
+            # dict[env_in] = [signal,rm,lm]
             self.egt = set_responses()
-            # known core transitions between states
-            self.txs = set_cycles()
-            self.cycles = deepcopy(self.txs)
-            # known dash patterns (empty space only for new gliders)
-            self.kdp = [0]
+            # glider response to encountered env dashes
+            # defdict[env dashes,cx,mx] : [env dashes_t+1,cx_t+1,mx_t+1]
+            self.rxs = defaultdict(list)
+            # loops, closed sequences of responses
+            # dict[cx,mx] : [cx,mx],...[cx_i,mx_i],...,[cx,mx]
+            self.cycles = set_cycles()
+            # transients redirecting to known cycles
+            # defdict[cx,mx] : [cx_0,mx_0],...,[cx,mx]
+            self.txs = defaultdict(list)
+            # dashes survived
+            self.dashes = [0]
         else:
             self.egt = deepcopy(glx.egt)
+            self.rxs = deepcopy(glx.rxs)
+            self.cxs = deepcopy(glx.cxs)
             self.txs = deepcopy(glx.txs)
-            self.kdp = deepcopy(glx.kdp)
-            self.cycles = deepcopy(glx.cycles)
         # prob of different output (error?)
         self.flex = flex
 
@@ -101,16 +109,22 @@ def set_responses():
 def set_cycles():
     # bsts = []
     # bgrs = []
-    btrs = []
+    # btrs = []
+    btrs = {}
     a = np.array([0,0,1,1,0,1,0,1,1])
     b = np.array([1,0,0,0,1,1,1,1,0])
     # for each cycle
     for do in range(4):
         c1,c2 = arr2int(a,b,rot=do)
         c3,c4 = arr2int(a,b,rot=do,transp=True)
+        # dict version
+        btrs[c1] = [[c2,0],[c3,0],[c4,0],[c1,0]]
+        btrs[c2] = [[c3,0],[c4,0],[c1,0],[c2,0]]
+        btrs[c3] = [[c4,0],[c1,0],[c2,0],[c3,0]]
+        btrs[c4] = [[c1,0],[c2,0],[c3,0],[c4,0]]
         # bsts.extend([c1,c2,c3,c4])
         # btrs.extend([[c1,c2],[c2,c3],[c3,c4],[c4,c1],[0,0,0,0]])
-        btrs.append([c1,c2,c3,c4])
+        # btrs.append([c1,c2,c3,c4])
         # o1r,o1l = [int(o) for o in np.binary_repr(((1-do)%4),2)]
         # o3r,o3l = [int(o) for o in np.binary_repr(((1+do+1)%4),2)]
         # r1,r2 = arr2int(np.asarray([1,o1r,o1l,0,0,0,0]),np.asarray([0,o1r,o1l,0,0,0,0]))

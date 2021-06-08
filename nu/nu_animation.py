@@ -11,12 +11,12 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
 
     # fig and subplots: nrows, ncols, index
     fig = plt.figure(figsize=(15,10))
-    ax1 = fig.add_subplot(3,2,1)    # glider
-    ax2 = fig.add_subplot(3,2,2)    # glider zoom
-    ax3 = fig.add_subplot(3,2,3)    # genotype transitions
-    ax4 = fig.add_subplot(3,2,4)    # trial transitions
-    ax5 = fig.add_subplot(3,2,5)    # gt cycles
-    ax6 = fig.add_subplot(3,2,6)    # trial cycles
+    ax1 = fig.add_subplot(3,2,1)    # anim: glider
+    ax2 = fig.add_subplot(3,2,2)    # anim: glider zoom
+    ax3 = fig.add_subplot(3,2,3)    # gt network (memb/core)
+    ax4 = fig.add_subplot(3,2,4)    # gt loops and txs
+    ax5 = fig.add_subplot(3,2,5)    # trial sts (core,memb,loops)
+    ax6 = fig.add_subplot(3,2,6)    # gl responses to dashes
 
     tt = len(glx.states)
     fname = "glx timesteps={}, known dashes={}, cycles={}".format(tt,len(glx.kdp),len(glx.cycles))
@@ -24,62 +24,63 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     time = fig.text(0.5,0.95,"",ha="center",va="center")
     ax1.title.set_text("glider")
     ax2.title.set_text("zoom")
-    ax3.title.set_text("genotype transitions")
-    ax4.title.set_text("trial transitions")
-    ax5.title.set_text("genotype cycles")
-    ax6.title.set_text("trial cycles")
+    ax3.title.set_text("gt: memb/core")
+    ax4.title.set_text("gt: cycles and transients")
+    ax5.title.set_text("trial states")
+    ax6.title.set_text("responses to dashes")
 
-    # ax3: gt transitions (graph)
+    # ax3: memb/core
     gx = nx.DiGraph()
-    for txi in glx.txs:
-        for i,tx in enumerate(txi):
-            gx.add_node(tx)
-            if i>0:
-                gx.add_edge(txi[i-1],tx)
-    nx.draw_networkx(gx,ax=ax3,node_size=10,alpha=0.5)
+    for ri in glx.rxs.keys():
+        rxs = glx.rxs[ri]
+        di,ci,mi = ri
+        gx.add_node((ci,mi),pos=(ci,mi))
+        for rx in rxs:
+            dx,cx,mx = rx
+            gx.add_node((cx,mx),pos=(cx,mx))
+            gx.add_edge((ci,mi),(cx,mx))
+    nx.draw_networkx(gx,ax=ax3,node_size=10,alpha=0.5,with_labels=False)
 
-    # ax4: trial transitions (animated)
-    ax4.set_xlim(0,525)
-    ax4.set_ylim(0,525)
-    # nodes
-    txs = []
-    for i,sti in enumerate(glx.hs):
-        if i>0:
-            tx = plt.Circle((glx.hs[i-1],glx.hs[i]),radius=5,color="orange",fill=True,visible=False)
-            ax4.add_artist(tx)
-            txs.append(tx)
-    # looping nodes
-    for i,cx in enumerate(glx.cycles):
-        cx = cx+[cx[0]]
-        if i>0:
-            tx = plt.Circle((glx.hs[i-1],glx.hs[i]),radius=7,color="blue",fill=False,visible=True)
-            ax4.add_artist(tx)
-    # edges
-    tx0, = ax4.plot([],[],color="grey",linestyle="dashed")
-    tx1, = ax4.plot([],[],color="black",linestyle="dashed")
+    # ax4: loops & transients
+    gx2 = nx.DiGraph()
+    # loops
+    for cycle_i in glx.cycles.keys():
+        ci,mi = cycle_i
+        if (ci,mi) not in gx2.nodes:
+            gx2.add_node((ci,mi),pos=(ci,mi))
+        # create only the first (to avoid overlaps)
+        cx,mx = glx.cycles[cycle_i][0]
+        if (cx,mx) not in gx2.nodes:
+            gx2.add_node((cx,mx),pos=(cx,mx))
+        gx2.add_edge((ci,mi),(cx,mx),color="b")
+    # connecting transients
+    for tx in glx.txs.keys():
+        (c0,m0),(cx,mx) = tx
+        tx_seq = glx.txs[tx]
+        for ti,tx_st in enumerate(tx_seq):
+            ci,mi = tx_st
+            if (ci,mi) not in gx2.nodes:
+                gx2.add_node((ci,mi),pos=(ci,mi))
+            if ti>0:
+                c0,m0 = tx_seq[ti-1]
+                gx2.add_edge((c0,m0),(ci,mi),color="r")
+    colors = [gx2[u][v] for u,v in gx2.edges]
+    nx.draw_networkx(gx,ax=ax4,node_size=10,alpha=0.5,with_labels=False,edge_color=color)
 
-    # ax5: gt cycles (graph)
-    gk = nx.DiGraph()
-    for cxi in glx.cycles:
-        for i,cx in enumerate(cxi):
-            gk.add_node(cx)
-            if i>0:
-                gk.add_edge(cxi[i-1],cx)
-    nx.draw_networkx(gk,ax=ax5,node_size=10,alpha=0.5)
+    # ax5: trials states
+    ax5.plot(glx.core, label="core sts", color="black")
+    ax5.plot(glx.memb, label="memb sts", color="grey")
+    for loop in glx.loops:
+        ax5.plot(loop[0], linestyle="dashed")
+        ax5.plot(loop[1], linestyle="dashed")
+    ax5.legend()
 
-    # ax6: trial cycles (regular plt)
-    ax6.plot(glx.hs, label="trial loops",color="black")
-    colors = ["purple","blue","green","orange","red"]
-    for cx in glx.hcycles:
-        cxlen=0
-        for i in cx:
-            if i!=0:
-                cxlen+=1
-            if cxlen>1 and i==0:
-                break
-        color = colors[cxlen-3]
-        ax6.plot(cx,color=color,label="{}".format(cxlen))
-    ax6.legend()
+    # ax6: responses to dashes
+    for ri in glx.rxs.keys():
+        di,ci,mi = ri
+        for rx in glx.rxs[ri]:
+            dx,cx,mx = rx
+            ax6.plot([ci,cx],[di,dx],color="black")
 
     # to pause the animation and check data
     anim_running = True
@@ -121,15 +122,8 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
             # gl domain
             gl_rgb = palette[gi.astype(int)]
             gl_domain = ax2.imshow(gl_rgb)
-            # transition path
-            if i < len(txs):
-                txs[i].set_visible(True)
-                if i > 0:
-                    tx1.set_data([glx.hs[i-1:i+1]],[glx.hs[i:i+2]])
-                if i > 1:
-                    tx0.set_data([glx.hs[i-2:i]],[glx.hs[i-1:i+1]])
 
-        return gl_nav,gl_domain,tuple(txs),tx0,tx1
+        return gl_nav,gl_domain
 
     # call for onClick and for the animation
     fig.canvas.mpl_connect('button_press_event',onClick)
