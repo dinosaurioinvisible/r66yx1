@@ -24,12 +24,12 @@ class Glider:
         self.mt = 3
         # trial data
         self.states = []
-        self.loc = [x0,y0]  # [i,j]
-        self.core = []      # core states (int)
-        self.memb = []      # membrane states (int)
-        self.env = []      # encountered dashes ([int1,(int2),...(int4)])
-        self.dodm = []      # dominant orientation and motion [do,dm]
-        self.loops = []     # trial recurrences (list of (2,time) arrays)
+        self.loc = [[x0,y0]]    # [i,j]
+        self.core = []          # core states (int)
+        self.memb = []          # membrane states (int)
+        self.env = []           # encountered dashes ([int1,(int2),...(int4)])
+        self.dodm = []          # dominant orientation and motion [do,dm]
+        self.loops = []         # trial recurrences (list of (2,time) arrays)
         self.set_cfg(st0)
 
     '''update every element for a new global state'''
@@ -140,12 +140,19 @@ class Glider:
                     # windows skips to states after loop
                     wi = wx+1
                     wx = wi+r
+                else:
+                    wx+=1
             # if something
             if len(loop_seq)>0:
                 self.loops.append(loop)
                 for seq in loop_seq:
-                    if seq not in self.cycles[tuple(ci,mi)]:
-                        self.cycles[tuple(ci,mi)] += [seq]
+                    # from zero so it closes the loop (last->first)
+                    for si in range(0,len(seq)):
+                        cs0,ms0 = seq[si-1]
+                        cs,ms = seq[si]
+                        if not [cs,ms] in self.cycles[(cs0,ms0)]:
+                            self.cycles[(cs0,ms0)] += [[cs,ms]]
+
 
     '''allocate glider starting from some known cfg'''
     def set_cfg(self,st0):

@@ -10,7 +10,7 @@ import networkx as nx
 def glx_anim(glx,world,show=True,save=False,autoclose=0):
 
     # fig and subplots: nrows, ncols, index
-    fig = plt.figure(figsize=(15,10))
+    fig = plt.figure(figsize=(15,8))
     ax1 = fig.add_subplot(3,2,1)    # anim: glider
     ax2 = fig.add_subplot(3,2,2)    # anim: glider zoom
     ax3 = fig.add_subplot(3,2,3)    # gt network (memb/core)
@@ -19,7 +19,7 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     ax6 = fig.add_subplot(3,2,6)    # gl responses to dashes
 
     tt = len(glx.states)
-    fname = "glx timesteps={}, known dashes={}, cycles={}".format(tt,len(glx.kdp),len(glx.cycles))
+    fname = "glx, known dashes={}, cycles={}, transients={}".format(tt,len(glx.dashes),len(glx.cycles),len(glx.txs))
     fig.suptitle("{}".format(fname),ha="center",va="center")
     time = fig.text(0.5,0.95,"",ha="center",va="center")
     ax1.title.set_text("glider")
@@ -43,29 +43,31 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
 
     # ax4: loops & transients
     gx2 = nx.DiGraph()
-    # loops
-    for cycle_i in glx.cycles.keys():
-        ci,mi = cycle_i
+    # for each mapping
+    for (ci,mi) in glx.cycles.keys():
+        # starting node (key)
         if (ci,mi) not in gx2.nodes:
             gx2.add_node((ci,mi),pos=(ci,mi))
-        # create only the first (to avoid overlaps)
-        cx,mx = glx.cycles[cycle_i][0]
-        if (cx,mx) not in gx2.nodes:
-            gx2.add_node((cx,mx),pos=(cx,mx))
-        gx2.add_edge((ci,mi),(cx,mx),color="b")
+        # ending node (value)
+        map_sts = glx.cycles[(ci,mi)]
+        for (cx,mx) in map_sts:
+            if (cx,mx) not in gx2.nodes:
+                gx2.add_node((cx,mx),pos=(cx,mx))
+            gx2.add_edge((ci,mi),(cx,mx),color="b")
     # connecting transients
     for tx in glx.txs.keys():
         (c0,m0),(cx,mx) = tx
         tx_seq = glx.txs[tx]
-        for ti,tx_st in enumerate(tx_seq):
-            ci,mi = tx_st
+        #for ti,tx_st in enumerate(tx_seq):
+        for ti in range(1,len(tx_seq)):
+            ci,mi = tx_seq[ti]
             if (ci,mi) not in gx2.nodes:
                 gx2.add_node((ci,mi),pos=(ci,mi))
-            if ti>0:
-                c0,m0 = tx_seq[ti-1]
-                gx2.add_edge((c0,m0),(ci,mi),color="r")
-    colors = [gx2[u][v] for u,v in gx2.edges]
-    nx.draw_networkx(gx,ax=ax4,node_size=10,alpha=0.5,with_labels=False,edge_color=color)
+            c0,m0 = tx_seq[ti-1]
+            gx2.add_edge((c0,m0),(ci,mi),color="r")
+    colors = [gx2[u][v]['color'] for u,v in gx2.edges]
+    print(colors)
+    nx.draw_networkx(gx,ax=ax4,node_size=10,alpha=0.5,with_labels=False,edge_color=colors)
 
     # ax5: trials states
     ax5.plot(glx.core, label="core sts", color="black")
@@ -103,19 +105,20 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     def init():
         return True
 
-    def animate(i):
-        time.set_text("time={}/{}".format(i,tt-1))
+    def animate(ti):
+        time.set_text("time={}/{}".format(ti,tt-1))
         # update
-        if i < tt:
+        if ti < tt:
             # glider imshow (if world objects: 4=black)
             wi = world*4
             # (0:off, 1:memb off, 2: memb on, 3:core on)
-            gst = glx.states[i]+1
+            gst = glx.states[ti]+1
             gst[1:4,1:4] -= 1
             gst[1:4,1:4] *= 3
-            # inverted cause of np array
-            wi[int(glx.hi[i]-2):int(glx.hi[i]+3),int(glx.hj[i]-2):int(glx.hj[i]+3)] = gst
-            gi = wi[int(glx.hi[i]-4):int(glx.hi[i]+5),int(glx.hj[i]-4):int(glx.hj[i]+5)]
+            # inverted cause np array
+            i,j = glx.loc[ti]
+            wi[i-2:i+3,j-2:j+3] = gst
+            gi = wi[i-4:i+5,j-4:j+5]
             # colors
             wi_rgb = palette[wi.astype(int)]
             gl_nav = ax1.imshow(wi_rgb)

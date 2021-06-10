@@ -7,14 +7,14 @@ import os
 import pickle
 
 class Evol:
-    def __init__(self,t=200,gens=100,popsize=250,offs=5):
+    def __init__(self,t=100,wsize=200,gens=100,popsize=250,offs=5):
         self.gens = gens
         self.popsize = popsize
         self.offs = offs
         self.genotypes = []
         self.save_path = None
         self.init_population()
-        self.trial = Trial(t)
+        self.trial = Trial(t,wsize)
         self.evolve_dashes()
 
     '''first step: survive different patterns'''
@@ -27,7 +27,7 @@ class Evol:
             for dash in range(1,128):
                 # gts
                 for gi,gt in enumerate(self.genotypes):
-                    glx = self.trial.run(gt,st0=1,mode="dashes",anim=True)
+                    glx = self.trial.run(gt,st0=1,mode="dashes",dash=dash,anim=True)
                     if glx:
                         glxs.append(glx)
                     print("gen={}, dash={}/127, gl={}/{}, saved={}{}".format(n_gen,dash,gi+1,len(self.genotypes),len(glxs),""*10),end='\r')

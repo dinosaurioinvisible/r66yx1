@@ -15,8 +15,8 @@ class Genotype:
             # glider response to encountered env dashes
             # defdict[env dashes,cx,mx] : [env dashes_t+1,cx_t+1,mx_t+1]
             self.rxs = defaultdict(list)
-            # loops, closed sequences of responses
-            # dict[cx,mx] : [cx,mx],...[cx_i,mx_i],...,[cx,mx]
+            # loops, closed mapping of sequences of responses (like a graph)
+            # defdict[ci,mi] : [cx,mx]
             self.cycles = set_cycles()
             # transients redirecting to known cycles
             # defdict[cx,mx] : [cx_0,mx_0],...,[cx,mx]
@@ -110,7 +110,7 @@ def set_cycles():
     # bsts = []
     # bgrs = []
     # btrs = []
-    btrs = {}
+    btrs = defaultdict(list)
     a = np.array([0,0,1,1,0,1,0,1,1])
     b = np.array([1,0,0,0,1,1,1,1,0])
     # for each cycle
@@ -118,10 +118,10 @@ def set_cycles():
         c1,c2 = arr2int(a,b,rot=do)
         c3,c4 = arr2int(a,b,rot=do,transp=True)
         # dict version
-        btrs[c1] = [[c2,0],[c3,0],[c4,0],[c1,0]]
-        btrs[c2] = [[c3,0],[c4,0],[c1,0],[c2,0]]
-        btrs[c3] = [[c4,0],[c1,0],[c2,0],[c3,0]]
-        btrs[c4] = [[c1,0],[c2,0],[c3,0],[c4,0]]
+        btrs[(c1,0)] = [[c2,0]]     #[[c2,0],[c3,0],[c4,0],[c1,0]]
+        btrs[(c2,0)] = [[c3,0]]     #[[c3,0],[c4,0],[c1,0],[c2,0]]
+        btrs[(c3,0)] = [[c4,0]]     #[[c4,0],[c1,0],[c2,0],[c3,0]]
+        btrs[(c4,0)] = [[c1,0]]     #[[c1,0],[c2,0],[c3,0],[c4,0]]
         # bsts.extend([c1,c2,c3,c4])
         # btrs.extend([[c1,c2],[c2,c3],[c3,c4],[c4,c1],[0,0,0,0]])
         # btrs.append([c1,c2,c3,c4])
