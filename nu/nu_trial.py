@@ -24,26 +24,33 @@ class Trial:
         self.set_world(x0,y0,st0,mode,dash)
         gl = Glider(gtx,st0,x0,y0)
         # run trial
-        tlim = 0
+        dist=0
+        tlim=0
         for ti in range(self.tt):
             # get world domain
             gl_domain = deepcopy(self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4])
             # if world object within glider domain (collision), it dies
             if np.sum(gl_domain[1:6,1:6]):
-                return
+                glx_anim(gl,self.world)
+                return [None,1,0,ti,dist]
             # if gl doesn't move in time limit, it dies
             elif tlim > self.limit:
-                return
+                glx_anim(gl,self.world)
+                return [None,0,1,ti,dist]
             else:
                 # allocate and update glider
                 gl_domain[1:6,1:6] += gl.st
                 gl.update(gl_domain)
-                tlim=0 if gl.dodm[-1][1]==1 else tlim+1
+                tlim += 1
+                if gl.dxy[-1]>0:
+                    tlim=0
+                    dist+=1
+        glx_anim(gl,self.world)
         # count loops, opt visualization and return
         gl.gl_loops()
         if anim:
             glx_anim(gl,self.world)
-        return gl
+        return [gl,dist]
 
     '''create world and allocate dash patterns'''
     def set_world(self,x0,y0,st0=1,mode="",dash=0,r=5):

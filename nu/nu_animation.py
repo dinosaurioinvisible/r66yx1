@@ -10,7 +10,7 @@ import networkx as nx
 def glx_anim(glx,world,show=True,save=False,autoclose=0):
 
     # fig and subplots: nrows, ncols, index
-    fig = plt.figure(figsize=(15,8))
+    fig = plt.figure(figsize=(12,10))
     ax1 = fig.add_subplot(3,2,1)    # anim: glider
     ax2 = fig.add_subplot(3,2,2)    # anim: glider zoom
     ax3 = fig.add_subplot(3,2,3)    # gt network (memb/core)
@@ -19,7 +19,7 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     ax6 = fig.add_subplot(3,2,6)    # gl responses to dashes
 
     tt = len(glx.states)
-    fname = "glx, known dashes={}, cycles={}, transients={}".format(tt,len(glx.dashes),len(glx.cycles),len(glx.txs))
+    fname = "glx, known dashes={}, cycles={}, transients={}".format(tt,len(self.dashes),len(glx.cycles),len(glx.txs))
     fig.suptitle("{}".format(fname),ha="center",va="center")
     time = fig.text(0.5,0.95,"",ha="center",va="center")
     ax1.title.set_text("glider")
@@ -33,10 +33,10 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     gx = nx.DiGraph()
     for ri in glx.rxs.keys():
         rxs = glx.rxs[ri]
-        di,ci,mi = ri
+        ci,mi,di = ri
         gx.add_node((ci,mi),pos=(ci,mi))
         for rx in rxs:
-            dx,cx,mx = rx
+            cx,mx,dij = rx
             gx.add_node((cx,mx),pos=(cx,mx))
             gx.add_edge((ci,mi),(cx,mx))
     nx.draw_networkx(gx,ax=ax3,node_size=10,alpha=0.5,with_labels=False)
@@ -44,45 +44,41 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     # ax4: loops & transients
     gx2 = nx.DiGraph()
     # for each mapping
-    for (ci,mi) in glx.cycles.keys():
+    for (ci,mi,di) in glx.cycles.keys():
         # starting node (key)
         if (ci,mi) not in gx2.nodes:
             gx2.add_node((ci,mi),pos=(ci,mi))
-        # ending node (value)
-        map_sts = glx.cycles[(ci,mi)]
-        for (cx,mx) in map_sts:
-            if (cx,mx) not in gx2.nodes:
-                gx2.add_node((cx,mx),pos=(cx,mx))
-            gx2.add_edge((ci,mi),(cx,mx),color="b")
+        # ending node (dict value)
+        cx,mx = glx.cycles[(ci,mi,di)]
+        if (cx,mx) not in gx2.nodes:
+            gx2.add_node((cx,mx),pos=(cx,mx))
+        gx2.add_edge((ci,mi),(cx,mx),color="b")
     # connecting transients
-    for tx in glx.txs.keys():
-        (c0,m0),(cx,mx) = tx
-        tx_seq = glx.txs[tx]
-        #for ti,tx_st in enumerate(tx_seq):
-        for ti in range(1,len(tx_seq)):
-            ci,mi = tx_seq[ti]
-            if (ci,mi) not in gx2.nodes:
-                gx2.add_node((ci,mi),pos=(ci,mi))
-            c0,m0 = tx_seq[ti-1]
-            gx2.add_edge((c0,m0),(ci,mi),color="r")
+    for dash in glx.txs.keys():
+        tx_seqs = glx.txs[dash]
+        for tx_seq in tx_seqs:
+            for ti in range(1,len(tx_seq)):
+                cti,mti,dti = tx_seq[ti]
+                if (cti,mti) not in gx2.nodes:
+                    gx2.add_node((cti,mti),pos=(cti,mti))
+                ct0,mt0 = tx_seq[ti-1]
+                gx2.add_edge((ct0,mt0),(cti,mti),color="r")
     colors = [gx2[u][v]['color'] for u,v in gx2.edges]
-    print(colors)
-    nx.draw_networkx(gx,ax=ax4,node_size=10,alpha=0.5,with_labels=False,edge_color=colors)
+    nx.draw_networkx(gx2,ax=ax4,node_size=10,alpha=0.5,with_labels=False,edge_color=colors)
 
     # ax5: trials states
     ax5.plot(glx.core, label="core sts", color="black")
     ax5.plot(glx.memb, label="memb sts", color="grey")
     for loop in glx.loops:
-        ax5.plot(loop[0], linestyle="dashed")
-        ax5.plot(loop[1], linestyle="dashed")
+        ax5.plot(loop[0], linestyle="dashed", color="blue")
+        ax5.plot(loop[1], linestyle="dashed", color="red")
+        ax5.plot(loop[2], linestyle="dashed", color="green")
     ax5.legend()
 
     # ax6: responses to dashes
-    for ri in glx.rxs.keys():
-        di,ci,mi = ri
-        for rx in glx.rxs[ri]:
-            dx,cx,mx = rx
-            ax6.plot([ci,cx],[di,dx],color="black")
+    ax6.plot(glx.env, label="dashes", color="black")
+    ax6.plot(glx.dxy, label="motion", color="blue")
+    ax6.legend()
 
     # to pause the animation and check data
     anim_running = True
@@ -116,7 +112,7 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
             gst[1:4,1:4] -= 1
             gst[1:4,1:4] *= 3
             # inverted cause np array
-            i,j = glx.loc[ti]
+            i,j = glx.loc[ti][:2]
             wi[i-2:i+3,j-2:j+3] = gst
             gi = wi[i-4:i+5,j-4:j+5]
             # colors
@@ -132,7 +128,7 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     fig.canvas.mpl_connect('button_press_event',onClick)
     anim=animation.FuncAnimation(fig, animate,
             init_func=init, frames=tt,
-            interval=1000, blit=False, repeat=True)
+            interval=500, blit=False, repeat=True)
 
     if save:
         # writer for saving the animation

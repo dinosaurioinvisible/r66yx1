@@ -47,6 +47,59 @@ class Element:
     tx0, = ax4.plot([],[],color="grey",linestyle="dashed")
     tx1, = ax4.plot([],[],color="black",linestyle="dashed")
 
+    '''bounded group motion'''
+    def gl_motion(self,dxy):
+        # dm = 0
+        dx = dxy[1]-dxy[3]
+        dy = dxy[0]-dxy[2]
+        # select higher sum and move if higher than motion threshold
+        if abs(dx)>abs(dy):
+            # do = 1 if dx>0 else 3
+            if abs(dx)>self.mt:
+                self.j += int(dx/abs(dx))
+                # dm = 1
+        elif abs(dy)>abs(dx):
+            # do = 0 if dy>0 else 2
+            if abs(dy)>self.mt:
+                self.i += int(-dy/abs(dy))
+                # dm = 1
+        # so if dx==dy (no dominant orientation)
+        # else:
+        #     do = -1
+        # self.loc.append([self.i,self.j])
+        # self.dodm.append([do,dm])
+
+def gl_loops(self,r=2):
+    for sti,[ci,mi] in enumerate(zip(self.core[:-r],self.memb[:-r])):
+        loop = np.zeros((2,len(self.states))).astype(int)
+        loop_seq = []
+        wi = sti
+        wx = sti+r
+        # sliding window like
+        while wx<len(self.states)-1:
+            cx,mx = self.core[wx],self.memb[wx]
+            if [ci,mi]==[cx,mx]:
+                loop[0][wi:wx+1] = self.core[wi:wx+1]
+                loop[1][wi:wx+1] = self.memb[wi:wx+1]
+                # it could be the case that different seqs happen (pretty rare though)
+                seq = [(c,m) for [c,m] in zip(self.core[wi:wx+1],self.memb[wi:wx+1])]
+                if seq not in loop_seq:
+                    loop_seq.append(seq)
+                # windows skips to states after loop
+                wi = wx+1
+                wx = wi+r
+            else:
+                wx+=1
+        # if something
+        if len(loop_seq)>0:
+            self.loops.append(loop)
+            for seq in loop_seq:
+                # from zero so it closes the loop (last->first)
+                for si in range(0,len(seq)):
+                    cs0,ms0 = seq[si-1]
+                    cs,ms = seq[si]
+                    if not [cs,ms] in self.cycles[(cs0,ms0)]:
+                        self.cycles[(cs0,ms0)] += [[cs,ms]]
 
 '''search for new loops (possible cycles)'''
 def gl_loops(self):
@@ -199,6 +252,72 @@ def xupdate(self,env):
                     if new:
                         self.cycles.append(cy_sts)
 
+'''group common vals in array'''
+def arr2group(x,vals=4,xmax=False,bin=False):
+    gi = []
+    for vi in range(0,vals):
+        gi.append(np.sum(np.where(x==vi,1,0)))
+    if xmax:
+        xmi = sorted([[xvi,xi] for xi,xvi in enumerate(gi)])[-1][1]
+        if bin:
+            xbi = [int(i) for i in np.binary_repr(xmi,2)]
+            return xbi
+        return xmi
+    return gi
+
+'''membrane signaling reaction'''
+def membrane_fx(domain,me_ij=[],mx=None):
+    mdomain=np.zeros((7,7))
+    # reacts if any external cell is active
+    if len(me_ij)>0:
+        domain[1:6,1:6] = 0
+        for [i,j] in me_ij:
+            if np.sum(domain[i-1:i+2,j-1:j+2]) > 0:
+                mdomain[i][j] = 1
+        membrane = mdomain[1:6,1:6]
+    # reacts if external input > internal input
+    else:
+        for j in range(1,6):
+            mdomain[1][j] += np.sum(domain[0,j-1:j+2])-np.sum(domain[2,max(2,j-1):min(j+2,5)])
+            mdomain[5][j] += np.sum(domain[6,j-1:j+2])-np.sum(domain[4,max(2,j-1):min(j+2,5)])
+        for i in range(1,6):
+            mdomain[i][1] += np.sum(domain[i-1:i+2,0])-np.sum(domain[max(2,i-1):min(i+2,5),2])
+            mdomain[i][5] += np.sum(domain[i-1:i+2,6])-np.sum(domain[max(2,i-1):min(i+2,5),4])
+        membrane = np.where(mdomain[1:6,1:6]>0,1,0)
+    if not mx:
+        return membrane
+    # sum of all active external cells
+    if mx=="all":
+        msx = np.sum(membrane)
+    # sum as 4 walls
+    if mx==4:
+        me = np.where(np.asarray([np.sum(membrane[0,:]),np.sum(membrane[:,4]),np.sum(membrane[4,:]),np.sum(membrane[:,0])])>0,1,0)
+        msx = arr2int(me)
+    # sum as corners + walls
+    if mx==8:
+        ml = np.sum(membrane[1:4,0])
+        mr = np.sum(membrane[1:4,4])
+        mu = np.sum(membrane[0,1:4])
+        md = np.sum(membrane[4,1:4])
+        mul = membrane[0][0]
+        mur = membrane[0][4]
+        mdl = membrane[4][0]
+        mdr = membrane[4][4]
+        me = np.where(np.asarray([mul,mu,mur,ml,mr,mdl,md,mdr])>0,1,0)
+        msx = arr2int(me)
+    # get encountered dash (only for 1 wall)
+    if mx=="dash":
+        d0 = domain[0,:]
+        d1 = domain[:,6]
+        d2 = domain[6,:]
+        d3 = domain[:,0]
+        dm = [d0,d1,d2,d3]
+        di = np.asarray([np.sum(dx) for dx in dm]).argmax()
+        msx = arr2int(dm[di])
+    if not mx:
+        raise Exception("mx argument unknown")
+    return membrane,msx
+
 '''convert the borders of some matrix to int'''
 def ext2int(ma):
     ma_arrs = [ma[0,:],map[:,-1],ma[-1,:],ma[:,0]]
@@ -274,6 +393,122 @@ for txi in self.txs:
 # self.cycles = list(nx.simple_cycles(gx))
 self.cycles = nx.cycle_basis(gx)
 
+'''initial cycles for the default glider'''
+def set_cycles():
+    # bsts = []
+    # bgrs = []
+    # btrs = []
+    # btrs = defaultdict(list)
+    btrs = {}
+    a = np.array([0,0,1,1,0,1,0,1,1])
+    b = np.array([1,0,0,0,1,1,1,1,0])
+    # for each cycle
+    for do in range(4):
+        c1,c2 = arr2int(a,b,rot=do)
+        c3,c4 = arr2int(a,b,rot=do,transp=True)
+        # dict version
+        btrs[(c1,0,0)] = [c2,0,0]     #[[c2,0],[c3,0],[c4,0],[c1,0]]
+        btrs[(c2,0,0)] = [c3,0,0]     #[[c3,0],[c4,0],[c1,0],[c2,0]]
+        btrs[(c3,0,0)] = [c4,0,0]     #[[c4,0],[c1,0],[c2,0],[c3,0]]
+        btrs[(c4,0,0)] = [c1,0,0]     #[[c1,0],[c2,0],[c3,0],[c4,0]]
+        # bsts.extend([c1,c2,c3,c4])
+        # btrs.extend([[c1,c2],[c2,c3],[c3,c4],[c4,c1],[0,0,0,0]])
+        # btrs.append([c1,c2,c3,c4])
+        # o1r,o1l = [int(o) for o in np.binary_repr(((1-do)%4),2)]
+        # o3r,o3l = [int(o) for o in np.binary_repr(((1+do+1)%4),2)]
+        # r1,r2 = arr2int(np.asarray([1,o1r,o1l,0,0,0,0]),np.asarray([0,o1r,o1l,0,0,0,0]))
+        # r3,r4 = arr2int(np.asarray([1,o3r,o3l,0,0,0,0]),np.asarray([0,o3r,o3l,0,0,0,0]))
+        # bgrs.extend([r1,r2,r3,r4])
+    return btrs
+
+'''element's base responses (just 4 cycles)'''
+def set_responses():
+    # map: gl_in -> gl_response
+    variations = False
+    variations2 = False
+    membrane_gt = False
+    # gt = [None]*512
+    gt = {}
+    a1 = np.array([0,0,1,1,0,1,0,1,1])
+    a2 = np.array([1,0,0,0,1,1,1,1,0])
+    a3 = np.array([0,1,0,0,0,1,1,1,1])
+    a4 = np.array([1,0,1,0,1,1,0,1,0])
+    at = [a1,a2,a3,a4,a1]
+    # these have cycles of orientations
+    aeo13579 = [1,1,2,2]
+    aei13579 = [0,2,4,6,8]
+    aer13579 = [[1,1],[1,0],[1,1],[0,1]]
+    # these have fixed orientations
+    aeo2468 = [0,3,1,2]
+    aei2468 = [1,3,5,7]
+    # membrane cell that can be on
+    mvij = [[[0,0],[4,0]],[[0,4],[4,4]],[[0,0],[0,4]],[[4,0],[4,4]]]
+    aevijc = [[[1,1],[3,1]],[[1,3],[3,3]],[[1,1],[1,3]],[[3,1],[3,3]]]
+    aeviji = [[0,6],[2,8],[0,2],[6,8]]
+    # cases where 2 membrane cells can be on
+    mvij2 = [[0,1],[0,3],[1,0],[3,0]]
+    aevij2 = [[1,1],[1,3],[1,1],[3,1]]
+    aevij2i = [0,2,0,2]
+    aevij2c = [[1,2],[1,2],[2,1],[2,1]]
+    aevij2ci = [1,1,3,3]
+    aevij2co = [0,0,3,3]
+    # for every state of A
+    for ai in range(len(at)-1):
+        xa = np.zeros((5,5))
+        xa[1:4,1:4] = at[ai].reshape(3,3)
+        eo = aeo13579[ai]
+        # diagonals (x)
+        for ei,[i,j] in zip(aei13579,[[1,1],[1,3],[2,2],[3,1],[3,3]]):
+            ev = np.rot90(xa[i-1:i+2,j-1:j+2],eo).flatten()
+            eb = int(''.join(str(int(i)) for i in ev),2)
+            rm,lm = aer13579[ai]
+            gt[eb] = [at[ai+1][ei],rm,lm]
+        # cross (+)
+        for ei,eoc,[i,j] in zip(aei2468,aeo2468,[[1,2],[2,1],[2,3],[3,2]]):
+            ev = np.rot90(xa[i-1:i+2,j-1:j+2],eoc).flatten()
+            eb = int(''.join(str(int(i)) for i in ev),2)
+            em = 0 if at[ai][ei] == 1 else 1
+            gt[eb] = [at[ai+1][ei],em,em]
+        # membrane
+        if membrane_gt:
+            for mi in range(0,8):
+                gt[mi] = [0,0,0]
+        # known viable membrane variations
+        if variations:
+            for [vi,vj] in mvij[ai]:
+                xa[vi][vj] = 1
+            for ei,[i,j] in zip(aeviji[ai],aevijc[ai]):
+                ev = np.rot90(xa[i-1:i+2,j-1:j+2],eo).flatten()
+                eb = int(''.join(str(int(i)) for i in ev),2)
+                rm,lm = aer13579[ai]
+                gt[eb] = [at[ai+1][ei],rm,lm]
+        if variations2:
+            for [vi,vj] in mvij2[ai]:
+                xa[vi][vj] = 1
+            for ei,[i,j] in zip(aevij2i,aevij2):
+                ev = np.rot90(xa[i-1:i+2,j-1:j+2],eo).flatten()
+                eb = int(''.join(str(int(i)) for i in ev),2)
+                rm,lm = aer13579[ai]
+                gt[eb] = [at[ai+1][ei],rm,lm]
+            for ei,eoc,[i,j] in zip(aevij2ci,aevij2co,aevij2c):
+                ev = np.rot90(xa[i-1:i+2,j-1:j+2],eoc).flatten()
+                eb = int(''.join(str(int(i)) for i in ev),2)
+                em = 0 if at[ai][ei] == 1 else 1
+                gt[eb] = [at[ai+1][ei],em,em]
+    return gt
+
+def set_combined_os():
+    cos = []
+    for o1 in range(0,10):
+        for o2 in range(0,10):
+            for o3 in range(0,10):
+                for o4 in range(0,10):
+                    so = o1+o2+o3+o4
+                    xo = ''.join(str(o) for o in [o1,o2,o3,o4])
+                    if so==9:
+                        cos.append(xo)
+    cos = (np.asarray(cos).astype(int)/9).astype(int)
+    return cos
 
 # arrows
 if arrows:

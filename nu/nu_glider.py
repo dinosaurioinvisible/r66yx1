@@ -1,7 +1,11 @@
 
 import numpy as np
 from copy import deepcopy
-from nu_fx import *
+from nu_fxs import *
+
+#TODO: try di->mi->ci->dx->mx->cx with memb reacting if not core input
+#TODO: replace random response for something more sensible (viability based dists?)
+# replace defdicts(list) for defdicts(set) (to avoid checking previous instances)
 
 class Glider:
     def __init__(self,genotype,st0=1,x0=25,y0=25):
@@ -10,7 +14,6 @@ class Glider:
         self.rxs = deepcopy(genotype.rxs)
         self.cycles = deepcopy(genotype.cycles)
         self.txs = deepcopy(genotype.txs)
-        self.dashes = deepcopy(genotype.dashes)
         # glider trial sts (orientation: 0=north, 1=east, 2=south, 3=west)
         self.st = np.zeros(25).astype(int)
         self.eos = np.zeros(9).astype(int)
@@ -23,13 +26,14 @@ class Glider:
         # threshold for motion
         self.mt = 3
         # trial data
-        self.states = []
-        self.loc = [[x0,y0]]    # [i,j]
+        self.states = []        # 5x5 ndarrays
+        self.loc = []           # [xi,yi],...
+        self.dxy = []
         self.core = []          # core states (int)
         self.memb = []          # membrane states (int)
-        self.env = []           # encountered dashes ([int1,(int2),...(int4)])
-        self.dodm = []          # dominant orientation and motion [do,dm]
+        self.env = []           # encountered dashes [d0,d1,d2,d3],...
         self.loops = []         # trial recurrences (list of (2,time) arrays)
+        self.dashes = [0]
         self.set_cfg(st0)
 
     '''update every element for a new global state'''
@@ -50,11 +54,10 @@ class Glider:
                 core_dxy[self.eos[ei]] += 1
             else:
                 self.eos[ei] = (self.eos[ei]+rm-lm)%4
-        # update membrane
+        # update membrane (reaction to any active external cells)
         membrane = np.zeros((7,7)).astype(int)
         me_domain = deepcopy(gl_domain)
         me_domain[1:6,1:6] = 0
-        # reaction if any external cell is active
         for [i,j] in self.me_ij:
             if np.sum(me_domain[i-1:i+2,j-1:j+2]) > 0:
                 membrane[i][j] = 1
@@ -68,91 +71,66 @@ class Glider:
 
     '''bounded group motion'''
     def gl_motion(self,dxy):
-        dm = 0
         dx = dxy[1]-dxy[3]
         dy = dxy[0]-dxy[2]
+        ij = 0
         # select higher sum and move if higher than motion threshold
         if abs(dx)>abs(dy):
-            do = 1 if dx>0 else 3
             if abs(dx)>self.mt:
                 self.j += int(dx/abs(dx))
-                dm = 1
+                ij = 1 if int(dx/abs(dx))>0 else 3
         elif abs(dy)>abs(dx):
-            do = 0 if dy>0 else 2
             if abs(dy)>self.mt:
                 self.i += int(-dy/abs(dy))
-                dm = 1
-        # so if dx==dy (no dominant orientation)
-        else:
-            do = -1
+                ij = 4 if int(-dy/abs(dy))>0 else 2
         self.loc.append([self.i,self.j])
-        self.dodm.append([do,dm])
+        self.dxy.append(ij)
 
     '''core st, membrane st, encountered dashes'''
     def gl_data(self,gl_domain):
         # core
+        cx0 = self.core[-1]
         cx = arr2int(self.st[1:4,1:4].flatten())
         self.core.append(cx)
         # membrane
+        mx0 = self.memb[-1]
         mx = ext2int(self.st)
         self.memb.append(mx)
         # encountered dash patterns
         dx0 = self.env[-1]
-        gl_env = [gl_domain[0,:],gl_domain[:,-1],np.rot90(gl_domain,2)[0,:],np.rot90(gl_domain,2)[:,-1]]
-        dxi = [arr2int(ei) if np.sum(ei)>0 else 0 for ei in gl_env]
-        self.env.append(dxi)
-        if dxi not in self.dashes:
-            self.dashes.append(dxi)
-        # transitions
-        cx0 = arr2int(gl_domain[2:5,2:5].flatten())
-        mx0 = ext2int(gl_domain[1:6,1:6])
-        # as if nothing new appears (dxi wouldn't be a cause of dx0 otherwise)
-        delta_dx = np.where(np.asarray(dx0)>0,1,0)-np.where(np.asarray(dxi)>0,1,0)
-        dx = [dxi[i] if x>=0 else 0 for i,x in enumerate(delta_dx)]
-        self.rxs[(tuple(dx0),cx0,mx0)] += [[tuple(dx),cx,mx]]
-        # if current sequence comes back to some cyclic state
-        if len(self.tx_seq)==0 and (cx,mx) not in self.cycles.keys():
-            self.tx_seq = [[cx0,mx0]]
-        self.tx_seq.append([cx,mx])
-        if len(self.tx_seq)>0 and (cx,mx) in self.cycles.keys():
-            tx0 = self.tx_seq[0]
-            txn = self.tx_seq[-1]
-            self.txs[tuple(tx0),tuple(txn)] = self.tx_seq
+        dx = ext2int(gl_domain,index=False)
+        self.env.append(dx)
+        if dx not in self.dashes:
+            self.dashes.append(dx)
+        # responses
+        if [cx,mx,self.dxy[-1]] not in self.rxs[(cx0,mx0,dx0)]:
+            self.rxs[(cx0,mx0,dx0)] += [[cx,mx,self.dxy[-1]]]
+        # if glider goes out from a cycle
+        if len(self.tx_seq)==0 and (cx,mx,dx) not in self.cycles.keys():
+            self.tx_seq = [[cx0,mx0,dx0]]
+        self.tx_seq.append([cx,mx,dx])
+        # if glider comes back to a cycle
+        if len(self.tx_seq)>0 and (cx,mx,dx) in self.cycles.keys():
+            d0 = self.tx_seq[0][2]
+            self.txs[d0] += [self.tx_seq]
             self.tx_seq = []
 
-    '''search for existing & new loops (possible cycles)'''
-    def gl_loops(self,r=2):
-        for sti,[ci,mi] in enumerate(zip(self.core[:-r],self.memb[:-r])):
-            loop = np.zeros((2,len(self.states))).astype(int)
-            loop_seq = []
-            wi = sti
-            wx = sti+r
-            # sliding window like
-            while wx<len(self.states)-1:
-                cx,mx = self.core[wx],self.memb[wx]
-                if [ci,mi]==[cx,mx]:
-                    loop[0][wi:wx+1] = self.core[wi:wx+1]
-                    loop[1][wi:wx+1] = self.memb[wi:wx+1]
-                    # it could be the case that different seqs happen (pretty rare though)
-                    seq = [(c,m) for [c,m] in zip(self.core[wi:wx+1],self.memb[wi:wx+1])]
-                    if seq not in loop_seq:
-                        loop_seq.append(seq)
-                    # windows skips to states after loop
-                    wi = wx+1
-                    wx = wi+r
-                else:
-                    wx+=1
-            # if something
-            if len(loop_seq)>0:
-                self.loops.append(loop)
-                for seq in loop_seq:
-                    # from zero so it closes the loop (last->first)
-                    for si in range(0,len(seq)):
-                        cs0,ms0 = seq[si-1]
-                        cs,ms = seq[si]
-                        if not [cs,ms] in self.cycles[(cs0,ms0)]:
-                            self.cycles[(cs0,ms0)] += [[cs,ms]]
-
+    '''search for loops (possible transients/cycles)'''
+    def gl_loops(self):
+        for i,[ci,mi,di] in enumerate(zip(self.core,self.memb,self.env)):
+            skip = []
+            cxi = np.where(self.core==ci,1,0)
+            mxi = np.where(self.memb==mi,1,0)
+            dxi = np.where(self.memb==di,1,0)
+            cxmxi = cxi*mxi
+            if np.sum(cxmxi)>1:
+                if [ci,mi] not in skip:
+                    cx = np.where(self.core==ci,self.core,0)
+                    mx = np.where(self.memb==mi,self.memb,0)
+                    dx = np.where(self.memb==di,self.env,0)
+                    loop = np.vstack((cx,mx,dx))
+                    self.loops.append(loop)
+                    skip.append([ci,mi])
 
     '''allocate glider starting from some known cfg'''
     def set_cfg(self,st0):
@@ -182,7 +160,9 @@ class Glider:
         st = arr2int(self.st[1:4,1:4].flatten())
         self.core.append(st)
         self.memb.append(0)
-        self.env.append([0,0,0,0])
+        self.loc.append([self.i,self.j])
+        self.dxy.append(0)
+        self.env.append(0)
 
 
 

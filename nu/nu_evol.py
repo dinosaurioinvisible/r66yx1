@@ -7,7 +7,7 @@ import os
 import pickle
 
 class Evol:
-    def __init__(self,t=100,wsize=200,gens=100,popsize=250,offs=5):
+    def __init__(self,t=100,wsize=100,gens=100,popsize=250,offs=5):
         self.gens = gens
         self.popsize = popsize
         self.offs = offs
@@ -26,11 +26,16 @@ class Evol:
             # env dashes
             for dash in range(1,128):
                 # gts
+                cols = 0
+                tlim = 0
                 for gi,gt in enumerate(self.genotypes):
-                    glx = self.trial.run(gt,st0=1,mode="dashes",dash=dash,anim=True)
-                    if glx:
-                        glxs.append(glx)
-                    print("gen={}, dash={}/127, gl={}/{}, saved={}{}".format(n_gen,dash,gi+1,len(self.genotypes),len(glxs),""*10),end='\r')
+                    tgl = self.trial.run(gt,st0=1,mode="dashes",dash=dash)
+                    if tgl[0]:
+                        glxs.append(tgl[0])
+                    else:
+                        cols += tgl[1]
+                        tlim += tgl[2]
+                    print("gen={}, dash={}/127, gl={}/{}, cols={},tlim={},saved={}{}".format(n_gen,dash,gi+1,len(self.genotypes),cols,tlim,len(glxs),""*10),end='\r')
                 # reset pop
                 self.genotypes = []
                 # dash results (sorted by number of transients)
@@ -46,7 +51,7 @@ class Evol:
                     self.genotypes.append(gt)
             # gen results (sorted by number of dashes)
             print("\n\ngeneration={} results:".format(n_gen+1))
-            glxs = sorted(glxs,key=lambda x:len(x.dashes),reverse=True)
+            glxs = sorted(glxs,key=lambda x:len(x.txs),reverse=True)
             for gi,gl in enumerate(glxs):
                 print("{} - txs={}, cycles={}, dashes={}".format(gi+1,len(gl.txs),len(gl.cycles),len(gl.dashes)))
             # optional animation and save
