@@ -51,16 +51,17 @@ def ext2int(ma,index=True):
     # check if nothing
     if np.sum(ma_arrs)==0:
         return 0
+    # if only 1: center around that? use doxy to re-orient dash? use corners? 
+    if np.sum(ma_arrs)==1:
+
     # first and last active cells
     ma_arr = np.concatenate((ma_arrs[0][:-1],ma_arrs[1][:-1],ma_arrs[2][:-1],ma_arrs[3][:-1]))
     mi = ma_arr.argmax()
-    mn = len(ma_arr)-np.flip(ma_arr).argmax()
-    # if only 1: center around that
-
+    mn = len(ma_arr)-1-np.flip(ma_arr).argmax()
     # starting corner index (0=NW, 1=NE, 2=SE, 3=SW)
     ei,en = int(mi/ma_n),int(mn/ma_n)
     ew0 = en if ei==0 and en==3 else ei
-    ew1 = (ew0+1)%ma_n
+    ew1 = (ew0+1)%4
     # combined as int or list
     if index:
         # vector = index & elements from 2 adjacent walls

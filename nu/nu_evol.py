@@ -7,7 +7,7 @@ import os
 import pickle
 
 class Evol:
-    def __init__(self,t=100,wsize=100,gens=100,popsize=250,offs=5):
+    def __init__(self,t=100,wsize=100,gens=100,popsize=1000,offs=5):
         self.gens = gens
         self.popsize = popsize
         self.offs = offs
@@ -22,7 +22,7 @@ class Evol:
         # generations
         for n_gen in range(10):
             glxs = []
-            print("\ngeneration {}".format(n_gen))
+            print("\n\ngeneration {}".format(n_gen))
             # env dashes
             for dash in range(1,128):
                 # gts
@@ -35,28 +35,23 @@ class Evol:
                     else:
                         cols += tgl[1]
                         tlim += tgl[2]
-                    print("gen={}, dash={}/127, gl={}/{}, cols={},tlim={},saved={}{}".format(n_gen,dash,gi+1,len(self.genotypes),cols,tlim,len(glxs),""*10),end='\r')
+                    print("gen={}, dash={}/127, gl={}/{}, cols={},tlim={}, saved={}{}".format(n_gen,dash,gi+1,len(self.genotypes),cols,tlim,len(glxs),""*10),end='\r')
                 # reset pop
                 self.genotypes = []
                 # dash results (sorted by number of transients)
-                print("\n\ndash={} results:".format(dash))
+                print("\n\ngen={}, dash={} results:".format(n_gen,dash))
                 glxs = sorted(glxs,key=lambda x:len(x.txs),reverse=True)
                 for gi,gl in enumerate(glxs):
-                    print("{} - transients={}, cycles={}, dashes={}".format(gi+1,len(gl.txs),len(gl.cycles),len(gl.dashes)))
+                    print("{} - cycles={}, transients={}, responses={}, dashes={}".format(gi+1,len(gl.cycles),len(gl.txs),len(gl.rxs),len(gl.dxs)))
                     # refill pop
                     for _ in range(self.offs):
-                        gtx = Genotype(glx=gl)
+                        gt = Genotype(glx=gl)
+                        self.genotypes.append(gt)
                 while len(self.genotypes) < self.popsize:
                     gt = Genotype()
                     self.genotypes.append(gt)
-            # gen results (sorted by number of dashes)
-            print("\n\ngeneration={} results:".format(n_gen+1))
-            glxs = sorted(glxs,key=lambda x:len(x.txs),reverse=True)
-            for gi,gl in enumerate(glxs):
-                print("{} - txs={}, cycles={}, dashes={}".format(gi+1,len(gl.txs),len(gl.cycles),len(gl.dashes)))
-            # optional animation and save
+            # generation step: optional animation and save
             self.save_data(n_gen,glxs)
-            plot=False
             rx,timedOut = timedInput("Press any key before 5 seconds for pdb",5)
             if not timedOut:
                 import pdb; pdb.set_trace()

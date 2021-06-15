@@ -15,16 +15,19 @@ class Genotype:
             # cycles: dict[ci,mi,di]=[cx,mx]
             self.cycles = set_cycles()
             # rxs: responses to env dashes
-            # defdict[ci,mi,dash]=[cx,mx,dij]
-            self.rxs = defaultdict(list)
-            # txs: transients redirecting to known cycles
+            # defdict[ci,mi,dash] = set{(cx,mx,dij)}
+            self.rxs = defaultdict(set)
+            # txs: transients redirecting to set of known cycles
             # defdict[dash0]=[[c0,m0,d0],...,[ci,mi,di],...,[cx,mx,dx]]
-            self.txs = defaultdict(list)
+            self.txs = defaultdict(set)
+            # encountered dashes (set)
+            self.dxs = {0}
         else:
             self.egt = deepcopy(glx.egt)
+            self.cycles = deepcopy(glx.cycles)
             self.rxs = deepcopy(glx.rxs)
-            self.cxs = deepcopy(glx.cxs)
             self.txs = deepcopy(glx.txs)
+            self.dxs = deepcopy(glx.dxs)
         # for future distributions based on viability
         self.flex = flex
 
