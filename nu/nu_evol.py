@@ -29,7 +29,7 @@ class Evol:
                 cols = 0
                 tlim = 0
                 for gi,gt in enumerate(self.genotypes):
-                    tgl = self.trial.run(gt,st0=1,mode="dashes",dash=dash)
+                    tgl = self.trial.run(gt,st0=12,mode="dashes",dash=dash)
                     if tgl[0]:
                         glxs.append(tgl[0])
                     else:

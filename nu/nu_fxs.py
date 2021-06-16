@@ -44,40 +44,34 @@ def arr2int(a,b=[],rot=None,transp=False):
     return xa
 
 '''convert active borders of matrix to int (clockwise)'''
-def ext2int(ma,index=True):
+def ext2int(ma,oxy):
     # ext membrane/walls values (clockwise)
     ma_arrs = [ma[0,:],ma[:,-1],np.flip(ma[-1,:]),np.flip(ma[:,0])]
-    ma_n = len(ma_arrs[0])-1
+    ma_oxy = ma_arrs[oxy]
     # check if nothing
     if np.sum(ma_arrs)==0:
         return 0
-    # if only 1: center around that? use doxy to re-orient dash? use corners? 
-    if np.sum(ma_arrs)==1:
-
-    # first and last active cells
-    ma_arr = np.concatenate((ma_arrs[0][:-1],ma_arrs[1][:-1],ma_arrs[2][:-1],ma_arrs[3][:-1]))
-    mi = ma_arr.argmax()
-    mn = len(ma_arr)-1-np.flip(ma_arr).argmax()
-    # starting corner index (0=NW, 1=NE, 2=SE, 3=SW)
-    ei,en = int(mi/ma_n),int(mn/ma_n)
-    ew0 = en if ei==0 and en==3 else ei
-    ew1 = (ew0+1)%4
-    # combined as int or list
-    if index:
-        # vector = index & elements from 2 adjacent walls
-        mx = np.zeros((ma_n*2)+3)
-        mx[:2] = [int(i) for i in np.binary_repr(ew0,2)]
-        mx[2:] = np.concatenate((ma_arrs[ew0],ma_arrs[ew1][1:]))
+    # 1 wall cases (all active cells in same oxy wall)
+    ma_wx = [ma_arrs[0][:-1],ma_arrs[1][:-1],ma_arrs[2][:-1],ma_arrs[3][:-1]]
+    if np.sum(ma_wx)==np.sum(ma_oxy):
+        mx_int = arr2int(ma_oxy)
+        return mx_int
+    ml = ma_arrs[(oxy-1)%4][:-1]
+    mr = ma_arrs[(oxy+1)%4][1:]
+    # 2 walls cases
+    if np.sum(ml)>0 and np.sum(mr)==0:
+        mx = np.concatenate((np.array(ml),ma_oxy))
+        mx_int = arr2int(mx)
+        return mx_int
+    elif np.sum(ml)==0 and np.sum(mr)>0:
+        mx = np.concatenate((ma_oxy,np.array(mr)))
+        mx_int = arr2int(mx)
+        return mx_int
+    # 3 or 4 walls?
     else:
-        # return list of dash patterns from walls
-        if np.sum(ma_arrs[ew1][1:])>0:
-            mx = np.concatenate((ma_arrs[ew0],ma_arrs[ew1][1:]))
-        else:
-            mx = ma_arrs[ew0]
-    mx_int = arr2int(mx)
-    return mx_int
-
-
+        print("more than 2 walls?")
+        #import pdb; pdb.set_trace()
+        return -1
 
 
 
