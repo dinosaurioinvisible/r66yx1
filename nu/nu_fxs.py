@@ -51,14 +51,27 @@ def ext2int(ma,oxy):
     # check if nothing
     if np.sum(ma_arrs)==0:
         return 0
-    # 1 wall cases (all active cells in same oxy wall)
+    # which walls have active elements
+    wx = []
     ma_wx = [ma_arrs[0][:-1],ma_arrs[1][:-1],ma_arrs[2][:-1],ma_arrs[3][:-1]]
-    if np.sum(ma_wx)==np.sum(ma_oxy):
-        mx_int = arr2int(ma_oxy)
-        return mx_int
+    for wi in range(len(ma_arrs)):
+        # 1 wall cases (all active cells in same wall)
+        if np.sum(ma_wx)==np.sum(ma_arrs[wi]):
+            mx_int = arr2int(ma_arrs[wi])
+            return mx_int
+        # 2 or more walls
+        if np.sum(ma_arrs[wi])>0:
+            wx.append(wi)
+    # wall indeces
+    if len(wx)==1:
+
+
+
+
+
+    # 2 walls cases
     ml = ma_arrs[(oxy-1)%4][:-1]
     mr = ma_arrs[(oxy+1)%4][1:]
-    # 2 walls cases
     if np.sum(ml)>0 and np.sum(mr)==0:
         mx = np.concatenate((np.array(ml),ma_oxy))
         mx_int = arr2int(mx)
