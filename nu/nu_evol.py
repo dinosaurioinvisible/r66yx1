@@ -26,16 +26,16 @@ class Evol:
             # env dashes
             for dash in range(1,128):
                 # gts
-                cols = 0
-                tlim = 0
+                off,col,lim = 0,0,0
                 for gi,gt in enumerate(self.genotypes):
                     tgl = self.trial.run(gt,st0=12,mode="dashes",dash=dash)
                     if tgl[0]:
                         glxs.append(tgl[0])
                     else:
-                        cols += tgl[1]
-                        tlim += tgl[2]
-                    print("gen={}, dash={}/127, gl={}/{}, cols={},tlim={}, saved={}{}".format(n_gen,dash,gi+1,len(self.genotypes),cols,tlim,len(glxs),""*10),end='\r')
+                        off += tgl[1]
+                        col += tgl[2]
+                        lim += tgl[3]
+                    print("gen={}, dash={}/127, gl={}/{}, off={},cols={},tlim={}, saved={}{}".format(n_gen,dash,gi+1,len(self.genotypes),off,col,lim,len(glxs),""*10),end='\r')
                 # reset pop
                 self.genotypes = []
                 # dash results (sorted by number of transients)

@@ -4,7 +4,10 @@ from copy import deepcopy
 from nu_fxs import *
 
 #TODO: replace random response for something more sensible (viability based dists?)
+#TODO: gt: assign values from occurrences for a exgt distribution, so to pass responses for next generarions
+# in this way unnecesar things should get discarded
 
+'''dx,mx0,cx0 -> mx : mx,cx0 -> cx : cx -> dx+1 : ...'''
 class Glider:
     def __init__(self,gt,st0=12,x0=25,y0=25):
         # element gt instructions
@@ -24,7 +27,6 @@ class Glider:
         self.eos = None
         self.ems = None
         self.om = None
-        self.oxm = None
         self.i,self.j = x0,y0
         # elements rel locs and init orientations
         self.ce_ij = xy_around(3,3,r=1,inv=True)
@@ -32,12 +34,13 @@ class Glider:
         # threshold for motion
         self.mt = 2
         # trial data
+        self.t = 0
         self.states = []
         self.core_sts = []
         self.memb_sts = []
         self.loc = [[x0,y0]]
         self.dashes = [0]
-        self.doxm = []
+        self.dxom = []
         self.tx_seq = []
         self.loops = set()
         self.set_cfg(st0)
@@ -55,6 +58,7 @@ class Glider:
         self.gl_motion()
         # data for analysis
         self.gl_data(gl_domain)
+        self.t += 1
 
     '''update membrane'''
     def gl_membrane(self,domain,mode=""):
@@ -156,72 +160,66 @@ class Glider:
         # select higher sum and move if higher than motion threshold
         dx = self.ems[1]-self.ems[3]
         dy = self.ems[0]-self.ems[2]
-        # also get the change in oxm
-        om0 = self.om
-        self.oxm = 0
-        motion = False
+        # om: 0:stay, 1:E, 2:S, 3:W, 4:N
+        om0,xom,self.om = self.om,0,0
         if abs(dx)>abs(dy):
             if abs(dx)>=self.mt:
                 self.j += int(dx/abs(dx))
                 self.om = 1 if int(dx/abs(dx))>0 else 3
-                motion = True
         elif abs(dy)>abs(dx):
             if abs(dy)>=self.mt:
                 self.i += int(-dy/abs(dy))
-                self.om = 0 if int(-dy/abs(dy))>0 else 2
-                motion = True
-        # (0:stay, -1:left, 1:right, 2:forward, -2:backwards)
-        if motion:
-            dom = self.om-om0
-            if dom==0:
-                self.oxm = 2
-            elif abs(dom)==1:
-                self.oxm = dom
-            elif abs(dom)==2:
-                self.oxm = -2
-            elif abs(dom)==3:
-                self.oxm = 2-dom
-            else:
-                raise Exception("motion change error")
-                import pdb; pdb.set_trace()
+                self.om = 4 if int(-dy/abs(dy))>0 else 2
+        # xom: (0:stay, -1:left, 1:right, 2:forward, -2:back, 3:start, -3:stop)
+        dom = self.om-om0
+        if om0==self.om==0:
+            xom=0
+        elif om0==0:
+            xom=3
+        elif self.om==0:
+            xom=-3
+        elif dom==0:
+            xom=2
+        elif abs(dom)==1:
+            xom=dom
+        elif abs(dom)==2:
+            xom=-2
+        elif abs(dom)==3:
+            xom=2-dom
+        else:
+            import pdb; pdb.set_trace()
+            raise Exception("motion change error")
         self.loc.append([self.i,self.j])
-        self.doxm.append([om0,self.oxm,self.om])
+        self.dxom.append([om0,xom,self.om])
 
-    '''core st, membrane st, encountered dashes'''
+    '''data for visualization and analysis'''
     def gl_data(self,gl_domain):
         # core
         cx0 = self.core_sts[-1]
         cx = arr2int(self.core)
         self.core_sts.append(cx)
         # membrane
-        om0 = self.doxm[-1][0]
         mx0 = self.memb_sts[-1]
-        mx = ext2int(self.membrane,om0)
-        if mx==-1:
-            import pdb; pdb.set_trace()
+        mx = ext2int(self.membrane)
         self.memb_sts.append(mx)
         # encountered dash pattern
-        dx = ext2int(gl_domain,om0)
-        if dx==-1:
-            import pdb; pdb.set_trace()
-        self.dashes.append(dx)
-        self.dxs.add(dx)
+        dx0 = ext2int(gl_domain)
+        self.dashes.append(dx0)
+        self.dxs.add(dx0)
+        # motion based orientation change
+        om0,xom,om = self.dxom[-1]
         # responses
-        self.rxs[(cx0,mx0,dx)].add((cx,mx,self.oxm))
-        # transients: if glider not in cycle
-        if (cx0,mx0,dx) not in self.cycles.keys():
-            # if glider just broke out from cycle
-            if len(self.tx_seq)==0:
-                self.tx_seq = [(cx0,mx0,dx)]
-            self.tx_seq.append((cx,mx,self.oxm))
-        # transients: if glider comes back to a cycle
-        elif len(self.tx_seq)>0 and (cx0,mx0,dx) in self.cycles.keys():
-            self.tx_seq.append((cx0,cx0,dx))
-            d0 = self.tx_seq[0][2]
-            self.txs[d0].add(tuple(self.tx_seq))
-            self.tx_seq = []
-            print("transient?")
-            import pdb; pdb.set_trace()
+        self.rxs[(cx0,mx0,dx0)].add((cx,mx,xom))
+        # txs v2
+        if (cx0,mx0,dx0) in self.cycles and (cx,mx)==self.cycles[(cx0,mx0,dx0)]:
+            if len(self.tx_seq)>0:
+                self.tx_seq.append((cx0,mx0,dx0,om0,xom,om,cx,mx,self.t))
+                self.tx_seq.append((cx,mx))
+                d0 = self.tx_seq[0][2]
+                self.txs[d0].append(self.tx_seq)
+                self.tx_seq = []
+        else:
+            self.tx_seq.append((self.t,cx0,mx0,dx0,om0,xom,om,cx,mx))
 
     '''search for loops (possible transients/cycles)'''
     def gl_loops(self):

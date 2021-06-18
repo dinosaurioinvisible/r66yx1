@@ -28,23 +28,31 @@ class Trial:
         for ti in range(self.tt):
             # get world domain
             gl_domain = deepcopy(self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4])
+            # if all core elements are off, it dies
+            if np.sum(gl.core)==0:
+                return [None,1,0,0]
             # if world object within glider domain (collision), it dies
             if np.sum(gl_domain[1:6,1:6]):
-                return [None,1,0]
+                return [None,0,1,0]
             # if gl doesn't move in time limit, it dies
             elif tlim > self.limit:
-                return [None,0,1]
+                return [None,0,0,1]
             # stop before encounters bounding walls (just in case)
             elif min(gl.i,gl.j)<10 or max(gl.i,gl.j)>self.wsize-10:
-                import pdb; pdb.set_trace()
                 break
             else:
                 # allocate and update glider
                 gl_domain[1:6,1:6] += gl.st
                 gl.update(gl_domain)
                 tlim += 1
-                if gl.oxm != 0:
+                if gl.om > 0:
                     tlim=0
+        if len(gl.txs)>0:
+            print("transient found?")
+            import pdb; pdb.set_trace()
+        if len(gl.loops)>0:
+            print("loop found?")
+            import pdb; pdb.set_trace()
         # count loops, opt visualization and return
         gl.gl_loops()
         if anim:
@@ -52,7 +60,7 @@ class Trial:
         return [gl]
 
     '''create world and allocate dash patterns'''
-    def set_world(self,x0,y0,st0=12,mode="",dash=0,r=5):
+    def set_world(self,x0,y0,st0=12,mode="",dash=0,r=6):
         # empty world
         self.world = np.zeros((self.wsize,self.wsize)).astype(int)
         # starting oxy (4=N, 1=E, 2=S, 3=W)
@@ -62,9 +70,9 @@ class Trial:
             # empty world no dashes
             if dash==0:
                 return
-            # wall i location
-            wi = y0-r
-            # dash j starting point (y0+gl width + j-steps (1 per cycle))
+            # wall i location (y0 - r-1 (raw 0))
+            wi = y0 - r-1
+            # dash j starting point (x0+gl_size + j-steps (1 per cycle))
             wj = x0-3 + r%4
             # create dashed wall (align+repeated pattern)
             dx = [int(di) for di in np.binary_repr(dash,7)]

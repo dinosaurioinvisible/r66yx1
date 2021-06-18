@@ -19,7 +19,11 @@ def xy_around(x,y,r=1,inv=False,ext=False):
     return np.asarray(axy)
 
 '''convert array into int'''
-def arr2int(a,b=[],rot=None,transp=False):
+def arr2int(a,b=[],rot=None,transp=False,inv=False):
+    # int to matrix
+    if inv:
+        ax = np.asarray([int(i) for i in np.binary_repr(a,9)]).reshape(3,3)
+        return ax
     # check for second array
     ab = True if len(a)==len(b) else False
     # check if it's a matrix (just in case)
@@ -43,48 +47,40 @@ def arr2int(a,b=[],rot=None,transp=False):
         return xa,xb
     return xa
 
-'''convert active borders of matrix to int (clockwise)'''
-def ext2int(ma,oxy):
+'''convert active membrane/wall pattern to int (clockwise)'''
+def ext2int(ma):
     # ext membrane/walls values (clockwise)
     ma_arrs = [ma[0,:],ma[:,-1],np.flip(ma[-1,:]),np.flip(ma[:,0])]
-    ma_oxy = ma_arrs[oxy]
-    # check if nothing
+    # if nothing
     if np.sum(ma_arrs)==0:
         return 0
-    # which walls have active elements
-    wx = []
-    ma_wx = [ma_arrs[0][:-1],ma_arrs[1][:-1],ma_arrs[2][:-1],ma_arrs[3][:-1]]
-    for wi in range(len(ma_arrs)):
-        # 1 wall cases (all active cells in same wall)
-        if np.sum(ma_wx)==np.sum(ma_arrs[wi]):
-            mx_int = arr2int(ma_arrs[wi])
-            return mx_int
-        # 2 or more walls
-        if np.sum(ma_arrs[wi])>0:
-            wx.append(wi)
-    # wall indeces
-    if len(wx)==1:
-
-
-
-
-
+    # linear array
+    ma_ux = np.concatenate((ma_arrs[0][:-1],ma_arrs[1][:-1],ma_arrs[2][:-1],ma_arrs[3][:-1]))
+    cn = len(ma_arrs[0])-1
+    ei = ma_ux.argmax()
+    wi = int(ei/cn)
+    # one active vertex element (vals: 1 or 16/64 (first/last))
+    if np.sum(ma_ux)==1 and ei%cn==0:
+        # for simplicity just 1 (assuming some symmetry)
+        return 1
+    # 1 wall cases (1 central or more than 1 element)
+    for wx in ma_arrs:
+        if np.sum(wx)==np.sum(ma_ux):
+            wx_int = arr2int(wx)
+            return wx_int
     # 2 walls cases
-    ml = ma_arrs[(oxy-1)%4][:-1]
-    mr = ma_arrs[(oxy+1)%4][1:]
-    if np.sum(ml)>0 and np.sum(mr)==0:
-        mx = np.concatenate((np.array(ml),ma_oxy))
-        mx_int = arr2int(mx)
-        return mx_int
-    elif np.sum(ml)==0 and np.sum(mr)>0:
-        mx = np.concatenate((ma_oxy,np.array(mr)))
-        mx_int = arr2int(mx)
-        return mx_int
+    wl = ma_arrs[(wi+1)%4][:-1]
+    wr = ma_arrs[(wi-1)%4][1:]
+    if np.sum(wl)>0 and np.sum(wr)==0:
+        wx = np.concatenate((wl,ma_arrs[wi]))
+    elif np.sum(wl)==0 and np.sum(wr)>0:
+        wx = np.concatenate((ma_arrs[wi],wr))
     # 3 or 4 walls?
     else:
         print("more than 2 walls?")
-        #import pdb; pdb.set_trace()
-        return -1
+        import pdb; pdb.set_trace()
+    wx_int = arr2int(wx)
+    return wx_int
 
 
 
