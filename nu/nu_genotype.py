@@ -23,7 +23,7 @@ class Genotype:
             # encountered dashes (set)
             self.dxs = {0}
         else:
-            self.egt = deepcopy(glx.egt)
+            self.exgt = deepcopy(glx.exgt)
             self.cycles = deepcopy(glx.cycles)
             self.rxs = deepcopy(glx.rxs)
             self.txs = deepcopy(glx.txs)
@@ -53,52 +53,55 @@ def set_cycles():
 
 '''elements base genotype (cycles only)'''
 def set_responses():
-    # try set rather for debugging
+    # dict (set for debugging)
+    # ex_gt = defaultdict(set)
     ex_gt = {}
     # rel location for elements
     eij = xy_around(2,2,r=1,inv=True)
     # base states
-    a = np.array([0,0,1,1,0,1,0,1,1])
-    b = np.array([1,0,0,0,1,1,1,1,0])
-    c = a.reshape(3,3).transpose(1,0).flatten()
-    d = b.reshape(3,3).transpose(1,0).flatten()
-    # orientations (a&b start the same, c&d idem)
-    ab_ox = np.array([1,0,1,3,1,1,1,2,1])
-    cd_ox = np.array([2,0,2,3,2,1,2,2,2])
-    # responses
-    a_rx = [(1,1),(1,1),(1,1),(0,0),(1,1),(1,1),(1,1),(1,1),(1,1)]
-    b_rx = [(1,0),(1,1),(1,0),(1,1),(1,0),(1,1),(1,0),(1,1),(1,0)]
-    c_rx = [(1,1),(0,0),(1,1),(1,1),(1,1),(1,1),(1,1),(1,1),(1,1)]
-    d_rx = [(0,1),(1,1),(0,1),(1,1),(0,1),(1,1),(0,1),(1,1),(0,1)]
-    # 5x5 domain to re-orient elements
-    e_dom = np.zeros((5,5)).astype(int)
-    # map
-    for ei,[i,j] in enumerate(eij):
-        # a -> b
-        e_dom[1:4,1:4] = a.reshape(3,3)
-        ae_in = arr2int(e_dom[i-1:i+2,j-1:j+2],rot=ab_ox[ei])
-        ar,al = a_rx[ei]
-        ae_rx = (b[ei],ar,al)
-        ex_gt[ae_in] = ae_rx
-        # b -> c
-        e_dom[1:4,1:4] = b.reshape(3,3)
-        be_in = arr2int(e_dom[i-1:i+2,j-1:j+2],rot=ab_ox[ei])
-        br,bl = b_rx[ei]
-        be_rx = (c[ei],br,bl)
-        ex_gt[be_in] = be_rx
-        # c -> d
-        e_dom[1:4,1:4] = c.reshape(3,3)
-        ce_in = arr2int(e_dom[i-1:i+2,j-1:j+2],rot=cd_ox[ei])
-        cr,cl = c_rx[ei]
-        ce_rx = (d[ei],cr,cl)
-        ex_gt[ce_in] = ce_rx
-        # d -> a
-        e_dom[1:4,1:4] = d.reshape(3,3)
-        de_in = arr2int(e_dom[i-1:i+2,j-1:j+2],rot=cd_ox[ei])
-        dr,dl = d_rx[ei]
-        de_rx = (a[ei],dr,dl)
-        ex_gt[de_in] = de_rx
-    # assuming symetry between these 4 and the whole 16
+    st1 = np.array([0,0,1,1,0,1,0,1,1])
+    st2 = np.array([1,0,0,0,1,1,1,1,0])
+    # different starting orientations
+    for do in range(4):
+        # base states
+        a = np.rot90(st1.reshape(3,3),do).flatten()
+        b = np.rot90(st2.reshape(3,3),do).flatten()
+        c = np.rot90(st1.reshape(3,3).transpose(1,0),do).flatten()
+        d = np.rot90(st2.reshape(3,3).transpose(1,0),do).flatten()
+        # orientations (a&b start the same, c&d idem)
+        ox = (1-do)%4
+        ab_ox = np.array([ox,0,ox,3,ox,1,ox,2,ox])
+        oy = (2-do)%4
+        cd_ox = np.array([oy,0,oy,3,oy,1,oy,2,oy])
+        # motor responses (a:move, b:turn right, c:move, d:turn left)
+        b_rx = [(1,0),(1,1),(1,0),(1,1),(1,0),(1,1),(1,0),(1,1),(1,0)]
+        d_rx = [(0,1),(1,1),(0,1),(1,1),(0,1),(1,1),(0,1),(1,1),(0,1)]
+        # 5x5 domain to re-orient elements
+        e_dom = np.zeros((5,5)).astype(int)
+        # map
+        for ei,[i,j] in enumerate(eij):
+            # a -> b
+            e_dom[1:4,1:4] = a.reshape(3,3)
+            ae_in = arr2int(e_dom[i-1:i+2,j-1:j+2],rot=ab_ox[ei])
+            ae_rx = (b[ei],1,1)
+            ex_gt[ae_in] = (ae_rx)
+            # b -> c
+            e_dom[1:4,1:4] = b.reshape(3,3)
+            be_in = arr2int(e_dom[i-1:i+2,j-1:j+2],rot=ab_ox[ei])
+            br,bl = b_rx[ei]
+            be_rx = (c[ei],br,bl)
+            ex_gt[be_in] = (be_rx)
+            # c -> d
+            e_dom[1:4,1:4] = c.reshape(3,3)
+            ce_in = arr2int(e_dom[i-1:i+2,j-1:j+2],rot=cd_ox[ei])
+            ce_rx = (d[ei],1,1)
+            ex_gt[ce_in] = (ce_rx)
+            # d -> a
+            e_dom[1:4,1:4] = d.reshape(3,3)
+            de_in = arr2int(e_dom[i-1:i+2,j-1:j+2],rot=cd_ox[ei])
+            dr,dl = d_rx[ei]
+            de_rx = (a[ei],dr,dl)
+            ex_gt[de_in] = (de_rx)
     return ex_gt
 
 

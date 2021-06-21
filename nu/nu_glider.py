@@ -38,6 +38,7 @@ class Glider:
         self.states = []
         self.core_sts = []
         self.memb_sts = []
+        self.ex_sts = []
         self.loc = [[x0,y0]]
         self.dashes = [0]
         self.dxom = []
@@ -120,15 +121,19 @@ class Glider:
     def gl_core(self,domain,mode=""):
         self.core = np.zeros(9).astype(int)
         self.ems = np.zeros(4).astype(int)
+        ers = []
         # responses given element genotypes
         if mode=="genotype":
             for ei,[i,j] in enumerate(self.ce_ij):
                 # re-oriented element domain
                 e_in = arr2int(domain[i-1:i+2,j-1:j+2],rot=self.eos[ei])
                 # create response if theres isn't one (dict of responses)
+                ri = "gt"
                 if not e_in in self.exgt.keys():
+                    ri = "new"
                     self.exgt[e_in] = list(np.random.randint(0,2,size=(3)))
                 sx,rm,lm = self.exgt[e_in]
+                ers.append((e_in,ri,sx,rm,lm))
                 # activation
                 self.core[ei] = sx
                 # motor response
@@ -136,6 +141,7 @@ class Glider:
                     self.ems[self.eos[ei]] += 1
                 else:
                     self.eos[ei] = (self.eos[ei]+rm-lm)%4
+            self.ex_sts.append(ers)
         # responses based on the CA version
         elif mode=="automata":
             for ei,[i,j] in enumerate(self.ce_ij):
@@ -219,7 +225,7 @@ class Glider:
                 self.txs[d0].append(self.tx_seq)
                 self.tx_seq = []
         else:
-            self.tx_seq.append((self.t,cx0,mx0,dx0,om0,xom,om,cx,mx))
+            self.tx_seq.append((cx0,mx0,dx0,om0,xom,om,cx,mx,self.t))
 
     '''search for loops (possible transients/cycles)'''
     def gl_loops(self):

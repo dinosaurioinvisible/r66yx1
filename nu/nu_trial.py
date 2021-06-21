@@ -47,12 +47,6 @@ class Trial:
                 tlim += 1
                 if gl.om > 0:
                     tlim=0
-        if len(gl.txs)>0:
-            print("transient found?")
-            import pdb; pdb.set_trace()
-        if len(gl.loops)>0:
-            print("loop found?")
-            import pdb; pdb.set_trace()
         # count loops, opt visualization and return
         gl.gl_loops()
         if anim:
@@ -76,7 +70,7 @@ class Trial:
             wj = x0-3 + r%4
             # create dashed wall (align+repeated pattern)
             dx = [int(di) for di in np.binary_repr(dash,7)]
-            dx_wall = [0]*(wj%7) + dx*int(self.wsize/7)
+            dx_wall = [0]*(wj%7) + dx*int(self.wsize/5)
             self.world[wi] = dx_wall[:self.wsize]
             # rotate according to initial orientation (rot90 rotates left)
             rx = 4-oxy

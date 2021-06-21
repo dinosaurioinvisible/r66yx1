@@ -71,10 +71,15 @@ def ext2int(ma):
     # 2 walls cases
     wl = ma_arrs[(wi+1)%4][:-1]
     wr = ma_arrs[(wi-1)%4][1:]
-    if np.sum(wl)>0 and np.sum(wr)==0:
-        wx = np.concatenate((wl,ma_arrs[wi]))
-    elif np.sum(wl)==0 and np.sum(wr)>0:
-        wx = np.concatenate((ma_arrs[wi],wr))
+    wb = ma_arrs[(wi+2)%4][:-1]
+    if np.sum(wl)>0 and np.sum(wr)==np.sum(wb)==0:
+        # wx = np.concatenate((wl,ma_arrs[wi]))
+        wx
+    elif np.sum(wr)>0 and np.sum(wl)==np.sum(wb)==0:
+        # wx = np.concatenate((ma_arrs[wi],wr))
+        wx
+    elif np.sum(wb)>0 and np.sum(wl)==np.sum(wr)==0:
+        wx
     # 3 or 4 walls?
     else:
         print("more than 2 walls?")
