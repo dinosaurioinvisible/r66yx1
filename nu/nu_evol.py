@@ -7,7 +7,7 @@ import os
 import pickle
 
 class Evol:
-    def __init__(self,t=100,wsize=100,gens=100,popsize=1000,offs=5):
+    def __init__(self,t=100,wsize=100,gens=100,popsize=1000,offs=3):
         self.gens = gens
         self.popsize = popsize
         self.offs = offs
@@ -28,7 +28,8 @@ class Evol:
                 # gts
                 off,col,lim = 0,0,0
                 for gi,gt in enumerate(self.genotypes):
-                    tgl = self.trial.run(gt,st0=12,mode="dashes",dash=dash)
+                    # start with north dashes so dash values are (0:127)
+                    tgl = self.trial.run(gt,st0=41,mode="dashes",dash=dash)
                     if tgl[0]:
                         glxs.append(tgl[0])
                     else:
@@ -42,11 +43,12 @@ class Evol:
                 print("\n\ngen={}, dash={} results:".format(n_gen,dash))
                 glxs = sorted(glxs,key=lambda x:len(x.txs),reverse=True)
                 for gi,gl in enumerate(glxs):
-                    print("{} - cycles={}, transients={}, responses={}, dashes={}".format(gi+1,len(gl.cycles),len(gl.txs),len(gl.rxs),len(gl.dxs)))
-                    # refill pop
-                    for _ in range(self.offs):
-                        gt = Genotype(glx=gl)
-                        self.genotypes.append(gt)
+                    if len(gl.txs)>0:
+                        print("{} - cycles={}, transients={}, responses={}, dashes={}".format(gi+1,len(gl.cycles),len(gl.txs),len(gl.exgt),len(gl.dxs)))
+                        # refill pop
+                        for _ in range(self.offs):
+                            gt = Genotype(glx=gl)
+                            self.genotypes.append(gt)
                 while len(self.genotypes) < self.popsize:
                     gt = Genotype()
                     self.genotypes.append(gt)

@@ -1,6 +1,7 @@
 
 import numpy as np
 from copy import deepcopy
+from collections import defaultdict
 from nu_fxs import *
 
 #TODO: replace random response for something more sensible (viability based dists?)
@@ -14,7 +15,6 @@ class Glider:
         self.exgt = deepcopy(gt.exgt)
         # glider behavioral data
         self.cycles = deepcopy(gt.cycles)
-        self.rxs = deepcopy(gt.rxs)
         self.txs = deepcopy(gt.txs)
         self.dxs = deepcopy(gt.dxs)
         # updating modes for core and membrane
@@ -28,6 +28,7 @@ class Glider:
         self.ems = None
         self.om = None
         self.i,self.j = x0,y0
+        self.erxs = {}
         # elements rel locs and init orientations
         self.ce_ij = xy_around(3,3,r=1,inv=True)
         self.me_ij = xy_around(3,3,r=2,inv=True,ext=True)
@@ -38,7 +39,8 @@ class Glider:
         self.states = []
         self.core_sts = []
         self.memb_sts = []
-        self.ex_sts = []
+        self.ex_sts = [0]
+        self.resps = defaultdict(set)
         self.loc = [[x0,y0]]
         self.dashes = [0]
         self.dxom = []
@@ -126,14 +128,15 @@ class Glider:
         if mode=="genotype":
             for ei,[i,j] in enumerate(self.ce_ij):
                 # re-oriented element domain
-                e_in = arr2int(domain[i-1:i+2,j-1:j+2],rot=self.eos[ei])
+                eo = self.eos[ei]
+                e_in = arr2int(domain[i-1:i+2,j-1:j+2],rot=eo)
                 # create response if theres isn't one (dict of responses)
                 ri = "gt"
                 if not e_in in self.exgt.keys():
                     ri = "new"
                     self.exgt[e_in] = list(np.random.randint(0,2,size=(3)))
                 sx,rm,lm = self.exgt[e_in]
-                ers.append((e_in,ri,sx,rm,lm))
+                ers.append((eo,e_in,ri,sx,rm,lm))
                 # activation
                 self.core[ei] = sx
                 # motor response
@@ -214,17 +217,27 @@ class Glider:
         self.dxs.add(dx0)
         # motion based orientation change
         om0,xom,om = self.dxom[-1]
-        # responses
-        self.rxs[(cx0,mx0,dx0)].add((cx,mx,xom))
-        # txs v2
+        # trial responses
+        self.resps[(cx0,mx0,dx0)].add((cx,mx,xom))
+        # txs v2: transition is in cycle
         if (cx0,mx0,dx0) in self.cycles and (cx,mx)==self.cycles[(cx0,mx0,dx0)]:
+            # if transition was occurring
             if len(self.tx_seq)>0:
                 self.tx_seq.append((cx0,mx0,dx0,om0,xom,om,cx,mx,self.t))
                 self.tx_seq.append((cx,mx))
                 d0 = self.tx_seq[0][2]
                 self.txs[d0].append(self.tx_seq)
+                # element responses
+                t0 = self.tx_seq[0][-1]
+                for ex_st in self.ex_sts[t0:]:
+                    for ei_st in ex_st:
+                        e_in = ei_st[1]
+                        e_ri = ei_st[3:]
+                        self.erxs[e_in] = e_ri
+                # reset
                 self.tx_seq = []
         else:
+            # if not in cycle, keep tx seq growing
             self.tx_seq.append((cx0,mx0,dx0,om0,xom,om,cx,mx,self.t))
 
     '''search for loops (possible transients/cycles)'''

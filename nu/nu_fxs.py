@@ -47,45 +47,19 @@ def arr2int(a,b=[],rot=None,transp=False,inv=False):
         return xa,xb
     return xa
 
-'''convert active membrane/wall pattern to int (clockwise)'''
+'''v5 of the same, just go with the whole thing'''
 def ext2int(ma):
     # ext membrane/walls values (clockwise)
     ma_arrs = [ma[0,:],ma[:,-1],np.flip(ma[-1,:]),np.flip(ma[:,0])]
     # if nothing
     if np.sum(ma_arrs)==0:
         return 0
-    # linear array
-    ma_ux = np.concatenate((ma_arrs[0][:-1],ma_arrs[1][:-1],ma_arrs[2][:-1],ma_arrs[3][:-1]))
-    cn = len(ma_arrs[0])-1
-    ei = ma_ux.argmax()
-    wi = int(ei/cn)
-    # one active vertex element (vals: 1 or 16/64 (first/last))
-    if np.sum(ma_ux)==1 and ei%cn==0:
-        # for simplicity just 1 (assuming some symmetry)
-        return 1
-    # 1 wall cases (1 central or more than 1 element)
-    for wx in ma_arrs:
-        if np.sum(wx)==np.sum(ma_ux):
-            wx_int = arr2int(wx)
-            return wx_int
-    # 2 walls cases
-    wl = ma_arrs[(wi+1)%4][:-1]
-    wr = ma_arrs[(wi-1)%4][1:]
-    wb = ma_arrs[(wi+2)%4][:-1]
-    if np.sum(wl)>0 and np.sum(wr)==np.sum(wb)==0:
-        # wx = np.concatenate((wl,ma_arrs[wi]))
-        wx
-    elif np.sum(wr)>0 and np.sum(wl)==np.sum(wb)==0:
-        # wx = np.concatenate((ma_arrs[wi],wr))
-        wx
-    elif np.sum(wb)>0 and np.sum(wl)==np.sum(wr)==0:
-        wx
-    # 3 or 4 walls?
-    else:
-        print("more than 2 walls?")
-        import pdb; pdb.set_trace()
-    wx_int = arr2int(wx)
-    return wx_int
+    # membrane to int (0 : 65.536) (2**16), env (0 : 16,777,216) (2**24)
+    # 0: north and so on clockwise (flip for continuity of array)
+    me = np.concatenate((ma[0,:][:-1],ma[:,-1][:-1],np.flip(ma[-1,:][:-1]),np.flip(ma[:,0][:-1])))
+    # flip so that ma[0][0]=1 and so on
+    mx = int(''.join(np.flip(me).astype(str)),2)
+    return mx
 
 
 

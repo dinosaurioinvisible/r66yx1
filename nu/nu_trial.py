@@ -6,7 +6,7 @@ from nu_genotype import Genotype
 from nu_animation import glx_anim
 
 class Trial:
-    def __init__(self,tt=100,wsize=200,auto=False,st0=12,center=True,gtx=None,mode="",dash=0,anim=True):
+    def __init__(self,tt=100,wsize=200,auto=False,st0=41,center=True,gtx=None,mode="",dash=0,anim=True):
         self.tt=tt
         self.limit=int(tt/10)
         self.wsize=wsize
@@ -15,7 +15,7 @@ class Trial:
             self.dash_trial(gtx,st0,center,mode,dash,anim)
 
     '''default trial: st1=SE, single glider, dashed wall world'''
-    def run(self,gtx,st0=12,center=True,mode="",dash=0,anim=False):
+    def run(self,gtx,st0=41,center=True,mode="",dash=0,anim=False):
         # initialize world and glider
         if center:
             x0,y0=int(self.wsize/2),int(self.wsize/2)
@@ -47,6 +47,10 @@ class Trial:
                 tlim += 1
                 if gl.om > 0:
                     tlim=0
+        # debug
+        # if len(gl.txs) > 0:
+        #     print("\n transition? \n")
+        #     import pdb; pdb.set_trace()
         # count loops, opt visualization and return
         gl.gl_loops()
         if anim:
@@ -54,7 +58,7 @@ class Trial:
         return [gl]
 
     '''create world and allocate dash patterns'''
-    def set_world(self,x0,y0,st0=12,mode="",dash=0,r=6):
+    def set_world(self,x0,y0,st0=41,mode="",dash=0,r=5):
         # empty world
         self.world = np.zeros((self.wsize,self.wsize)).astype(int)
         # starting oxy (4=N, 1=E, 2=S, 3=W)
@@ -64,13 +68,14 @@ class Trial:
             # empty world no dashes
             if dash==0:
                 return
-            # wall i location (y0 - r-1 (raw 0))
-            wi = y0 - r-1
+            # wall i location (y0 - r)
+            wi = y0 -r
             # dash j starting point (x0+gl_size + j-steps (1 per cycle))
-            wj = x0-3 + r%4
+            wj = x0-3 + int(r/4)
             # create dashed wall (align+repeated pattern)
             dx = [int(di) for di in np.binary_repr(dash,7)]
-            dx_wall = [0]*(wj%7) + dx*int(self.wsize/5)
+            align = (wj%7)+1
+            dx_wall = [0]*align + dx*int(self.wsize/5)
             self.world[wi] = dx_wall[:self.wsize]
             # rotate according to initial orientation (rot90 rotates left)
             rx = 4-oxy

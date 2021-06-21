@@ -10,24 +10,27 @@ class Genotype:
     def __init__(self,glx=None,cx_mode="genotype",mx_mode="all",flex=0):
         # init new
         if not glx:
-            # elements' responses: dict[env_in] = [signal,rm,lm]
+            # elements' gt responses: dict[env_in] = [signal,rm,lm]
             self.exgt = set_responses()
             # cycles: dict[ci,mi,di]=[cx,mx]
             self.cycles = set_cycles()
-            # rxs: responses to env dashes
-            # defdict[ci,mi,dash] = set{(cx,mx,dij)}
-            self.rxs = defaultdict(set)
             # txs: transients redirecting to set of known cycles
             # defdict[dash0]=[[c0,m0,d0],...,[ci,mi,di],...,[cx,mx,dx]]
             self.txs = defaultdict(list)
             # encountered dashes (set)
             self.dxs = {0}
         else:
-            self.exgt = deepcopy(glx.exgt)
-            self.cycles = deepcopy(glx.cycles)
-            self.rxs = deepcopy(glx.rxs)
-            self.txs = deepcopy(glx.txs)
-            self.dxs = deepcopy(glx.dxs)
+            gl = deepcopy(glx)
+            # gt responses + prev found transients
+            self.exgt = set_responses()
+            for ek in gl.erxs.keys():
+                self.exgt[ek] = gl.erxs[ek]
+            # in case there are new cycles
+            self.cycles = gl.cycles
+            # transients in terms of glider
+            self.txs = gl.txs
+            # encountered dashes
+            self.dxs = gl.dxs
         # updating modes for core and membrane
         self.cx_mode = cx_mode
         self.mx_mode = mx_mode
@@ -53,7 +56,6 @@ def set_cycles():
 
 '''elements base genotype (cycles only)'''
 def set_responses():
-    # dict (set for debugging)
     # ex_gt = defaultdict(set)
     ex_gt = {}
     # rel location for elements
