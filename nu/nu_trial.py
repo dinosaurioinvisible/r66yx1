@@ -90,7 +90,7 @@ class Trial:
         # normal distribution: 1 if val higher/lower than sd, 0 otherwise
         elif mode=="full":
             self.world = np.random.normal(0,1,size=(self.wsize,self.wsize))
-            self.world = np.where(self.world>1.25,1,np.where(self.world<-1.25,1,0))
+            self.world = np.where(self.world>1.5,1,np.where(self.world<-1.5,1,0))
             # leave the surroundings empty
             self.world[x0-5:x0+6,y0-5:y0+5] = 0
         # bounding walls

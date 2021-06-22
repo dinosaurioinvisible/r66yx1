@@ -7,11 +7,12 @@ import os
 import pickle
 
 class Evol:
-    def __init__(self,t=100,wsize=100,gens=100,popsize=1000,offs=3):
+    def __init__(self,t=100,wsize=100,gens=100,popsize=2500,offs=5):
         self.gens = gens
         self.popsize = popsize
         self.offs = offs
         self.genotypes = []
+        self.mode = "dashes"
         self.save_path = None
         self.init_population()
         self.trial = Trial(t,wsize)
@@ -21,22 +22,35 @@ class Evol:
     def evolve_dashes(self):
         # generations
         for n_gen in range(10):
-            glxs = []
             print("\n\ngeneration {}".format(n_gen))
             # env dashes
             for dash in range(1,128):
                 # gts
-                off,col,lim = 0,0,0
+                glxs = []
+                off,col,lim,dis = 0,0,0,0
+                # to avoid overpopulation
+                self.mode = "dashes"
+                if len(self.genotypes) > self.popsize:
+                    self.mode = "full"
+                    backup = self.genotypes[:int(self.popsize/4)]
+                # trials
                 for gi,gt in enumerate(self.genotypes):
                     # start with north dashes so dash values are (0:127)
-                    tgl = self.trial.run(gt,st0=41,mode="dashes",dash=dash)
+                    tgl = self.trial.run(gt,st0=41,mode=self.mode,dash=dash)
                     if tgl[0]:
-                        glxs.append(tgl[0])
+                        if len(tgl[0].txs) > 0:
+                            glxs.append(tgl[0])
+                        else:
+                            dis += 1
                     else:
                         off += tgl[1]
                         col += tgl[2]
                         lim += tgl[3]
-                    print("gen={}, dash={}/127, gl={}/{}, off={},cols={},tlim={}, saved={}{}".format(n_gen,dash,gi+1,len(self.genotypes),off,col,lim,len(glxs),""*10),end='\r')
+                    print("gen={}, mode={}, dash={}/127, gl={}/{}, off={},cols={},tlim={},disc={} saved={} {}".format(n_gen,self.mode,dash,gi+1,len(self.genotypes),off,col,lim,dis,len(glxs),""*11),end='\r')
+                # in case full mode was too much
+                if self.mode=="full" and len(glxs) < self.popsize/2:
+                    glxs += backup
+                    print("\nbackup used, current genotypes={}".format(len(glxs)))
                 # reset pop
                 self.genotypes = []
                 # dash results (sorted by number of transients)
