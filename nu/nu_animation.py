@@ -6,79 +6,139 @@ import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
 import plotly.graph_objects as go
 import networkx as nx
+from nu_fxs import reduce
 
 def glx_anim(glx,world,show=True,save=False,autoclose=0):
 
     # fig and subplots: nrows, ncols, index
-    fig = plt.figure(figsize=(12,10))
-    ax1 = fig.add_subplot(3,2,1)    # anim: glider
-    ax2 = fig.add_subplot(3,2,2)    # anim: glider zoom
-    ax3 = fig.add_subplot(3,2,3)    # gt network (memb/core)
-    ax4 = fig.add_subplot(3,2,4)    # gt loops and txs
-    ax5 = fig.add_subplot(3,2,5)    # trial sts (core,memb,loops)
-    ax6 = fig.add_subplot(3,2,6)    # gl responses to dashes
+    fig = plt.figure(figsize=(16,10))
+    # trial
+    ax11 = fig.add_subplot(2,4,1)   # glider (anim)
+    ax12 = fig.add_subplot(2,4,2)   # glider zoom (anim)
+    ax13 = fig.add_subplot(2,4,3)   # glider trajectory
+    ax14 = fig.add_subplot(2,4,4)   # cx,mx in states domain
+    # genotype
+    ax21 = fig.add_subplot(2,4,5)   # exgt as ein,erx array
+    ax22 = fig.add_subplot(2,4,6)   #
+    ax23 = fig.add_subplot(2,4,7)   # txs(dx) as trajectories
+    ax24 = fig.add_subplot(2,4,8)   # txs cx,mx in state domain
 
     tt = len(glx.states)
-    fname = "glx, known dashes={}, cycles={}, transients={}".format(tt,len(self.dashes),len(glx.cycles),len(glx.txs))
+    fname = "glx, known dashes={}, transients={}, gt size={}".format(len(glx.dxs),len(glx.txs),len(glx.exgt))
     fig.suptitle("{}".format(fname),ha="center",va="center")
     time = fig.text(0.5,0.95,"",ha="center",va="center")
-    ax1.title.set_text("glider")
-    ax2.title.set_text("zoom")
-    ax3.title.set_text("gt: memb/core")
-    ax4.title.set_text("gt: cycles and transients")
-    ax5.title.set_text("trial states")
-    ax6.title.set_text("responses to dashes")
+    ax11.title.set_text("glider")
+    ax12.title.set_text("zoom")
+    ax13.title.set_text("trajectory")
+    ax14.title.set_text("cx,mx states")
+    ax21.title.set_text("genotype")
+    ax22.title.set_text("gt: ")
+    ax23.title.set_text("gt: txs trajectories")
+    ax24.title.set_text("gt: cx,mx states")
 
-    # ax3: memb/core
-    gx = nx.DiGraph()
-    for ri in glx.rxs.keys():
-        rxs = glx.rxs[ri]
-        ci,mi,di = ri
-        gx.add_node((ci,mi),pos=(ci,mi))
-        for rx in rxs:
-            cx,mx,dij = rx
-            gx.add_node((cx,mx),pos=(cx,mx))
-            gx.add_edge((ci,mi),(cx,mx))
-    nx.draw_networkx(gx,ax=ax3,node_size=10,alpha=0.5,with_labels=False)
+    # ax13: trajectory
+    glx_i = [l[0] for l in glx.loc]
+    glx_j = [l[1] for l in glx.loc]
+    #ax13.set_xlim([0,100])
+    #ax13.set_ylim([0,100])
+    ax13.plot(glx_i,glx_j,color="grey")
 
-    # ax4: loops & transients
+    # ax14: cx,mx states; ax24: cx,mx gt states
+    gx1 = nx.DiGraph()
     gx2 = nx.DiGraph()
-    # for each mapping
-    for (ci,mi,di) in glx.cycles.keys():
-        # starting node (key)
-        if (ci,mi) not in gx2.nodes:
-            gx2.add_node((ci,mi),pos=(ci,mi))
-        # ending node (dict value)
-        cx,mx = glx.cycles[(ci,mi,di)]
-        if (cx,mx) not in gx2.nodes:
-            gx2.add_node((cx,mx),pos=(cx,mx))
-        gx2.add_edge((ci,mi),(cx,mx),color="b")
-    # connecting transients
-    for dash in glx.txs.keys():
-        tx_seqs = glx.txs[dash]
-        for tx_seq in tx_seqs:
-            for ti in range(1,len(tx_seq)):
-                cti,mti,dti = tx_seq[ti]
-                if (cti,mti) not in gx2.nodes:
-                    gx2.add_node((cti,mti),pos=(cti,mti))
-                ct0,mt0 = tx_seq[ti-1]
-                gx2.add_edge((ct0,mt0),(cti,mti),color="r")
-    colors = [gx2[u][v]['color'] for u,v in gx2.edges]
-    nx.draw_networkx(gx2,ax=ax4,node_size=10,alpha=0.5,with_labels=False,edge_color=colors)
+    # cycles locations
+    p0 = np.array([[0,50,50,50,50,0,0,0]]).reshape(4,2)
+    p1 = p0.astype(int)
+    p1[:,0] += 512+100
+    p2 = p0.astype(int)
+    p2[:,1] += 512+100
+    p3 = p0+512+100
+    pxy = [p0,p1,p2,p3]
+    for i,ck in enumerate(glx.cycles.keys()):
+        cx,mx,ex = ck
+        px,py = pxy[int(i/4)][i%4]
+        gx1.add_node((cx,mx),pos=(px,py))
+        gx2.add_node((cx,mx),pos=(px,py))
+    for ck in glx.cycles.keys():
+        cx0,mx0,dx0 = ck
+        cx,mx = glx.cycles[cx0,mx0,dx0]
+        gx1.add_edge((cx0,mx0),(cx,mx),color="b")
+        gx2.add_edge((cx0,mx0),(cx,mx),color="b")
+    # cx,mx trial states
+    for i,[ci,mi,ei] in enumerate(zip(glx.core_sts,glx.memb_sts,glx.env_sts)):
+        if (ci,mi,ei) not in glx.cycles.keys():
+            px = ci+100
+            mri = reduce(mi)
+            py = (mri*2)+100
+            gx1.add_node((ci,mi),pos=(px,py))
+            if i>0:
+                c0 = glx.core_sts[i-1]
+                m0 = glx.memb_sts[i-1]
+                gx1.add_edge((c0,m0),(ci,mi),color="r")
+    pos1 = nx.get_node_attributes(gx1,"pos")
+    colors1 = [gx1[u][v]['color'] for u,v in gx1.edges]
+    nx.draw(gx1,pos1,ax=ax14,node_size=10,alpha=0.5,with_labels=False,edge_color=colors1)
+    # cx,mx genotype txs
+    for tk in glx.txs.keys():
+        transients = glx.txs[tk]
+        for transient in transients:
+            for sti in transient[:-1]:
+                cx0 = sti[0]
+                mx0 = sti[1]
+                dxo = sti[2]
+                cx = sti[6]
+                mx = sti[7]
+                if (cx,mx) not in gx2.nodes:
+                    px = cx+100
+                    mri = reduce(mx)
+                    py = (mri*2)+100
+                    gx2.add_node((cx,mx),pos=(px,py))
+                if ((cx0,mx0),(cx,mx)) not in gx2.edges:
+                    gx2.add_edge((cx0,mx0),(cx,mx),color="r")
+    pos2 = nx.get_node_attributes(gx2,"pos")
+    colors2 = [gx2[u][v]['color'] for u,v in gx2.edges]
+    nx.draw(gx2,pos2,ax=ax24,node_size=10,alpha=0.2,with_labels=False,edge_color=colors2)
 
-    # ax5: trials states
-    ax5.plot(glx.core, label="core sts", color="black")
-    ax5.plot(glx.memb, label="memb sts", color="grey")
-    for loop in glx.loops:
-        ax5.plot(loop[0], linestyle="dashed", color="blue")
-        ax5.plot(loop[1], linestyle="dashed", color="red")
-        ax5.plot(loop[2], linestyle="dashed", color="green")
-    ax5.legend()
+    # ax21: gt as array
+    xy = []
+    for gk in glx.exgt.keys():
+        gv = int(''.join(str(i) for i in glx.exgt[gk]),2)
+        xy.append([gk,gv])
+    xy = sorted(xy)
+    xs,ys = zip(*xy)
+    ax21.scatter(xs,ys)
 
-    # ax6: responses to dashes
-    ax6.plot(glx.env, label="dashes", color="black")
-    ax6.plot(glx.dxy, label="motion", color="blue")
-    ax6.legend()
+    # ax23: txs as trajectories
+    for tk in glx.txs.keys():
+        transients = glx.txs[tk]
+        for transient in transients:
+            x,y = 50,50
+            xs = [x]
+            ys = [y]
+            om0 = transient[0][3]
+            if om0==1:
+                x += 1
+            elif om0==2:
+                y -= 1
+            elif om0==3:
+                x -= 1
+            elif om0==4:
+                y += 1
+            xs.append(x)
+            ys.append(y)
+            for sti in transient[:-1]:
+                om = sti[5]
+                if om==1:
+                    x += 1
+                elif om==2:
+                    y -= 1
+                elif om==3:
+                    x -= 1
+                elif om==4:
+                    y += 1
+                xs.append(x)
+                ys.append(y)
+        ax23.plot(xs,ys)
 
     # to pause the animation and check data
     anim_running = True
@@ -117,10 +177,10 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
             gi = wi[i-4:i+5,j-4:j+5]
             # colors
             wi_rgb = palette[wi.astype(int)]
-            gl_nav = ax1.imshow(wi_rgb)
+            gl_nav = ax11.imshow(wi_rgb)
             # gl domain
             gl_rgb = palette[gi.astype(int)]
-            gl_domain = ax2.imshow(gl_rgb)
+            gl_domain = ax12.imshow(gl_rgb)
 
         return gl_nav,gl_domain
 

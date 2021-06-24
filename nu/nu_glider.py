@@ -37,12 +37,12 @@ class Glider:
         # trial data
         self.t = 0
         self.states = []
+        self.ex_sts = [0]
         self.core_sts = []
         self.memb_sts = []
-        self.ex_sts = [0]
+        self.env_sts = [0]
         self.resps = defaultdict(set)
         self.loc = [[x0,y0]]
-        self.dashes = [0]
         self.dxom = []
         self.tx_seq = []
         self.loops = set()
@@ -183,10 +183,10 @@ class Glider:
         dom = self.om-om0
         if om0==self.om==0:
             xom=0
-        elif om0==0:
-            xom=3
         elif self.om==0:
             xom=-3
+        elif om0==0:
+            xom=3
         elif dom==0:
             xom=2
         elif abs(dom)==1:
@@ -213,7 +213,7 @@ class Glider:
         self.memb_sts.append(mx)
         # encountered dash pattern
         dx0 = ext2int(gl_domain)
-        self.dashes.append(dx0)
+        self.env_sts.append(dx0)
         self.dxs.add(dx0)
         # motion based orientation change
         om0,xom,om = self.dxom[-1]
@@ -242,15 +242,15 @@ class Glider:
 
     '''search for loops (possible transients/cycles)'''
     def gl_loops(self):
-        for i,[ci,mi,di] in enumerate(zip(self.core_sts,self.memb_sts,self.dashes)):
+        for i,[ci,mi,di] in enumerate(zip(self.core_sts,self.memb_sts,self.env_sts)):
             cxi = np.where(self.core_sts==ci,1,0)
             mxi = np.where(self.memb_sts==mi,1,0)
-            dxi = np.where(self.dashes==di,1,0)
+            dxi = np.where(self.env_sts==di,1,0)
             lxi = cxi*mxi*dxi
             if np.sum(lxi)>1:
                 cx = np.where(self.core_sts==ci,self.core_sts,0)
                 mx = np.where(self.memb_sts==mi,self.memb_sts,0)
-                dx = np.where(self.dashes==di,self.dashes,0)
+                dx = np.where(self.env_sts==di,self.dashes,0)
                 loop = np.vstack((cx,mx,dx))
                 self.loops.add(loop)
 

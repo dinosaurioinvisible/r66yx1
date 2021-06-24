@@ -61,7 +61,18 @@ def ext2int(ma):
     mx = int(''.join(np.flip(me).astype(str)),2)
     return mx
 
-
+'''convert from full int to aprox. int'''
+def reduce(arr):
+    mi = [int(i) for i in np.binary_repr(arr,16)]
+    mi.insert(0,mi[-1])
+    msi = []
+    for i in range(8):
+        si = np.sum(mi[i*2:(i*2)+3])
+        msi.append(si)
+    msi = np.asarray(np.flip(msi))
+    msi = np.where(msi>0,1,0)
+    mxi = arr2int(msi)
+    return mxi
 
 
 
