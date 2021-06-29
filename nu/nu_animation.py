@@ -37,11 +37,11 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0):
     ax24.title.set_text("gt: cx,mx states")
 
     # ax13: trajectory
-    glx_i = [l[0] for l in glx.loc]
-    glx_j = [l[1] for l in glx.loc]
+    glx_y = [100-l[0] for l in glx.loc]
+    glx_x = [l[1] for l in glx.loc]
     #ax13.set_xlim([0,100])
     #ax13.set_ylim([0,100])
-    ax13.plot(glx_i,glx_j,color="grey")
+    ax13.plot(glx_x,glx_y,color="grey")
 
     # ax14: cx,mx states; ax24: cx,mx gt states
     gx1 = nx.DiGraph()

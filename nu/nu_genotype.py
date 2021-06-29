@@ -7,7 +7,7 @@ from collections import defaultdict
 '''initialized only with the 4 known cycles info
 (dictionaries work as pointing graphs)'''
 class Genotype:
-    def __init__(self,glx=None,cx_mode="genotype",mx_mode="all",flex=0):
+    def __init__(self,glx=None,cx_mode=None,mx_mode=None,flex=0):
         # init new
         if not glx:
             # elements' gt responses: dict[env_in] = [signal,rm,lm]
@@ -31,9 +31,13 @@ class Genotype:
             self.txs = gl.txs
             # encountered dashes
             self.dxs = gl.dxs
-        # updating modes for core and membrane
-        self.cx_mode = cx_mode
-        self.mx_mode = mx_mode
+        # modes for core and membrane
+        if not cx_mode:
+            self.cx_mode = "genotype"
+            # self.cx_mode = np.random.choice(["genotype","automata"])
+        if not mx_mode:
+            self.mx_mode = "all"
+            # self.mx_mode = np.random.choice(["basic","delta","all"])
         # for future distributions based on viability
         self.flex = flex
 

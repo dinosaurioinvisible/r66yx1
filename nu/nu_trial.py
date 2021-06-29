@@ -2,26 +2,97 @@
 import numpy as np
 from copy import deepcopy
 from nu_glider import Glider
+from nu_glider_v2 import BasicGlider
 from nu_genotype import Genotype
 from nu_animation import glx_anim
 
 class Trial:
-    def __init__(self,tt=100,wsize=100,auto=False,st0=41,center=True,gtx=None,mode="",dash=0,anim=True):
+    def __init__(self,tt=100,wsize=100,auto=False,gtx=None,st0=41,anim=False):
         self.tt=tt
         self.limit=int(tt/10)
         self.wsize=wsize
         self.world=None
         if auto:
-            self.run(gtx,st0,center,mode,dash,anim)
+            self.full(gtx,st0,anim=True)
 
-    '''default trial: st1=SE, single glider, dashed wall world'''
-    def run(self,gtx,st0=41,center=True,mode="",dash=0,anim=False):
+    '''try behavior for every dash possible'''
+    def behavior(self,gt,st0=41,anim=False):
         # initialize world and glider
-        if center:
-            x0,y0=int(self.wsize/2),int(self.wsize/2)
-        else:
-            x0,y0=np.random.randint(10,self.wsize-10,size=(2))
-        self.set_world(x0,y0,st0,mode,dash)
+        x0,y0 = int(self.wsize/2),int(self.wsize/2)
+        gl = BasicGlider(gt,st0)
+        results = np.zeros(128).astype(int)
+        # try behavior for every dash
+        for dx in range(1,128):
+            # set dashed wall, x0,y0 and orientation
+            gl.set_cfg(st0,x0,y0)
+            self.set_world(st0,x0,y0,mode="dash",dash=dx)
+            # run trial
+            rx=4
+            tlim=0
+            for ti in range(self.tt):
+                gl_domain = self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4].astype(int)
+                # collision
+                if np.sum(gl_domain[1:6,1:6])>0:
+                    rx=0
+                # timed out
+                elif tlim > self.limit:
+                    rx=0
+                # wall avoided (assuming north)
+                elif gl.i < y0-20:
+                    rx=1
+                # came back from wall
+                elif gl.i > y0+10:
+                    rx=2
+                # horizontal movement
+                elif gl.j>x0+15 or gl.j<x0-15:
+                    rx=3
+                else:
+                    gl_domain[1:6,1:6] += gl.st
+                    gl.update(gl_domain)
+                    tlim = 0 if gl.ox > 0 else tlim+1
+                if rx<4:
+                    break
+            results[dx] = rx
+        results[0] = np.sum(np.where(results>0,1,0))
+        if anim:
+            glx_anim(gl,self.world)
+        return results
+
+
+    '''randomly fully filled world'''
+    def full(self,gtx,st0=41,anim=False):
+        # initialize world and glider
+        x0,y0=int(self.wsize/2),int(self.wsize/2)
+        self.set_world(st0,x0,y0,mode="full")
+        gl = Glider(gtx,st0,x0,y0)
+        # run trial
+        tlim=0
+        for ti in range(self.tt):
+            # get world domain
+            gl_domain = deepcopy(self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4])
+            # if all core elements are off, it dies
+            if np.sum(gl.core)==0:
+                break
+            # if world object within glider domain (collision), it dies
+            elif np.sum(gl_domain[1:6,1:6]):
+                break
+            # if gl doesn't move in time limit, it dies
+            elif tlim > self.limit:
+                break
+            else:
+                # allocate and update glider
+                gl_domain[1:6,1:6] += gl.st
+                gl.update(gl_domain)
+                tlim = 0 if gl.om > 0 else tlim+1
+        if anim:
+            glx_anim(gl,self.world)
+        return gl
+
+    '''default trial: st41=NE, single glider, dashed wall world'''
+    def dashes(self,gtx,st0=41,dash=0,anim=False):
+        # initialize world and glider
+        x0,y0=int(self.wsize/2),int(self.wsize/2)
+        self.set_world(st0,x0,y0,mode="dash",dash=dash)
         gl = Glider(gtx,st0,x0,y0)
         # run trial
         tlim=0
@@ -60,18 +131,32 @@ class Trial:
         return gl
 
     '''create world and allocate dash patterns'''
-    def set_world(self,x0,y0,st0=41,mode="",dash=0,r=5):
+    def set_world(self,st0=41,x0=50,y0=50,mode="",dash=0,r=5):
         # empty world
         self.world = np.zeros((self.wsize,self.wsize)).astype(int)
         # starting oxy (4=N, 1=E, 2=S, 3=W)
         oxy = int(str(st0)[0])
         # set dashed wall at north
-        if mode=="dashes":
+        if mode=="dash":
+            if dash==0:
+                return
+            wi = y0-r
+            dj = int(str(st0)[1])
+            if dj==1 or dj==2:
+                wj = x0-3+int(r/4)
+            else:
+                wj = x0+3-int(r/4)
+            dx = [int(di) for di in np.binary_repr(dash,7)]
+            self.world[wi,wj:wj+7] = dx
+            rot = 4-oxy
+            self.world = np.rot90(self.world,rot)
+        # same but repeated pattern
+        elif mode=="dashes":
             # empty world no dashes
             if dash==0:
                 return
             # wall i location (y0 - r)
-            wi = y0 -r
+            wi = y0-r
             # dash j starting point (x0+gl_size + j-steps (1 per cycle))
             wj = x0-3 + int(r/4)
             # create dashed wall (align+repeated pattern)

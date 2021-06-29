@@ -1,0 +1,29 @@
+
+
+generation: 0	dx: 
+
+1 - txs=45, exgt=121, dxs=58
+2 - txs=28, exgt=278, dxs=80
+3 - txs=28, exgt=313, dxs=79
+4 - txs=28, exgt=263, dxs=78
+5 - txs=27, exgt=193, dxs=77
+6 - txs=27, exgt=247, dxs=77
+7 - txs=27, exgt=36, dxs=76
+8 - txs=27, exgt=105, dxs=79
+9 - txs=27, exgt=171, dxs=83
+10 - txs=27, exgt=283, dxs=78
+11 - txs=27, exgt=264, dxs=80
+12 - txs=27, exgt=255, dxs=80
+13 - txs=27, exgt=264, dxs=82
+14 - txs=27, exgt=280, dxs=81
+15 - txs=27, exgt=316, dxs=82
+16 - txs=27, exgt=197, dxs=80
+17 - txs=27, exgt=242, dxs=78
+18 - txs=27, exgt=278, dxs=80
+19 - txs=27, exgt=288, dxs=82
+20 - txs=27, exgt=234, dxs=84
+21 - txs=26, exgt=69, dxs=77
+22 - txs=26, exgt=200, dxs=78
+23 - txs=26, exgt=135, dxs=78
+24 - txs=26, exgt=36, dxs=75
+25 - txs=26, exgt=36, dxs=84

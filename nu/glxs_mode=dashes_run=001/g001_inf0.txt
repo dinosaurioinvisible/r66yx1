@@ -1,0 +1,29 @@
+
+
+generation: 1	dx: 112
+
+1 - txs=13, exgt=261, dxs=38
+2 - txs=13, exgt=249, dxs=34
+3 - txs=13, exgt=331, dxs=32
+4 - txs=13, exgt=318, dxs=28
+5 - txs=13, exgt=320, dxs=26
+6 - txs=13, exgt=317, dxs=28
+7 - txs=13, exgt=329, dxs=35
+8 - txs=13, exgt=309, dxs=36
+9 - txs=13, exgt=287, dxs=27
+10 - txs=13, exgt=299, dxs=30
+11 - txs=13, exgt=305, dxs=36
+12 - txs=12, exgt=306, dxs=31
+13 - txs=12, exgt=298, dxs=37
+14 - txs=12, exgt=294, dxs=35
+15 - txs=12, exgt=241, dxs=37
+16 - txs=12, exgt=287, dxs=34
+17 - txs=12, exgt=297, dxs=33
+18 - txs=12, exgt=303, dxs=32
+19 - txs=12, exgt=302, dxs=35
+20 - txs=12, exgt=225, dxs=34
+21 - txs=12, exgt=292, dxs=25
+22 - txs=11, exgt=246, dxs=34
+23 - txs=11, exgt=329, dxs=37
+24 - txs=11, exgt=324, dxs=36
+25 - txs=11, exgt=259, dxs=37

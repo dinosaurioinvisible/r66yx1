@@ -10,7 +10,7 @@ from nu_fxs import *
 
 '''dx,mx0,cx0 -> mx : mx,cx0 -> cx : cx -> dx+1 : ...'''
 class Glider:
-    def __init__(self,gt,st0=12,x0=25,y0=25):
+    def __init__(self,gt,st0=41,x0=25,y0=25):
         # element gt instructions
         self.exgt = deepcopy(gt.exgt)
         # glider behavioral data
@@ -101,19 +101,19 @@ class Glider:
             for i in range(1,6):
                 self.membrane[i][1] += np.sum(domain[i-1:i+2,0])-np.sum(domain[max(2,i-1):min(i+2,5),2])
                 self.membrane[i][5] += np.sum(domain[i-1:i+2,6])-np.sum(domain[max(2,i-1):min(i+2,5),4])
-            # corners (to avoid double sum from domain's corners)
-            self.membrane[1][1] -= domain[0][0]
-            self.membrane[1][5] -= domain[0][6]
-            self.membrane[5][1] -= domain[6][0]
-            self.membrane[5][5] -= domain[6][6]
+            # corners (to prevent double sum from core and domain's corners)
+            self.membrane[1][1] += domain[2][2] - domain[0][0]
+            self.membrane[1][5] += domain[2][4] - domain[0][6]
+            self.membrane[5][1] += domain[4][2] - domain[6][0]
+            self.membrane[5][5] += domain[4][4] - domain[6][6]
             # if outside > inside input:1, otherwise:0
             self.membrane = np.where(self.membrane[1:6,1:6]>0,1,0)
         # anything from outside
         elif mode=="all":
-            mdomain = deepcopy(domain)
-            mdomain[1:6,1:6] = 0
+            memb_domain = deepcopy(domain)
+            memb_domain[1:6,1:6] = 0
             for [i,j] in self.me_ij:
-                if np.sum(mdomain[i-1:i+2,j-1:j+2])>0:
+                if np.sum(memb_domain[i-1:i+2,j-1:j+2])>0:
                     self.membrane[i][j] = 1
             self.membrane = self.membrane[1:6,1:6]
         else:
@@ -121,6 +121,10 @@ class Glider:
 
     '''update core'''
     def gl_core(self,domain,mode=""):
+        # changes in the membrane are assumed as previous
+        core_domain = np.zeros((7,7)).astype(int)
+        core_domain[1:6,1:6] = self.membrane.astype(int)
+        core_domain[2:5,2:5] = domain[2:5,2:5]
         self.core = np.zeros(9).astype(int)
         self.ems = np.zeros(4).astype(int)
         ers = []
@@ -129,7 +133,7 @@ class Glider:
             for ei,[i,j] in enumerate(self.ce_ij):
                 # re-oriented element domain
                 eo = self.eos[ei]
-                e_in = arr2int(domain[i-1:i+2,j-1:j+2],rot=eo)
+                e_in = arr2int(core_domain[i-1:i+2,j-1:j+2],rot=eo)
                 # create response if theres isn't one (dict of responses)
                 ri = "gt"
                 if not e_in in self.exgt.keys():
@@ -149,8 +153,8 @@ class Glider:
         elif mode=="automata":
             for ei,[i,j] in enumerate(self.ce_ij):
                 # signalings
-                e_in = np.sum(domain[i-1:i+2,j-1:j+2])-domain[i][j]
-                if domain[i][j]==0:
+                e_in = np.sum(core_domain[i-1:i+2,j-1:j+2])-core_domain[i][j]
+                if core_domain[i][j]==0:
                     if e_in==3:
                         self.core[ei]=1
                 else:

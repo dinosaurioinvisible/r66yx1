@@ -66,7 +66,7 @@ def load(fdir="glxs",anim=True,save=False,netplot=True,auto=False):
                     import pdb; pdb.set_trace()
             auto = False
 
-load("glxs_run=001",auto=True)
+load("glxs_002",auto=True)
 
 
 
