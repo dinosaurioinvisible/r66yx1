@@ -226,22 +226,30 @@ class Evol:
                 fname = "g{:0=3d}_dx{:0=3d}.{}s".format(n_gen,dash,self.fkey)
             else:
                 fname = "g{:0=3d}.{}s".format(n_gen,self.fkey)
-            iname = "g{:0=3d}_inf0.txt".format(n_gen,self.fkey)
-            ipath = os.path.join(self.fdir,iname)
+            iname = "g{:0=3d}_info.txt".format(n_gen)
         elif self.mode=="behavior":
             fname = "gts={}.{}s".format(len(self.genotypes),self.fkey)
+            iname = "genotypes_info.txt"
         fpath = os.path.join(self.fdir,fname)
+        ipath = os.path.join(self.fdir,iname)
         if self.mode=="dashes":
             with open(ipath,"w") as info:
                 info.write("\n\ngeneration: {}".format(n_gen))
                 info.write("\tdx: {}\n\n".format(dash if dash else ""))
                 for gi,gl in enumerate(self.glxs):
                     info.write("{} - txs={}, exgt={}, dxs={}\n".format(gi+1,len(gl.txs),len(gl.exgt),len(gl.dxs)))
+        elif self.mode=="behavior":
+            # clear and write again
+            with open(ipath,"r+") as info:
+                info.truncate(0)
+                info.write("\n\nnumber of genotypes tried: {}\n\n".format(len(self.genotypes)))
+                for gt in self.genotypes:
+                    info.write("\n{}".format(gt))
         with open(fpath,"wb") as glxs_path:
             if self.mode=="dashes":
                 pickle.dump(self.glxs,glxs_path)
             elif self.mode=="behavior":
-                pickle.dump([self.genotypes,self.glxs],glxs_path)
+                pickle.dump(self.glxs,glxs_path)
         print("\ndata saved at {}\n".format(fpath))
 
     def init_population(self):
