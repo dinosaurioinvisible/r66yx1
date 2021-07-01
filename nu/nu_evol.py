@@ -238,13 +238,21 @@ class Evol:
                 info.write("\tdx: {}\n\n".format(dash if dash else ""))
                 for gi,gl in enumerate(self.glxs):
                     info.write("{} - txs={}, exgt={}, dxs={}\n".format(gi+1,len(gl.txs),len(gl.exgt),len(gl.dxs)))
+                info.close()
         elif self.mode=="behavior":
+            # create info file
+            if not os.path.isfile(ipath):
+                with open(ipath,"w") as info:
+                    info.write("?")
+                info.close()
             # clear and write again
             with open(ipath,"r+") as info:
                 info.truncate(0)
                 info.write("\n\nnumber of genotypes tried: {}\n\n".format(len(self.genotypes)))
                 for gt in self.genotypes:
                     info.write("\n{}".format(gt))
+                info.close()
+        # pickle save
         with open(fpath,"wb") as glxs_path:
             if self.mode=="dashes":
                 pickle.dump(self.glxs,glxs_path)
