@@ -12,7 +12,7 @@ import pickle
 #TODO: 1 not-useful inner layer
 
 class Evol:
-    def __init__(self,mode="dashes",t=100,wsize=100,gens=1000,popsize=250,offs=3,fkey="glx"):
+    def __init__(self,mode="dashes",t=100,wsize=100,gens=100,popsize=250,offs=3,fkey="glx"):
         self.gens = gens
         self.popsize = popsize
         self.offs = offs
@@ -50,12 +50,14 @@ class Evol:
                     if tuple(gt) not in self.genotypes:
                         self.genotypes.add(tuple(gt))
                         new_gt = True
-                # results = [dx_surv,t1,t2,...,t127] (0:die,1:avoid,2:come back,3:horizontal,4:other)
-                gt_results = self.trial.behavior(gt,st0=41)
-                self.glxs.append([gt,gt_results])
+                # results = [dx_surv,t1,...,t127,cys] (0:die,1:avoid,2:come back,3:horizontal,4:other)
+                gl,gt_results = self.trial.behavior(gt,st0=41)
+                self.glxs.append([gl,gt_results])
             self.glxs = sorted(self.glxs,key=lambda x:x[1][0],reverse=True)[:int(self.popsize/10)]
-            self.save_data()
             self.check_data()
+            self.glxs = [glxr for glxr in self.glxs if glxr[1][0]>=100]
+            if len(self.glxs)>0:
+                self.save_data()
 
     '''first step: survive different patterns'''
     def evolve_dashes(self):
@@ -125,10 +127,10 @@ class Evol:
             elif self.mode=="behavior":
                 # generation results
                 print("\n\ngts tried={}".format(len(self.genotypes)))
-                for gi,[gt,gt_res] in enumerate(self.glxs[ni:nx]):
+                for gi,[gl,gt_res] in enumerate(self.glxs[ni:nx]):
                     dxs = [di+1 for di,dx in enumerate(gt_res[1:]) if dx>0]
-                    rxs = [np.sum(np.where(gt_res==1,1,0)),np.sum(np.where(gt_res==2,1,0)),np.sum(np.where(gt_res==3,1,0)),np.sum(np.where(gt_res==4,1,0))]
-                    print("{} - rxs: {} - dxs: {}: \n{}".format(gi,rxs,gt_res[0],dxs))
+                    beh = [np.sum(np.where(gt_res[1:-1]==1,1,0)),np.sum(np.where(gt_res[1:-1]==2,1,0)),np.sum(np.where(gt_res[1:-1]==3,1,0)),np.sum(np.where(gt_res[1:-1]==4,1,0))]
+                    print("{} - cys: {} - memb_rxs: {} - core_rxs: {} - beh: {} - dxs: {}: \n{}".format(gi,len(gl.cys),len(gl.memb_rxs),len(gl.core_rxs),beh,gt_res[0],dxs))
             # if timed out, just print best 25
             if ask:
                 # optinal data check
@@ -170,17 +172,21 @@ class Evol:
                 out = True if out==False else False
             else:
                 try:
-                    glx = self.glxs[int(n_gl)]
+                    if self.mode=="dashes":
+                        glx = self.glxs[int(n_gl)]
+                    elif self.mode=="behavior":
+                        glx,results = self.glxs[int(n_gl)]
                     if pdb_check:
-                        print("\nglx = {}\n".format(glx))
+                        print("\nresults = {}\n".format(results))
                         import pdb; pdb.set_trace()
                     if anim==True or save==True:
+                        import nu_animation
                         if self.mode=="dashes":
-                            import nu_animation
                             nu_animation.glx_anim(glx,self.trial.world,show=anim,save=save)
                         elif self.mode=="behavior":
+                            nu_animation.glx_anim(glx,self.trial.world,basic=True,show=anim,save=save)
                             gt_anim = Genotype()
-                            for fi,fx in enumerate(glx[0]):
+                            for fi,fx in enumerate(glx.exgt):
                                 fx = tuple([int(i) for i in np.binary_repr(fx,3)])
                                 gt_anim.exgt[fi] = fx
                             self.trial.dashes(gt_anim,dash=127,anim=True)

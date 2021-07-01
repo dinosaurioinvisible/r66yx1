@@ -1,6 +1,8 @@
 
 import numpy as np
 from nu_fxs import *
+from nu_genotype import set_cycles
+from collections import defaultdict
 
 class BasicGlider:
     def __init__(self,gt,st0):
@@ -10,7 +12,15 @@ class BasicGlider:
         self.st = None
         self.eos = None
         self.ox = None
+        self.cycles = set_cycles()
+        self.cy = True
+        self.cys = defaultdict(int)
+        self.cx0 = None
+        self.core_rxs = defaultdict(set)
+        self.memb_rxs = defaultdict(set)
         self.i,self.j = 0,0
+        self.loc = None
+        self.states = None
         self.ce_ij = xy_around(3,3,r=1,inv=True)
         self.me_ij = xy_around(3,3,r=2,inv=True,ext=True)
         self.mt = 2
@@ -23,11 +33,12 @@ class BasicGlider:
         for [i,j] in self.me_ij:
             if np.sum(memb_domain[i-1:i+2,j-1:j+2])>0:
                 membrane[i][j] = 1
+        membrane = membrane[1:6,1:6]
         # core and local motion
         motion = [0,0,0,0]
         core = np.zeros(9).astype(int)
         core_domain = np.zeros((7,7)).astype(int)
-        core_domain[1:6,1:6] = membrane[1:6,1:6].astype(int)
+        core_domain[1:6,1:6] = membrane.astype(int)
         core_domain[2:5,2:5] = gl_domain[2:5,2:5].astype(int)
         for ei,[i,j] in enumerate(self.ce_ij):
             e_in = arr2int(core_domain[i-1:i+2,j-1:j+2],rot=self.eos[ei])
@@ -41,21 +52,39 @@ class BasicGlider:
             elif rx==2 or rx==6:
                 self.eos[ei] = (self.eos[ei]+1)%4
         # global state and motion
-        self.st = membrane[1:6,1:6].astype(int)
-        self.st[2:5,2:5] = core.reshape(3,3)
+        self.st = membrane.astype(int)
+        self.st[1:4,1:4] = core.reshape(3,3)
+        self.states.append(self.st.astype(int))
         dx = motion[1]-motion[3]
         dy = motion[0]-motion[2]
         self.ox = 1
-        if abs(dx)>abs(dy) and abs(dx)>self.mt:
+        if abs(dx)>abs(dy) and abs(dx)>=self.mt:
             self.j += int(dx/abs(dx))
-        elif abs(dy)>abs(dx) and abs(dy)>self.mt:
+        elif abs(dy)>abs(dx) and abs(dy)>=self.mt:
             self.i += int(-dy/abs(dy))
         else:
             self.ox = 0
+        self.loc.append([self.i,self.j])
+        # responses
+        cx = arr2int(core)
+        mx = ext2int(membrane)
+        ex = ext2int(gl_domain)
+        self.memb_rxs[mx].add(ex)
+        self.core_rxs[cx].add((self.cx0,mx))
+        # check for cyclyc states
+        if self.cy==True and (cx,mx,ex) not in self.cycles.keys():
+            self.cy = False
+        if self.cy==False:
+            if (cx,mx,ex) in self.cycles.keys():
+                self.cys[self.cx0,cx] += 1
+        self.cx0 = cx
 
     def set_cfg(self,st0,x0,y0):
         # location
         self.i,self.j = x0,y0
+        self.loc = [[x0,y0]]
+        # cycling?
+        self.cy = True
         # initial states (assuming initial empty env)
         if st0==14:
             act=[3,1,2,5,8]     # east -> north
@@ -78,8 +107,10 @@ class BasicGlider:
         cxi = np.zeros(9).astype(int)
         for ei in act:
             cxi[ei] = 1
+        self.cx0 = arr2int(cxi)
         self.st = np.zeros((5,5)).astype(int)
         self.st[1:4,1:4] = cxi.reshape(3,3)
+        self.states = [self.st]
         # initial orientations (changing, then fixed-start ones)
         self.eos = np.zeros(9).astype(int)
         eos0 = int(str(st0)[0])%4

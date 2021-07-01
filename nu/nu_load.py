@@ -63,7 +63,7 @@ def load(fdir="glxs",anim=True,save=False,netplot=True,auto=False):
                 print("\n\nglx pdb")
                 if anim==True or save==True:
                     glx_trial = Trial(auto=True,gtx=glx,mode="full",anim=anim)
-                    import pdb; pdb.set_trace()
+                    # import pdb; pdb.set_trace()
             auto = False
 
 load("glxs_002",auto=True)

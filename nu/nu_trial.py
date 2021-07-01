@@ -54,10 +54,10 @@ class Trial:
                     break
             results[dx] = rx
         results[0] = np.sum(np.where(results>0,1,0))
+        # results = np.append(results,gl.cys)
         if anim:
-            glx_anim(gl,self.world)
-        return results
-
+            glx_anim(gl,self.world,basic=True)
+        return [gl,results]
 
     '''randomly fully filled world'''
     def full(self,gtx,st0=41,anim=False):
@@ -131,9 +131,10 @@ class Trial:
         return gl
 
     '''create world and allocate dash patterns'''
-    def set_world(self,st0=41,x0=50,y0=50,mode="",dash=0,r=5):
+    def set_world(self,st0=41,x0=50,y0=50,mode="",dash=0,r=5,gl_motion=None):
         # empty world
-        self.world = np.zeros((self.wsize,self.wsize)).astype(int)
+        if mode != "complex_dash":
+            self.world = np.zeros((self.wsize,self.wsize)).astype(int)
         # starting oxy (4=N, 1=E, 2=S, 3=W)
         oxy = int(str(st0)[0])
         # set dashed wall at north
@@ -150,6 +151,21 @@ class Trial:
             self.world[wi,wj:wj+7] = dx
             rot = 4-oxy
             self.world = np.rot90(self.world,rot)
+        # allocate second wall according to gl motion
+        elif mode=="complex_dash":
+            # dash binary pattern
+            dx = [int(di) for di in np.binary_repr(dash,13)]
+            dx1,dx2 = dx[:7],dx[7:]
+            # go trough space in wall
+            if gl_motion==4:
+                return
+            # horizontal motion
+            if gl_motion==1:
+                wj = x0+3+1
+            elif gl_motion==3:
+                wj = x0-3-1
+            # reverse motion
+            # TODO
         # same but repeated pattern
         elif mode=="dashes":
             # empty world no dashes
@@ -177,7 +193,7 @@ class Trial:
         # normal distribution: 1 if val higher/lower than sd, 0 otherwise
         elif mode=="full":
             self.world = np.random.normal(0,1,size=(self.wsize,self.wsize))
-            self.world = np.where(self.world>2.5,1,np.where(self.world<-2.5,1,0))
+            self.world = np.where(self.world>2.25,1,np.where(self.world<-2.25,1,0))
             # leave the surroundings empty
             self.world[x0-5:x0+6,y0-5:y0+5] = 0
         # bounding walls

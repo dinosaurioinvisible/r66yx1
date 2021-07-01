@@ -124,7 +124,7 @@ class Glider:
         # changes in the membrane are assumed as previous
         core_domain = np.zeros((7,7)).astype(int)
         core_domain[1:6,1:6] = self.membrane.astype(int)
-        core_domain[2:5,2:5] = domain[2:5,2:5]
+        core_domain[2:5,2:5] = domain[2:5,2:5].astype(int)
         self.core = np.zeros(9).astype(int)
         self.ems = np.zeros(4).astype(int)
         ers = []
@@ -175,14 +175,12 @@ class Glider:
         dy = self.ems[0]-self.ems[2]
         # om: 0:stay, 1:E, 2:S, 3:W, 4:N
         om0,xom,self.om = self.om,0,0
-        if abs(dx)>abs(dy):
-            if abs(dx)>=self.mt:
-                self.j += int(dx/abs(dx))
-                self.om = 1 if int(dx/abs(dx))>0 else 3
-        elif abs(dy)>abs(dx):
-            if abs(dy)>=self.mt:
-                self.i += int(-dy/abs(dy))
-                self.om = 4 if int(-dy/abs(dy))>0 else 2
+        if abs(dx)>abs(dy) and abs(dx)>=self.mt:
+            self.j += int(dx/abs(dx))
+            self.om = 1 if int(dx/abs(dx))>0 else 3
+        elif abs(dy)>abs(dx) and abs(dy)>=self.mt:
+            self.i += int(-dy/abs(dy))
+            self.om = 4 if int(-dy/abs(dy))>0 else 2
         # xom: (0:stay, -1:left, 1:right, 2:forward, -2:back, 3:start, -3:stop)
         dom = self.om-om0
         if om0==self.om==0:
