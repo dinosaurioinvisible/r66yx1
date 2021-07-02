@@ -3,6 +3,7 @@ import numpy as np
 from nu_fxs import *
 from nu_genotype import set_cycles
 from collections import defaultdict
+from collections import Counter
 
 class BasicGlider:
     def __init__(self,gt,st0):
@@ -16,9 +17,11 @@ class BasicGlider:
         self.cy = True
         self.cys = defaultdict(int)
         self.cx0 = None
-        self.core_rxs = defaultdict(set)
+        self.core_rxs = defaultdict(Counter)
         self.memb_rxs = defaultdict(set)
+        self.env_rxs = defaultdict(set)
         self.i,self.j = 0,0
+        self.motion = np.zeros(5).astype(int)
         self.loc = None
         self.states = None
         self.ce_ij = xy_around(3,3,r=1,inv=True)
@@ -57,20 +60,22 @@ class BasicGlider:
         self.states.append(self.st.astype(int))
         dx = motion[1]-motion[3]
         dy = motion[0]-motion[2]
-        self.ox = 1
+        self.ox = 0
         if abs(dx)>abs(dy) and abs(dx)>=self.mt:
             self.j += int(dx/abs(dx))
+            self.ox = 1 if int(dx/abs(dx))>0 else 3
         elif abs(dy)>abs(dx) and abs(dy)>=self.mt:
             self.i += int(-dy/abs(dy))
-        else:
-            self.ox = 0
+            self.ox = 4 if int(-dy/abs(dy)) else 2
         self.loc.append([self.i,self.j])
+        self.motion[self.ox] += 1
         # responses
         cx = arr2int(core)
         mx = ext2int(membrane)
         ex = ext2int(gl_domain)
         self.memb_rxs[mx].add(ex)
-        self.core_rxs[cx].add((self.cx0,mx))
+        self.core_rxs[cx][self.cx0,mx] += 1
+        self.env_rxs[self.ox].add(ex)
         # check for cyclyc states
         if self.cy==True and (cx,mx,ex) not in self.cycles.keys():
             self.cy = False

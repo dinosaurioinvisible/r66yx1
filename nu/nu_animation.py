@@ -25,32 +25,30 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
 
     tt = len(glx.states)
     if basic:
-        fname = "basic glider"
+        envs = sum([len(i[1]) for i in glx.env_rxs.items()])
+        fname = "basic glx, cys={}, motion={}, memb_rxs={}, core_rxs={}, envs={}".format(len(glx.cys),glx.motion,len(glx.memb_rxs),len(glx.core_rxs),envs)
     else:
         fname = "glx, known dashes={}, transients={}, gt size={}".format(len(glx.dxs),len(glx.txs),len(glx.exgt))
     fig.suptitle("{}".format(fname),ha="center",va="center")
     time = fig.text(0.5,0.95,"",ha="center",va="center")
     ax11.title.set_text("glider")
     ax12.title.set_text("zoom")
-    ax13.title.set_text("trajectory")
-    ax14.title.set_text("cx,mx states")
-    ax21.title.set_text("genotype")
-    ax22.title.set_text("gt: ")
-    ax23.title.set_text("gt: txs trajectories")
-    ax24.title.set_text("gt: cx,mx states")
 
     # ax13: trajectory
+    ax13.title.set_text("trajectory")
     glx_y = [100-l[0] for l in glx.loc]
     glx_x = [l[1] for l in glx.loc]
     y0,x0 = glx.loc[0]
     y0 = 100-y0
-    ax13.set_xlim([x0-10,x0+10])
-    ax13.set_ylim([y0-10,y0+10])
+    ax13.set_xlim([min(glx_x)-5,max(glx_x)+5])
+    ax13.set_ylim([min(glx_y)-5,max(glx_y)+5])
     ax13.plot(glx_x,glx_y,color="black")
     glx_xy = plt.Circle((x0,y0), radius=0.25, fill=True, color="green")
     ax13.add_patch(glx_xy)
 
     # ax14: cx,mx states; ax24: cx,mx gt states
+    ax14.title.set_text("cx,mx states")
+    ax24.title.set_text("gt: cx,mx states")
     if not basic:
         gx1 = nx.DiGraph()
         gx2 = nx.DiGraph()
@@ -108,6 +106,7 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
         nx.draw(gx2,pos2,ax=ax24,node_size=10,alpha=0.2,with_labels=False,edge_color=colors2)
 
     # ax21: gt as array
+    ax21.title.set_text("genotype")
     xy = []
     if basic:
         xy = [[ri,rx] for ri,rx in enumerate(glx.exgt)]
@@ -119,8 +118,12 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
     xs,ys = zip(*xy)
     ax21.scatter(xs,ys)
 
+    # ax22
+    ax22.title.set_text("gt: ")
+
     # ax23: txs as trajectories
     if not basic:
+        ax23.title.set_text("gt: txs trajectories")
         for tk in glx.txs.keys():
             transients = glx.txs[tk]
             for transient in transients:

@@ -61,6 +61,9 @@ def ext2int(ma):
     mx = int(''.join(np.flip(me).astype(str)),2)
     return mx
 
+'''change in oriented motion'''
+# TODO
+
 '''convert from full int to aprox. int'''
 def reduce(arr):
     mi = [int(i) for i in np.binary_repr(arr,16)]

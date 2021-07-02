@@ -3,6 +3,7 @@ import numpy as np
 from nu_trial import Trial
 from nu_genotype import Genotype
 from copy import deepcopy
+import nu_animation
 from pytimedinput import timedInput
 from collections import defaultdict
 from tqdm import tqdm
@@ -117,8 +118,9 @@ class Evol:
         # menu
         ask,check = True,False
         load,message = True,None
-        pdb_check,anim,save,out,ni,nx = True,False,False,False,0,25
+        pdb_check,anim,dash,save,ni,nx = True,False,100,False,0,25
         while load==True:
+            glx = None
             if self.mode=="dashes":
                 # dash results (sorted by number of transients)
                 print("\n\ngen={}, dash={}, glxs={} results:".format(n_gen,dash,len(glxs)))
@@ -129,8 +131,9 @@ class Evol:
                 print("\n\ngts tried={}".format(len(self.genotypes)))
                 for gi,[gl,gt_res] in enumerate(self.glxs[ni:nx]):
                     dxs = [di+1 for di,dx in enumerate(gt_res[1:]) if dx>0]
-                    beh = [np.sum(np.where(gt_res[1:-1]==1,1,0)),np.sum(np.where(gt_res[1:-1]==2,1,0)),np.sum(np.where(gt_res[1:-1]==3,1,0)),np.sum(np.where(gt_res[1:-1]==4,1,0))]
-                    print("{} - cys: {} - memb_rxs: {} - core_rxs: {} - beh: {} - dxs: {}: \n{}".format(gi,len(gl.cys),len(gl.memb_rxs),len(gl.core_rxs),beh,gt_res[0],dxs))
+                    beh = [np.sum(np.where(gt_res[1:-1]==0,1,0)),np.sum(np.where(gt_res[1:-1]==1,1,0)),np.sum(np.where(gt_res[1:-1]==2,1,0))]
+                    envs = sum([len(i[1]) for i in gl.env_rxs.items()])
+                    print("{} - cys: {} - motion: {} - memb_rxs: {} - core_rxs: {} - beh: {} - envs: {}, dxs: {}: \n{}".format(gi,len(gl.cys),gl.motion,len(gl.memb_rxs),len(gl.core_rxs),beh,envs,gt_res[0],dxs))
             # if timed out, just print best 25
             if ask:
                 # optinal data check
@@ -151,7 +154,7 @@ class Evol:
                 print("\n{}\n".format(message))
                 message = None
             # menu options
-            print("\n[p]db={}, [a]nim={}, [s]ave={}, [o]utput={}, [r]ange={}:{}".format(pdb_check,anim,save,out,ni,nx))
+            print("\n[p]db={}, [a]nim={}: [d]ash={}, [s]ave={}, [r]ange={}:{}".format(pdb_check,anim,dash,save,ni,nx))
             n_gl = input("\ngl index or \'q\' to quit: _ ")
             if n_gl=="q" or n_gl=="quit":
                 return
@@ -166,38 +169,41 @@ class Evol:
                 pdb_check = True if pdb_check==False else False
             elif n_gl=="a":
                 anim = True if anim==False else False
+            elif n_gl=="d":
+                new_dash = input("\nnew dash? _ ")
+                try:
+                    if int(new_dash)>0 and int(new_dash)<128:
+                        dash = int(new_dash)
+                    else:
+                        glx_message = "dash needs to be between 1:127"
+                except:
+                    glx_message = "invalid dash input"
             elif n_gl=="s":
                 save = True if save==False else False
-            elif n_gl=="o":
-                out = True if out==False else False
             else:
                 try:
                     if self.mode=="dashes":
                         glx = self.glxs[int(n_gl)]
                     elif self.mode=="behavior":
                         glx,results = self.glxs[int(n_gl)]
-                    if pdb_check:
-                        print("\nresults = {}\n".format(results))
-                        import pdb; pdb.set_trace()
-                    if anim==True or save==True:
-                        import nu_animation
-                        if self.mode=="dashes":
-                            nu_animation.glx_anim(glx,self.trial.world,show=anim,save=save)
-                        elif self.mode=="behavior":
-                            nu_animation.glx_anim(glx,self.trial.world,basic=True,show=anim,save=save)
-                            gt_anim = Genotype()
-                            for fi,fx in enumerate(glx.exgt):
-                                fx = tuple([int(i) for i in np.binary_repr(fx,3)])
-                                gt_anim.exgt[fi] = fx
-                            self.trial.dashes(gt_anim,dash=127,anim=True)
-                            self.trial.full(gt_anim,anim=True)
-                    if out:
-                        if self.mode=="dashes":
-                            self.save_single(glx,n_gen,dash,int(n_gl)+1)
-                        elif self.mode=="behavior":
-                            self.save_single(glx)
                 except:
                     message = "invalid input"
+                if pdb_check:
+                    print("\nresults = {}\n".format(results))
+                    import pdb; pdb.set_trace()
+                if anim:
+                    if self.mode=="dashes":
+                        nu_animation.glx_anim(glx,self.trial.world,show=anim,save=save)
+                    elif self.mode=="behavior":
+                        # new trial so to avoid changing current one
+                        glx_trial_anim = Trial()
+                        glx_trial_anim.behavior(glx,single_dash=dash,anim=anim)
+                        glx_trial_anim.full(glx,anim=anim)
+                if save:
+                    if self.mode=="dashes":
+                        self.save_single(glx,n_gen,dash,int(n_gl)+1)
+                    elif self.mode=="behavior":
+                        self.save_single(glx)
 
     '''create folder for saving data'''
     def make_fdir(self):

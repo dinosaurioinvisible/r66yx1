@@ -26,7 +26,7 @@ class Glider:
         self.membrane = None
         self.eos = None
         self.ems = None
-        self.om = None
+        self.ox = None
         self.i,self.j = x0,y0
         self.erxs = {}
         # elements rel locs and init orientations
@@ -174,18 +174,18 @@ class Glider:
         dx = self.ems[1]-self.ems[3]
         dy = self.ems[0]-self.ems[2]
         # om: 0:stay, 1:E, 2:S, 3:W, 4:N
-        om0,xom,self.om = self.om,0,0
+        om0,xom, = self.ox,0,0
         if abs(dx)>abs(dy) and abs(dx)>=self.mt:
             self.j += int(dx/abs(dx))
-            self.om = 1 if int(dx/abs(dx))>0 else 3
+            self.ox = 1 if int(dx/abs(dx))>0 else 3
         elif abs(dy)>abs(dx) and abs(dy)>=self.mt:
             self.i += int(-dy/abs(dy))
-            self.om = 4 if int(-dy/abs(dy))>0 else 2
+            self.ox = 4 if int(-dy/abs(dy))>0 else 2
         # xom: (0:stay, -1:left, 1:right, 2:forward, -2:back, 3:start, -3:stop)
-        dom = self.om-om0
-        if om0==self.om==0:
+        dom = self.ox-om0
+        if om0==self.ox==0:
             xom=0
-        elif self.om==0:
+        elif self.ox==0:
             xom=-3
         elif om0==0:
             xom=3
@@ -201,7 +201,7 @@ class Glider:
             import pdb; pdb.set_trace()
             raise Exception("motion change error")
         self.loc.append([self.i,self.j])
-        self.dxom.append([om0,xom,self.om])
+        self.dxom.append([om0,xom,self.ox])
 
     '''data for visualization and analysis'''
     def gl_data(self,gl_domain):
@@ -291,7 +291,7 @@ class Glider:
         self.eos[5] = 1
         self.eos[7] = 2
         # oriented motion (assuming cycle)
-        self.om = int(str(st0)[1])%4
+        self.ox = int(str(st0)[1])%4
         # initial data
         self.states.append(self.st)
         cx = arr2int(cxi)

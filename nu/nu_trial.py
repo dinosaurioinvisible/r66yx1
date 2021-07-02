@@ -1,6 +1,5 @@
 
 import numpy as np
-from copy import deepcopy
 from nu_glider import Glider
 from nu_glider_v2 import BasicGlider
 from nu_genotype import Genotype
@@ -16,65 +15,75 @@ class Trial:
             self.full(gtx,st0,anim=True)
 
     '''try behavior for every dash possible'''
-    def behavior(self,gt,st0=41,anim=False):
-        # initialize world and glider
+    def behavior(self,gt,st0=41,single_dash=0,anim=False):
+        # initialize glider
         x0,y0 = int(self.wsize/2),int(self.wsize/2)
-        gl = BasicGlider(gt,st0)
+        if type(gt)==BasicGlider:
+            gl=gt
+        else:
+            gl = BasicGlider(gt,st0)
         results = np.zeros(128).astype(int)
-        # try behavior for every dash
-        for dx in range(1,128):
-            # set dashed wall, x0,y0 and orientation
+        # for some specific case
+        if single_dash>0:
             gl.set_cfg(st0,x0,y0)
-            self.set_world(st0,x0,y0,mode="dash",dash=dx)
-            # run trial
-            rx=4
+            self.set_world(st0,x0,y0,mode="dash",dash=single_dash)
             tlim=0
             for ti in range(self.tt):
                 gl_domain = self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4].astype(int)
-                # collision
-                if np.sum(gl_domain[1:6,1:6])>0:
-                    rx=0
-                # timed out
-                elif tlim > self.limit:
-                    rx=0
-                # wall avoided (assuming north)
-                elif gl.i < y0-20:
-                    rx=1
-                # came back from wall
-                elif gl.i > y0+10:
-                    rx=2
-                # horizontal movement
-                elif gl.j>x0+15 or gl.j<x0-15:
-                    rx=3
-                else:
-                    gl_domain[1:6,1:6] += gl.st
-                    gl.update(gl_domain)
-                    tlim = 0 if gl.ox > 0 else tlim+1
-                if rx<4:
+                if np.sum(gl_domain[1:6,1:6])>0 or tlim>self.limit:
                     break
-            results[dx] = rx
+                gl_domain[1:6,1:6] += gl.st
+                gl.update(gl_domain)
+                tlim = 0 if gl.ox > 0 else tlim+1
+        else:
+            # try behavior for every dash
+            for dx in range(1,128):
+                # set dashed wall, x0,y0 and orientation
+                gl.set_cfg(st0,x0,y0)
+                self.set_world(st0,x0,y0,mode="dash",dash=dx)
+                # run trial
+                rx=1
+                tlim=0
+                for ti in range(self.tt):
+                    gl_domain = self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4].astype(int)
+                    # collision
+                    if np.sum(gl_domain[1:6,1:6])>0 or tlim>self.limit:
+                        rx=0
+                        break
+                    # arrived to bounds
+                    if not 5<gl.i<self.wsize-5 or not 5<gl.j<self.wsize-5:
+                        rx=2
+                        break
+                    # update
+                    else:
+                        gl_domain[1:6,1:6] += gl.st
+                        gl.update(gl_domain)
+                        tlim = 0 if gl.ox > 0 else tlim+1
+                results[dx] = rx
         results[0] = np.sum(np.where(results>0,1,0))
-        # results = np.append(results,gl.cys)
         if anim:
             glx_anim(gl,self.world,basic=True)
         return [gl,results]
 
     '''randomly fully filled world'''
-    def full(self,gtx,st0=41,anim=False):
+    def full(self,gt,st0=41,anim=False):
         # initialize world and glider
         x0,y0=int(self.wsize/2),int(self.wsize/2)
         self.set_world(st0,x0,y0,mode="full")
-        gl = Glider(gtx,st0,x0,y0)
+        if type(gt)==BasicGlider:
+            gl=gt
+            gl.set_cfg(st0,x0,y0)
+            basic=True
+        else:
+            gl=Glider(gt,st0,x0,y0)
+            basic=False
         # run trial
         tlim=0
         for ti in range(self.tt):
             # get world domain
-            gl_domain = deepcopy(self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4])
-            # if all core elements are off, it dies
-            if np.sum(gl.core)==0:
-                break
+            gl_domain = self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4].astype(int)
             # if world object within glider domain (collision), it dies
-            elif np.sum(gl_domain[1:6,1:6]):
+            if np.sum(gl_domain[1:6,1:6]):
                 break
             # if gl doesn't move in time limit, it dies
             elif tlim > self.limit:
@@ -83,9 +92,9 @@ class Trial:
                 # allocate and update glider
                 gl_domain[1:6,1:6] += gl.st
                 gl.update(gl_domain)
-                tlim = 0 if gl.om > 0 else tlim+1
+                tlim = 0 if gl.ox > 0 else tlim+1
         if anim:
-            glx_anim(gl,self.world)
+            glx_anim(gl,self.world,basic=basic)
         return gl
 
     '''default trial: st41=NE, single glider, dashed wall world'''
@@ -98,7 +107,7 @@ class Trial:
         tlim=0
         for ti in range(self.tt):
             # get world domain
-            gl_domain = deepcopy(self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4])
+            gl_domain = self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4].astype(int)
             # if all core elements are off, it dies
             if np.sum(gl.core)==0:
                 if anim:
@@ -122,7 +131,7 @@ class Trial:
                 gl_domain[1:6,1:6] += gl.st
                 gl.update(gl_domain)
                 tlim += 1
-                if gl.om > 0:
+                if gl.ox > 0:
                     tlim=0
         # end and return
         gl.gl_loops()
