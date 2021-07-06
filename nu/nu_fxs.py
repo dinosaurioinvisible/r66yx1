@@ -61,16 +61,25 @@ def ext2int(ma):
     mx = int(''.join(np.flip(me).astype(str)),2)
     return mx
 
+'''core st -> visual based int,int (for plotting)'''
+def core2core(cx):
+    pass
+
 '''change in oriented motion'''
 # TODO
 
 '''convert from full int to aprox. int'''
-def reduce(arr):
-    mi = [int(i) for i in np.binary_repr(arr,16)]
-    mi.insert(0,mi[-1])
+def reduce(arr,bin_pos=16):
+    mi = [int(i) for i in np.binary_repr(arr,bin_pos)]
+    # insert last elements for first corner wall
+    for xe in range(int(bin_pos/8)-1):
+        mi.insert(0+xe,mi[-1-xe])
     msi = []
+    # size of wall part
+    psize = int(bin_pos/8)+1
+    pstep = int(bin_pos/8)
     for i in range(8):
-        si = np.sum(mi[i*2:(i*2)+3])
+        si = np.sum(mi[i*pstep:(i*pstep)+psize])
         msi.append(si)
     msi = np.asarray(np.flip(msi))
     msi = np.where(msi>0,1,0)

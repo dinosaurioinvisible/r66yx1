@@ -132,7 +132,7 @@ class Evol:
                 for gi,[gl,gt_res] in enumerate(self.glxs[ni:nx]):
                     dxs = [di+1 for di,dx in enumerate(gt_res[1:]) if dx>0]
                     beh = [np.sum(np.where(gt_res[1:-1]==0,1,0)),np.sum(np.where(gt_res[1:-1]==1,1,0)),np.sum(np.where(gt_res[1:-1]==2,1,0))]
-                    envs = sum([len(i[1]) for i in gl.env_rxs.items()])
+                    envs = sum([len(set(i[1])) for i in gl.env_rxs.items()])
                     print("{} - cys: {} - motion: {} - memb_rxs: {} - core_rxs: {} - beh: {} - envs: {}, dxs: {}: \n{}".format(gi,len(gl.cys),gl.motion,len(gl.memb_rxs),len(gl.core_rxs),beh,envs,gt_res[0],dxs))
             # if timed out, just print best 25
             if ask:

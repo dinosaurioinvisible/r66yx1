@@ -1,10 +1,10 @@
 
 import numpy as np
-from copy import deepcopy
+# from copy import deepcopy
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+# import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
-import plotly.graph_objects as go
+# import plotly.graph_objects as go
 import networkx as nx
 from nu_fxs import reduce
 
@@ -15,18 +15,18 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
     # trial
     ax11 = fig.add_subplot(2,4,1)   # glider (anim)
     ax12 = fig.add_subplot(2,4,2)   # glider zoom (anim)
-    ax13 = fig.add_subplot(2,4,3)   # glider trajectory
+    ax13 = fig.add_subplot(2,4,3)   # glider trajectory (anim)
     ax14 = fig.add_subplot(2,4,4)   # cx,mx in states domain
-    # genotype
-    ax21 = fig.add_subplot(2,4,5)   # exgt as ein,erx array
-    ax22 = fig.add_subplot(2,4,6)   #
-    ax23 = fig.add_subplot(2,4,7)   # txs(dx) as trajectories
+    # genotype/history
+    ax21 = fig.add_subplot(2,4,5)   # scatter gt
+    ax22 = fig.add_subplot(2,4,6)   # env -> memb
+    ax23 = fig.add_subplot(2,4,7)   # txs(dx) as trajectories/ env -> motion
     ax24 = fig.add_subplot(2,4,8)   # txs cx,mx in state domain
 
     tt = len(glx.states)
     if basic:
-        envs = sum([len(i[1]) for i in glx.env_rxs.items()])
-        fname = "basic glx, cys={}, motion={}, memb_rxs={}, core_rxs={}, envs={}".format(len(glx.cys),glx.motion,len(glx.memb_rxs),len(glx.core_rxs),envs)
+        envs = sum([len(set(i[1])) for i in glx.env_rxs.items()])
+        fname = "basic glx, cys={}, motion={}, memb_rxs={}, core_rxs={}, envs={}".format(len(glx.cys),list(glx.motion),len(glx.memb_rxs),len(glx.core_rxs),envs)
     else:
         fname = "glx, known dashes={}, transients={}, gt size={}".format(len(glx.dxs),len(glx.txs),len(glx.exgt))
     fig.suptitle("{}".format(fname),ha="center",va="center")
@@ -46,10 +46,20 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
     glx_xy = plt.Circle((x0,y0), radius=0.25, fill=True, color="green")
     ax13.add_patch(glx_xy)
 
-    # ax14: cx,mx states; ax24: cx,mx gt states
-    ax14.title.set_text("cx,mx states")
-    ax24.title.set_text("gt: cx,mx states")
-    if not basic:
+    # ax14: cx states
+    if basic:
+        ax14.title.set_text("core states")
+        cxy,colors,sizes = [],[],[]
+        for cx,c0mx_cnt in glx.core_rxs.items():
+            for [c0,mx],cnt in c0mx_cnt.items():
+                cxy.append([cx,])
+                color = "red" if mx>0 else "blue"
+                colors.append(color)
+                sizes.append(cnt)
+    else:
+        # ax14: cx,mx states; ax24: cx,mx gt states
+        ax14.title.set_text("cx,mx states")
+        ax24.title.set_text("gt: cx,mx states")
         gx1 = nx.DiGraph()
         gx2 = nx.DiGraph()
         # cycles locations
@@ -105,7 +115,7 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
         colors2 = [gx2[u][v]['color'] for u,v in gx2.edges]
         nx.draw(gx2,pos2,ax=ax24,node_size=10,alpha=0.2,with_labels=False,edge_color=colors2)
 
-    # ax21: gt as array
+    # ax21: gt input/gt responses
     ax21.title.set_text("genotype")
     xy = []
     if basic:
@@ -118,11 +128,37 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
     xs,ys = zip(*xy)
     ax21.scatter(xs,ys)
 
-    # ax22
-    ax22.title.set_text("gt: ")
+    # ax22: env/membrane
+    if basic:
+        ax22.title.set_text("env -> memb")
+        ax22.set_xlim([-10,266])
+        ax22.set_ylim([-10,266])
+        mxy = []
+        for mx,envx in glx.memb_rxs.items():
+            for envi in envx:
+                rei = reduce(envi,bin_pos=24)
+                rmx = reduce(mx,bin_pos=16)
+                mxy.append([rmx,rei])
+        mx,my = zip(*mxy)
+        colors = np.random.rand(len(mxy))
+        ax22.scatter(mx,my,c=colors,alpha=0.5)
 
-    # ax23: txs as trajectories
-    if not basic:
+    # ax23
+    if basic:
+        # ax23: env/reaction
+        ax23.title.set_text("env -> motion")
+        # ax23.set_xlim([-0.5,4.5])
+        ax23.set_ylim([-10,266])
+        oxy = []
+        for ox,envx in glx.env_rxs.items():
+            for envi in envx:
+                rei = reduce(envi,bin_pos=24)
+                oxy.append([ox,rei])
+        xo,xy = zip(*oxy)
+        colors = np.random.rand(len(oxy))
+        ax23.scatter(xo,xy,c=colors,alpha=0.5)
+    else:
+        # ax23: txs as trajectories
         ax23.title.set_text("gt: txs trajectories")
         for tk in glx.txs.keys():
             transients = glx.txs[tk]

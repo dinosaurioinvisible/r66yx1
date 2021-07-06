@@ -66,7 +66,7 @@ class BasicGlider:
             self.ox = 1 if int(dx/abs(dx))>0 else 3
         elif abs(dy)>abs(dx) and abs(dy)>=self.mt:
             self.i += int(-dy/abs(dy))
-            self.ox = 4 if int(-dy/abs(dy)) else 2
+            self.ox = 4 if int(-dy/abs(dy))>0 else 2
         self.loc.append([self.i,self.j])
         self.motion[self.ox] += 1
         # responses

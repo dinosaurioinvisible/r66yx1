@@ -75,7 +75,7 @@ def load(fdir="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=Fals
                     dxs = [di+1 for di,dx in enumerate(gt_res[1:]) if dx>0]
                     beh = [np.sum(np.where(gt_res[1:-1]==1,1,0)),np.sum(np.where(gt_res[1:-1]==2,1,0)),np.sum(np.where(gt_res[1:-1]==3,1,0)),np.sum(np.where(gt_res[1:-1]==4,1,0))]
                     print("\n{} = cys={}, memb_rxs={}, core_rxs={}, beh={}, dxs={}: \n{}".format(gi,len(gl.cys),len(gl.memb_rxs),len(gl.core_rxs),beh,gt_res[0],dxs))
-            print("\n[p]db={}, [a]nim={}: [d]ash={}, [n]etplot={}, [all], [q]uit".format(pdb_check,anim,dash,netplot))
+            print("\n[p]db={}, [a]nim={}: [d]ash={}, [n]etplot={}, [all], [b]ack, [q]uit".format(pdb_check,anim,dash,netplot))
             if glx_message:
                 print("\n{}".format(glx_message))
             if auto:
@@ -114,7 +114,7 @@ def load(fdir="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=Fals
                 if pdb_check:
                     print("\n\nglx pdb:\n")
                     import pdb; pdb.set_trace()
-                if anim::
+                if anim:
                     glx_trial = Trial()
                     glx_trial.behavior(glx,single_dash=dash,anim=anim)
                     glx_trial.full(glx,anim=anim)
@@ -124,7 +124,7 @@ def load(fdir="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=Fals
                     pass
             auto = False
 
-load("behavior",auto=False)
+load("glxs_mode=behavior_run=002",pdb_check=False,anim=True,auto=True)
 
 
 
