@@ -61,12 +61,16 @@ def ext2int(ma):
     mx = int(''.join(np.flip(me).astype(str)),2)
     return mx
 
-'''core st -> visual based int,int (for plotting)'''
+'''core st -> loosely visually based int,int (for plotting)'''
 def core2core(cx):
-    pass
-
-'''change in oriented motion'''
-# TODO
+    ax = np.asarray([int(i) for i in np.binary_repr(cx,9)])
+    # x: higher -> E, lower -> W
+    x = [ax[2],ax[5],ax[8],ax[4],ax[0],ax[3],ax[6]]
+    xi = arr2int(np.asarray(x))
+    # y: higher -> N, lower -> S
+    y = [ax[0],ax[1],ax[2],ax[4],ax[6],ax[7],ax[8]]
+    yi = arr2int(np.asarray(y))
+    return xi,yi
 
 '''convert from full int to aprox. int'''
 def reduce(arr,bin_pos=16):

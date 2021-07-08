@@ -41,6 +41,40 @@ def ext2int(ma):
     wx_int = arr2int(wx)
     return wx_int
 
+    else:
+        # ax23: txs as trajectories
+        ax23.title.set_text("gt: txs trajectories")
+        for tk in glx.txs.keys():
+            transients = glx.txs[tk]
+            for transient in transients:
+                x,y = 50,50
+                xs = [x]
+                ys = [y]
+                om0 = transient[0][3]
+                if om0==1:
+                    x += 1
+                elif om0==2:
+                    y -= 1
+                elif om0==3:
+                    x -= 1
+                elif om0==4:
+                    y += 1
+                xs.append(x)
+                ys.append(y)
+                for sti in transient[:-1]:
+                    om = sti[5]
+                    if om==1:
+                        x += 1
+                    elif om==2:
+                        y -= 1
+                    elif om==3:
+                        x -= 1
+                    elif om==4:
+                        y += 1
+                    xs.append(x)
+                    ys.append(y)
+            ax23.plot(xs,ys)
+
 class Element:
     def __init__(self,gt,o0,s0):
         # genotype

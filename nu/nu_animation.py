@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 # import plotly.graph_objects as go
 import networkx as nx
-from nu_fxs import reduce
+from nu_fxs import *
 
 def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
 
@@ -48,14 +48,9 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
 
     # ax14: cx states
     if basic:
-        ax14.title.set_text("core states")
-        cxy,colors,sizes = [],[],[]
-        for cx,c0mx_cnt in glx.core_rxs.items():
-            for [c0,mx],cnt in c0mx_cnt.items():
-                cxy.append([cx,])
-                color = "red" if mx>0 else "blue"
-                colors.append(color)
-                sizes.append(cnt)
+        ax14.title.set_text("core transitions: heatmap")
+
+
     else:
         # ax14: cx,mx states; ax24: cx,mx gt states
         ax14.title.set_text("cx,mx states")
@@ -130,7 +125,8 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
 
     # ax22: env/membrane
     if basic:
-        ax22.title.set_text("env -> memb")
+        n_env = sum([len(ei) for mi,ei in glx.memb_rxs.items()])
+        ax22.title.set_text("env ({}) -> memb ({})".format(n_env,len(glx.memb_rxs)))
         ax22.set_xlim([-10,266])
         ax22.set_ylim([-10,266])
         mxy = []
@@ -157,39 +153,41 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
         xo,xy = zip(*oxy)
         colors = np.random.rand(len(oxy))
         ax23.scatter(xo,xy,c=colors,alpha=0.5)
-    else:
-        # ax23: txs as trajectories
-        ax23.title.set_text("gt: txs trajectories")
-        for tk in glx.txs.keys():
-            transients = glx.txs[tk]
-            for transient in transients:
-                x,y = 50,50
-                xs = [x]
-                ys = [y]
-                om0 = transient[0][3]
-                if om0==1:
-                    x += 1
-                elif om0==2:
-                    y -= 1
-                elif om0==3:
-                    x -= 1
-                elif om0==4:
-                    y += 1
-                xs.append(x)
-                ys.append(y)
-                for sti in transient[:-1]:
-                    om = sti[5]
-                    if om==1:
-                        x += 1
-                    elif om==2:
-                        y -= 1
-                    elif om==3:
-                        x -= 1
-                    elif om==4:
-                        y += 1
-                    xs.append(x)
-                    ys.append(y)
-            ax23.plot(xs,ys)
+
+    # ax24 core -> core
+    ax24.title.set_text("core transitions: graph")
+    ax24.set_xlim([-5,515])
+    ax24.set_ylim([-5,515])
+    gx = nx.DiGraph()
+    # cycles
+    for c0st,cst in glx.cycles.items():
+        cx0 = c0st[0]
+        cx = cst[0]
+        gx.add_node(cx,pos=(cx,cx0))
+    for c0st,cst in glx.cycles.items():
+        cx0 = c0st[0]
+        cx = cst[0]
+        gx.add_edge(cx0,cx,color="black")
+    # core states
+    for cx,cx0mx in glx.core_rxs.items():
+        for cimi,nt in cx0mx.items():
+            cx0,mx = cimi
+            if cx not in gx.nodes:
+                gx.add_node(cx,pos=(cx,cx0))
+    # relevant edges
+    for cx,cx0mx in glx.core_rxs.items():
+        for cimi,nt in cx0mx.items():
+            cx0,mx = cimi
+            if cx0 not in gx.nodes:
+                gx.add_node(cx0,pos=(cx0,0))
+            if (cx0,cx) not in gx.edges and nt>40:
+                col = "lightblue" if nt<128 else "red"
+                gx.add_edge(cx0,cx,color=col)
+    pos = nx.get_node_attributes(gx,"pos")
+    colors = [gx[u][v]["color"] for u,v in gx.edges]
+    # weights = [gx[u][v]["weight"] for u,v in gx.edges]
+    # import pdb; pdb.set_trace()
+    nx.draw(gx,pos,ax=ax24,node_size=0.5,node_color="black",alpha=0.2,with_labels=False,edge_color=colors,width=2,edge_cmap=plt.cm.Blues)
 
     # to pause the animation and check data
     anim_running = True

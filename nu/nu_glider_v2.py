@@ -31,6 +31,7 @@ class BasicGlider:
     def update(self,gl_domain):
         # membrane
         membrane = np.zeros((7,7)).astype(int)
+        # reacts to any active external element
         memb_domain = gl_domain.astype(int)
         memb_domain[1:6,1:6] = 0
         for [i,j] in self.me_ij:
