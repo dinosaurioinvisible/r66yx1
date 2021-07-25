@@ -8,7 +8,7 @@ import matplotlib.animation as animation
 import networkx as nx
 from nu_fxs import *
 
-def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
+def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=0):
 
     # fig and subplots: nrows, ncols, index
     fig = plt.figure(figsize=(16,8))
@@ -20,22 +20,32 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
     # genotype/history
     ax21 = fig.add_subplot(2,4,5)   # scatter gt
     ax22 = fig.add_subplot(2,4,6)   # env -> memb
-    ax23 = fig.add_subplot(2,4,7)   # txs(dx) as trajectories/ env -> motion
+    ax23 = fig.add_subplot(2,4,7)   # (if analysis) all trajectories
     ax24 = fig.add_subplot(2,4,8)   # txs cx,mx in state domain
 
     tt = len(glx.states)
-    if basic:
-        envs = sum([len(set(i[1])) for i in glx.env_rxs.items()])
-        fname = "basic glx, cys={}, motion={}, memb_rxs={}, core_rxs={}, envs={}".format(len(glx.cys),list(glx.motion),len(glx.memb_rxs),len(glx.core_rxs),envs)
-    else:
-        fname = "glx, known dashes={}, transients={}, gt size={}".format(len(glx.dxs),len(glx.txs),len(glx.exgt))
+    envs = sum([len(set(i[1])) for i in glx.env_rxs.items()])
+    fname = "basic glx, cys={}, motion={}, memb_rxs={}, core_rxs={}, envs={}".format(len(glx.cys),list(glx.motion),len(glx.memb_rxs),len(glx.core_rxs),envs)
     fig.suptitle("{}".format(fname),ha="center",va="center")
     time = fig.text(0.5,0.95,"",ha="center",va="center")
+    # glider animation
     ax11.title.set_text("glider")
     ax12.title.set_text("zoom")
 
+    # ax21: genotype: input/gt responses
+    ax21.title.set_text("genotype")
+    xy = []
+    xy = [[ri,rx] for ri,rx in enumerate(glx.exgt)]
+    xs,ys = zip(*xy)
+    ax21.scatter(xs,ys,s=1)
+
     # ax13: trajectory
-    ax13.title.set_text("trajectory")
+    if dash:
+        ax13.title.set_text("trajectory for dash = {}".format(dash))
+    elif len(trajectories)>1:
+        ax13.title.set_text("trajectory for dash = {}".format(127))
+    else:
+        ax13.title.set_text("trajectory")
     glx_y = [100-l[0] for l in glx.loc]
     glx_x = [l[1] for l in glx.loc]
     y0,x0 = glx.loc[0]
@@ -46,77 +56,48 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
     glx_xy = plt.Circle((x0,y0), radius=0.25, fill=True, color="green")
     ax13.add_patch(glx_xy)
 
+    # ax23: all trajectories
+    ax23.title.set_text("heatmap of trajectories")
+    if len(trajectories)>1:
+        ax23.set_xlim(0,100)
+        ax23.set_ylim(0,100)
+        xs,ys = [],[]
+        for trajectory in trajectories:
+            xs.extend([ti[1] for ti in trajectory])
+            ys.extend([100-ti[0] for ti in trajectory])
+        ax23.hist2d(xs,ys,cmap='plasma')
+
     # ax14: cx states
-    ax14.title.set_text("core transitions")
-    # hmap = np.zeros((512,512)).astype(int)
+    ax14.title.set_text("core transitions: recurrences")
     sxy = []
     sizes = []
     colors = []
-    # i:cx0, j:cx
     for cx,cx0mx in glx.core_rxs.items():
         for cimi,nt in cx0mx.items():
             cx0,mx = cimi
             sxy.append([cx,cx0])
             sizes.append(nt)
+            #print("{}: {},{} = {}".format(cx,cx0,mx,nt))
             if (cx,0,0) in glx.cycles.keys():
-                color = "black"
-            elif nt>100:
-                color = "red"
-            elif nt>40:
+                #print("cycle")
                 color = "orange"
+            elif nt>100:
+                #print("{}: {}".format("red",nt))
+                color = "red"
             elif mx>0:
+                #print("{}: {}".format("green",nt))
                 color = "green"
-            else:
+            elif nt>82:
+                #print("{}: {}".format("blue",nt))
                 color = "blue"
+            else:
+                #print("low")
+                color = "grey"
             colors.append(color)
             #hmap[cx0][cx] += nt
     sx,sy = zip(*sxy)
     #ax14.imshow(hmap,cmap="hot",vmin=0,vmax=1,aspect="auto")
     ax14.scatter(sx,sy,c=colors,s=sizes,alpha=0.5)
-
-    # ax21: gt input/gt responses
-    ax21.title.set_text("genotype")
-    xy = []
-    if basic:
-        xy = [[ri,rx] for ri,rx in enumerate(glx.exgt)]
-    else:
-        for gk in glx.exgt.keys():
-            gv = int(''.join(str(i) for i in glx.exgt[gk]),2)
-            xy.append([gk,gv])
-        xy = sorted(xy)
-    xs,ys = zip(*xy)
-    ax21.scatter(xs,ys)
-
-    # ax22: env/membrane
-    if basic:
-        n_env = sum([len(ei) for mi,ei in glx.memb_rxs.items()])
-        ax22.title.set_text("env ({}) -> memb ({})".format(n_env,len(glx.memb_rxs)))
-        ax22.set_xlim([-10,266])
-        ax22.set_ylim([-10,266])
-        mxy = []
-        for mx,envx in glx.memb_rxs.items():
-            for envi in envx:
-                rei = reduce(envi,bin_pos=24)
-                rmx = reduce(mx,bin_pos=16)
-                mxy.append([rmx,rei])
-        mx,my = zip(*mxy)
-        colors = np.random.rand(len(mxy))
-        ax22.scatter(mx,my,c=colors,alpha=0.5)
-
-    # ax23
-    if basic:
-        # ax23: env/reaction
-        ax23.title.set_text("env -> motion")
-        # ax23.set_xlim([-0.5,4.5])
-        ax23.set_ylim([-10,266])
-        oxy = []
-        for ox,envx in glx.env_rxs.items():
-            for envi in envx:
-                rei = reduce(envi,bin_pos=24)
-                oxy.append([ox,rei])
-        xo,xy = zip(*oxy)
-        colors = np.random.rand(len(oxy))
-        ax23.scatter(xo,xy,c=colors,alpha=0.5)
 
     # ax24 core -> core
     ax24.title.set_text("core transitions: graph")
@@ -144,13 +125,13 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
             cx0,mx = cimi
             if cx0 not in gx.nodes:
                 gx.add_node(cx0,pos=(cx0,0))
-            if (cx0,cx) not in gx.edges and nt>25:
+            if (cx0,cx) not in gx.edges and nt>66:
                 if nt>100:
                     col = "red"
-                elif nt>50:
-                    col = "orange"
-                else:
+                elif nt>82:
                     col = "blue"
+                else:
+                    col = "skyblue"
                 #col = "lightblue" if nt<100 else "red"
                 gx.add_edge(cx0,cx,color=col)
     pos = nx.get_node_attributes(gx,"pos")
@@ -158,6 +139,35 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
     # weights = [gx[u][v]["weight"] for u,v in gx.edges]
     # import pdb; pdb.set_trace()
     nx.draw(gx,pos,ax=ax24,node_size=0.5,node_color="black",alpha=0.2,with_labels=False,edge_color=colors,width=2,edge_cmap=plt.cm.Blues)
+
+    # ax22: environmental related transitions
+    ax22.title.set_text("env. based transitions")
+    ax22.set_xlim([-5,515])
+    ax22.set_ylim([-5,515])
+    egx = nx.DiGraph()
+    # core states
+    for cx,cx0mx in glx.core_rxs.items():
+        for cimi,nt in cx0mx.items():
+            cx0,mx = cimi
+            if cx not in egx.nodes and mx>0:
+                egx.add_node(cx,pos=(cx,cx0))
+    # relevant edges
+    for cx,cx0mx in glx.core_rxs.items():
+        for cimi,nt in cx0mx.items():
+            cx0,mx = cimi
+            if cx0 not in egx.nodes and mx>0:
+                egx.add_node(cx0,pos=(cx0,0))
+            if (cx0,cx) not in egx.edges and mx>0 and nt>10:
+                if nt>82:
+                    col = "red"
+                elif nt>40:
+                    col = "blue"
+                else:
+                    col = "grey"
+                egx.add_edge(cx0,cx,color=col)
+    pos = nx.get_node_attributes(egx,"pos")
+    colors = [egx[u][v]["color"] for u,v in egx.edges]
+    nx.draw(egx,pos,ax=ax22,node_size=0.5,node_color="black",alpha=0.2,with_labels=False,edge_color=colors,width=2)
 
     # to pause the animation and check data
     anim_running = True

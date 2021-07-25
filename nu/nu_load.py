@@ -1,10 +1,11 @@
 
 import os
 import pickle
+import random
 from nu_trial import Trial
 from nu_animation import glx_anim
 
-def load(fkey="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=False):
+def load(fkey="glxs",pdb_check=True,anim=True,save=False,random_fill=False,analysis=False,auto=False):
     # select directory
     select_dir=True
     dir_message = None
@@ -18,6 +19,7 @@ def load(fkey="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=Fals
             dir_message=None
         if auto:
             n_dir = -1
+            print("\n --> auto-opened: {}".format(glxs_dirs[n_dir]))
         else:
             n_dir = input("\nworking dir? (key=\"{}\" a:show all, q:quit) _ ".format(fkey))
         if n_dir=="q" or n_dir=="quit":
@@ -48,7 +50,8 @@ def load(fkey="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=Fals
                 print("\n{}".format(file_message))
                 file_message=None
             if auto:
-                nf=41
+                nf=random.randint(0,len(glxs_files)-1)
+                print("\n --> auto-opened: n{}: {}".format(nf,glxs_files[nf]))
             else:
                 nf = input("\n gl file? _ ")
             if nf=="q" or nf=="quit":
@@ -78,12 +81,13 @@ def load(fkey="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=Fals
                         dxs = [di+1 for di,dx in enumerate(gt_res[1:]) if dx>0]
                         beh = [list(gt_res).count(0),list(gt_res).count(1),list(gt_res).count(2)]
                         print("\n{} - cys={}, memb_rxs={}, core_rxs={}, motion={}, beh={}, dxs={}: \n{}".format(gi,len(gl.cys),len(gl.memb_rxs),len(gl.core_rxs),list(gl.motion),beh,gt_res[0],dxs))
-                print("\n[p]db={}, [a]nim={}: [d]ash={}, [n]etplot={}, [all], [b]ack, [q]uit".format(pdb_check,anim,dash,netplot))
+                print("\n[p]db={}, [a]nim={}: [d]ash={}, [r]andom fill={}, [x]analysis={}, [all], [b]ack, [q]uit".format(pdb_check,anim,dash,random_fill,analysis))
                 if glx_message:
                     print("\n{}".format(glx_message))
                     glx_message=None
                 if auto:
-                    ngl=0
+                    ngl=random.randint(0,len(glxs)-1)
+                    print("\n --> auto-opened: n{}".format(ngl))
                 else:
                     ngl = input("\n glx? _ ")
                 if ngl=="a" or ngl=="anim":
@@ -99,8 +103,10 @@ def load(fkey="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=Fals
                         glx_message = "invalid dash input"
                 elif ngl=="p" or ngl=="pdb":
                     pdb_check=True if pdb_check==False else False
-                elif ngl=="n" or ngl=="netplot":
-                    netplot = True if netplot==False else False
+                elif ngl=="r" or ngl=="random":
+                    random_fill = True if random_fill==False else False
+                elif ngl=="x" or ngl=="analysis":
+                    analysis = True if analysis==False else False
                 elif ngl=="all":
                     glxs_show=len(glxs)
                 elif ngl=="b" or ngl=="back":
@@ -120,15 +126,17 @@ def load(fkey="glxs",pdb_check=True,anim=True,save=False,netplot=False,auto=Fals
                         import pdb; pdb.set_trace()
                     if anim:
                         glx_trial = Trial()
-                        glx_trial.behavior(glx,single_dash=dash,anim=anim)
-                        glx_trial.full(glx,anim=anim)
-                    if netplot:
-                        pass
+                        if analysis:
+                            glx_trial.behavior(glx,anim=anim)
+                        else:
+                            glx_trial.behavior(glx,dash=dash,anim=anim)
+                        if random_fill:
+                            glx_trial.random_fill(glx,anim=anim)
                     if save:
                         pass
                 auto = False
 
-load("glxs",pdb_check=False,anim=True,auto=True)
+load("glxs",pdb_check=False,anim=True,analysis=False,auto=True)
 
 
 

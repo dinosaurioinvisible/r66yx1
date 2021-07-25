@@ -13,7 +13,7 @@ import pickle
 #TODO: 1 not-useful inner layer
 
 class Evol:
-    def __init__(self,mode="dashes",t=100,wsize=100,gens=100,popsize=250,offs=3,fkey="glx"):
+    def __init__(self,mode="behavior",t=100,wsize=100,gens=100,popsize=250,offs=3,fkey="glx"):
         self.gens = gens
         self.popsize = popsize
         self.offs = offs
@@ -60,60 +60,7 @@ class Evol:
             if len(self.glxs)>0:
                 self.save_data()
 
-    '''first step: survive different patterns'''
-    def evolve_dashes(self):
-        # generations
-        for n_gen in range(self.gens):
-            print("\n\ngeneration {}".format(n_gen))
-            # env dashes
-            for dash in range(1,128):
-                # gts
-                print("\n")
-                self.glxs = []
-                dead_by = [0,0,0,0]
-                survived = defaultdict(int)
-                # to avoid overpopulation
-                self.mode = "dashes"
-                if len(self.genotypes) > self.popsize:
-                    self.mode = "full"
-                    backup = deepcopy(self.genotypes[:int(self.popsize/10)])
-                # trials
-                for gi,gt in enumerate(self.genotypes):
-                    # start with north dashes so dash values are (0:127)
-                    gl = self.trial.dashes(gt,st0=41,dash=dash)
-                    if type(gl)==int:
-                        dead_by[gl] += 1
-                    elif len(gl.txs)==0:
-                        dead_by[3] += 1
-                    else:
-                        self.glxs.append(gl)
-                        survived[(gl.cx_mode,gl.mx_mode)] += 1
-                    print("gen={}, mode={}, dash={}/127, gl={}/{}, off={},cols={},tlim={},disc={} saved={} type={} {}".format(n_gen,self.mode,dash,gi+1,len(self.genotypes),dead_by[0],dead_by[1],dead_by[2],dead_by[3],len(self.glxs),survived,""*11),end='\r')
-                # results, data check and optional visualization
-                self.glxs = sorted(self.glxs,key=lambda x:len(x.txs),reverse=True)
-                self.check_data(n_gen,dash)
-                # in case full mode was too much
-                if self.mode=="full" and len(self.glxs) < self.popsize/10:
-                    print("\n\nbackup used, current genotypes={}".format(len(self.glxs)))
-                    self.genotypes = backup
-                else:
-                    self.genotypes = []
-                # reset and refill pop
-                for gi,gl in enumerate(self.glxs):
-                    for _ in range(self.offs):
-                        gt = Genotype(glx=gl)
-                        self.genotypes.append(gt)
-                while len(self.genotypes) < self.popsize:
-                    gt = Genotype()
-                    self.genotypes.append(gt)
-                # save (every 16 dashes)
-                if dash%16==0:
-                    self.glxs = self.glxs[:int(self.popsize/100)]
-                    self.save_data(n_gen,dash)
-            # generation end
-            self.glxs = self.glxs[:int(self.popsize/100)]
-            self.save_data(n_gen)
-
+    '''results and optional checking'''
     def check_data(self,n_gen=None,dash=None):
         # menu
         ask,check = True,False
@@ -197,8 +144,8 @@ class Evol:
                     elif self.mode=="behavior":
                         # new trial so to avoid changing current one
                         glx_trial_anim = Trial()
-                        glx_trial_anim.behavior(glx,single_dash=dash,anim=anim)
-                        glx_trial_anim.full(glx,anim=anim)
+                        glx_trial_anim.behavior(glx,dash=dash,anim=anim)
+                        glx_trial_anim.random_fill(glx,anim=anim)
                 if save:
                     if self.mode=="dashes":
                         self.save_single(glx,n_gen,dash,int(n_gl)+1)

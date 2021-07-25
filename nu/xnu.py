@@ -1,5 +1,131 @@
 
 
+    # ax22: env/membrane
+    n_env = sum([len(ei) for mi,ei in glx.memb_rxs.items()])
+    ax22.title.set_text("env ({}) -> memb ({})".format(n_env,len(glx.memb_rxs)))
+    ax22.set_xlim([-10,266])
+    ax22.set_ylim([-10,266])
+    mxy = []
+    for mx,envx in glx.memb_rxs.items():
+        for envi in envx:
+            rei = reduce(envi,bin_pos=24)
+            rmx = reduce(mx,bin_pos=16)
+            mxy.append([rmx,rei])
+    mx,my = zip(*mxy)
+    colors = np.random.rand(len(mxy))
+    ax22.scatter(mx,my,c=colors,alpha=0.5)
+
+    '''default trial: st41=NE, single glider, dashed wall world'''
+    def single_dash(self,gtx,st0=41,dash=0,anim=False):
+        # initialize world and glider
+        x0,y0=int(self.wsize/2),int(self.wsize/2)
+        self.set_world(st0,x0,y0,mode="single_dash",dash=dash)
+        gl = Glider(gtx,st0,x0,y0)
+        # run trial
+        tlim=0
+        for ti in range(self.tt):
+            # get world domain
+            gl_domain = self.world[gl.i-3:gl.i+4,gl.j-3:gl.j+4].astype(int)
+            # if all core elements are off, it dies
+            if np.sum(gl.core)==0:
+                if anim:
+                    glx_anim(gl,self.world)
+                return 0
+            # if world object within glider domain (collision), it dies
+            elif np.sum(gl_domain[1:6,1:6]):
+                if anim:
+                    glx_anim(gl,self.world)
+                return 1
+            # if gl doesn't move in time limit, it dies
+            elif tlim > self.limit:
+                if anim:
+                    glx_anim(gl,self.world)
+                return 2
+            # stop before encounters bounding walls (just in case)
+            elif min(gl.i,gl.j)<10 or max(gl.i,gl.j)>self.wsize-10:
+                break
+            else:
+                # allocate and update glider
+                gl_domain[1:6,1:6] += gl.st
+                gl.update(gl_domain)
+                tlim += 1
+                if gl.ox > 0:
+                    tlim=0
+        # end and return
+        gl.gl_loops()
+        if anim:
+            glx_anim(gl,self.world)
+        return gl
+
+    '''first step: survive different patterns'''
+    def evolve_dashes(self):
+        # generations
+        for n_gen in range(self.gens):
+            print("\n\ngeneration {}".format(n_gen))
+            # env dashes
+            for dash in range(1,128):
+                # gts
+                print("\n")
+                self.glxs = []
+                dead_by = [0,0,0,0]
+                survived = defaultdict(int)
+                # to avoid overpopulation
+                self.mode = "dashes"
+                if len(self.genotypes) > self.popsize:
+                    self.mode = "full"
+                    backup = deepcopy(self.genotypes[:int(self.popsize/10)])
+                # trials
+                for gi,gt in enumerate(self.genotypes):
+                    # start with north dashes so dash values are (0:127)
+                    gl = self.trial.dashes(gt,st0=41,dash=dash)
+                    if type(gl)==int:
+                        dead_by[gl] += 1
+                    elif len(gl.txs)==0:
+                        dead_by[3] += 1
+                    else:
+                        self.glxs.append(gl)
+                        survived[(gl.cx_mode,gl.mx_mode)] += 1
+                    print("gen={}, mode={}, dash={}/127, gl={}/{}, off={},cols={},tlim={},disc={} saved={} type={} {}".format(n_gen,self.mode,dash,gi+1,len(self.genotypes),dead_by[0],dead_by[1],dead_by[2],dead_by[3],len(self.glxs),survived,""*11),end='\r')
+                # results, data check and optional visualization
+                self.glxs = sorted(self.glxs,key=lambda x:len(x.txs),reverse=True)
+                self.check_data(n_gen,dash)
+                # in case full mode was too much
+                if self.mode=="full" and len(self.glxs) < self.popsize/10:
+                    print("\n\nbackup used, current genotypes={}".format(len(self.glxs)))
+                    self.genotypes = backup
+                else:
+                    self.genotypes = []
+                # reset and refill pop
+                for gi,gl in enumerate(self.glxs):
+                    for _ in range(self.offs):
+                        gt = Genotype(glx=gl)
+                        self.genotypes.append(gt)
+                while len(self.genotypes) < self.popsize:
+                    gt = Genotype()
+                    self.genotypes.append(gt)
+                # save (every 16 dashes)
+                if dash%16==0:
+                    self.glxs = self.glxs[:int(self.popsize/100)]
+                    self.save_data(n_gen,dash)
+            # generation end
+            self.glxs = self.glxs[:int(self.popsize/100)]
+            self.save_data(n_gen)
+
+
+    # ax23
+    if basic:
+        # ax23: env/reaction
+        ax23.title.set_text("env -> motion")
+        # ax23.set_xlim([-0.5,4.5])
+        ax23.set_ylim([-10,266])
+        oxy = []
+        for ox,envx in glx.env_rxs.items():
+            for envi in envx:
+                rei = reduce(envi,bin_pos=24)
+                oxy.append([ox,rei])
+        xo,xy = zip(*oxy)
+        colors = np.random.rand(len(oxy))
+        ax23.scatter(xo,xy,c=colors,alpha=0.5)
 
 '''convert active membrane/wall pattern to int (clockwise)'''
 def ext2int(ma):
