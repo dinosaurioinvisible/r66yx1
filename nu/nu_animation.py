@@ -11,7 +11,7 @@ from nu_fxs import *
 def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
 
     # fig and subplots: nrows, ncols, index
-    fig = plt.figure(figsize=(16,10))
+    fig = plt.figure(figsize=(16,8))
     # trial
     ax11 = fig.add_subplot(2,4,1)   # glider (anim)
     ax12 = fig.add_subplot(2,4,2)   # glider zoom (anim)
@@ -47,68 +47,32 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
     ax13.add_patch(glx_xy)
 
     # ax14: cx states
-    if basic:
-        ax14.title.set_text("core transitions: heatmap")
-
-
-    else:
-        # ax14: cx,mx states; ax24: cx,mx gt states
-        ax14.title.set_text("cx,mx states")
-        ax24.title.set_text("gt: cx,mx states")
-        gx1 = nx.DiGraph()
-        gx2 = nx.DiGraph()
-        # cycles locations
-        p0 = np.array([[0,50,50,50,50,0,0,0]]).reshape(4,2)
-        p1 = p0.astype(int)
-        p1[:,0] += 512+100
-        p2 = p0.astype(int)
-        p2[:,1] += 512+100
-        p3 = p0+512+100
-        pxy = [p0,p1,p2,p3]
-        for i,ck in enumerate(glx.cycles.keys()):
-            cx,mx,ex = ck
-            px,py = pxy[int(i/4)][i%4]
-            gx1.add_node((cx,mx),pos=(px,py))
-            gx2.add_node((cx,mx),pos=(px,py))
-        for ck in glx.cycles.keys():
-            cx0,mx0,dx0 = ck
-            cx,mx = glx.cycles[cx0,mx0,dx0]
-            gx1.add_edge((cx0,mx0),(cx,mx),color="b")
-            gx2.add_edge((cx0,mx0),(cx,mx),color="b")
-        # cx,mx trial states
-        for i,[ci,mi,ei] in enumerate(zip(glx.core_sts,glx.memb_sts,glx.env_sts)):
-            if (ci,mi,ei) not in glx.cycles.keys():
-                px = ci+100
-                mri = reduce(mi)
-                py = (mri*2)+100
-                gx1.add_node((ci,mi),pos=(px,py))
-                if i>0:
-                    c0 = glx.core_sts[i-1]
-                    m0 = glx.memb_sts[i-1]
-                    gx1.add_edge((c0,m0),(ci,mi),color="r")
-        pos1 = nx.get_node_attributes(gx1,"pos")
-        colors1 = [gx1[u][v]['color'] for u,v in gx1.edges]
-        nx.draw(gx1,pos1,ax=ax14,node_size=10,alpha=0.5,with_labels=False,edge_color=colors1)
-        # cx,mx genotype txs
-        for tk in glx.txs.keys():
-            transients = glx.txs[tk]
-            for transient in transients:
-                for sti in transient[:-1]:
-                    cx0 = sti[0]
-                    mx0 = sti[1]
-                    dxo = sti[2]
-                    cx = sti[6]
-                    mx = sti[7]
-                    if (cx,mx) not in gx2.nodes:
-                        px = cx+100
-                        mri = reduce(mx)
-                        py = (mri*2)+100
-                        gx2.add_node((cx,mx),pos=(px,py))
-                    if ((cx0,mx0),(cx,mx)) not in gx2.edges:
-                        gx2.add_edge((cx0,mx0),(cx,mx),color="r")
-        pos2 = nx.get_node_attributes(gx2,"pos")
-        colors2 = [gx2[u][v]['color'] for u,v in gx2.edges]
-        nx.draw(gx2,pos2,ax=ax24,node_size=10,alpha=0.2,with_labels=False,edge_color=colors2)
+    ax14.title.set_text("core transitions")
+    # hmap = np.zeros((512,512)).astype(int)
+    sxy = []
+    sizes = []
+    colors = []
+    # i:cx0, j:cx
+    for cx,cx0mx in glx.core_rxs.items():
+        for cimi,nt in cx0mx.items():
+            cx0,mx = cimi
+            sxy.append([cx,cx0])
+            sizes.append(nt)
+            if (cx,0,0) in glx.cycles.keys():
+                color = "black"
+            elif nt>100:
+                color = "red"
+            elif nt>40:
+                color = "orange"
+            elif mx>0:
+                color = "green"
+            else:
+                color = "blue"
+            colors.append(color)
+            #hmap[cx0][cx] += nt
+    sx,sy = zip(*sxy)
+    #ax14.imshow(hmap,cmap="hot",vmin=0,vmax=1,aspect="auto")
+    ax14.scatter(sx,sy,c=colors,s=sizes,alpha=0.5)
 
     # ax21: gt input/gt responses
     ax21.title.set_text("genotype")
@@ -180,8 +144,14 @@ def glx_anim(glx,world,show=True,save=False,autoclose=0,basic=False):
             cx0,mx = cimi
             if cx0 not in gx.nodes:
                 gx.add_node(cx0,pos=(cx0,0))
-            if (cx0,cx) not in gx.edges and nt>40:
-                col = "lightblue" if nt<128 else "red"
+            if (cx0,cx) not in gx.edges and nt>25:
+                if nt>100:
+                    col = "red"
+                elif nt>50:
+                    col = "orange"
+                else:
+                    col = "blue"
+                #col = "lightblue" if nt<100 else "red"
                 gx.add_edge(cx0,cx,color=col)
     pos = nx.get_node_attributes(gx,"pos")
     colors = [gx[u][v]["color"] for u,v in gx.edges]

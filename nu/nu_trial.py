@@ -15,7 +15,7 @@ class Trial:
             self.full(gtx,st0,anim=True)
 
     '''try behavior for every dash possible'''
-    def behavior(self,gt,st0=41,single_dash=0,anim=False):
+    def behavior(self,gt,st0=41,single_dash=0,anim=False,save=False):
         # initialize glider
         x0,y0 = int(self.wsize/2),int(self.wsize/2)
         if type(gt)==BasicGlider:
@@ -62,7 +62,7 @@ class Trial:
                 results[dx] = rx
         results[0] = np.sum(np.where(results>0,1,0))
         if anim:
-            glx_anim(gl,self.world,basic=True)
+            glx_anim(gl,self.world,basic=True,save=save)
         return [gl,results]
 
     '''randomly fully filled world'''
@@ -202,7 +202,7 @@ class Trial:
         # normal distribution: 1 if val higher/lower than sd, 0 otherwise
         elif mode=="full":
             self.world = np.random.normal(0,1,size=(self.wsize,self.wsize))
-            self.world = np.where(self.world>2.5,1,np.where(self.world<-2.5,1,0))
+            self.world = np.where(self.world>2.2,1,np.where(self.world<-2.2,1,0))
             # leave the surroundings empty
             self.world[x0-5:x0+6,y0-5:y0+5] = 0
         # bounding walls
