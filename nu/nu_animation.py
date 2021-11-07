@@ -15,11 +15,11 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
     # trial
     ax11 = fig.add_subplot(2,4,1)   # glider (anim)
     ax12 = fig.add_subplot(2,4,2)   # glider zoom (anim)
-    ax13 = fig.add_subplot(2,4,3)   # glider trajectory (anim)
+    ax13 = fig.add_subplot(2,4,6)   # glider trajectory (anim)
     ax14 = fig.add_subplot(2,4,4)   # cx,mx in states domain
     # genotype/history
     ax21 = fig.add_subplot(2,4,5)   # scatter gt
-    ax22 = fig.add_subplot(2,4,6)   # env -> memb
+    ax22 = fig.add_subplot(2,4,3)   # env -> memb
     ax23 = fig.add_subplot(2,4,7)   # (if analysis) all trajectories
     ax24 = fig.add_subplot(2,4,8)   # txs cx,mx in state domain
 
@@ -42,8 +42,6 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
     # ax13: trajectory
     if dash:
         ax13.title.set_text("trajectory for dash = {}".format(dash))
-    elif len(trajectories)>1:
-        ax13.title.set_text("trajectory for dash = {}".format(127))
     else:
         ax13.title.set_text("trajectory")
     glx_y = [100-l[0] for l in glx.loc]
@@ -77,26 +75,18 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
             cx0,mx = cimi
             sxy.append([cx,cx0])
             sizes.append(nt)
-            #print("{}: {},{} = {}".format(cx,cx0,mx,nt))
             if (cx,0,0) in glx.cycles.keys():
-                #print("cycle")
                 color = "orange"
             elif nt>100:
-                #print("{}: {}".format("red",nt))
                 color = "red"
             elif mx>0:
-                #print("{}: {}".format("green",nt))
                 color = "green"
             elif nt>82:
-                #print("{}: {}".format("blue",nt))
                 color = "blue"
             else:
-                #print("low")
                 color = "grey"
             colors.append(color)
-            #hmap[cx0][cx] += nt
     sx,sy = zip(*sxy)
-    #ax14.imshow(hmap,cmap="hot",vmin=0,vmax=1,aspect="auto")
     ax14.scatter(sx,sy,c=colors,s=sizes,alpha=0.5)
 
     # ax24 core -> core
@@ -108,23 +98,24 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
     for c0st,cst in glx.cycles.items():
         cx0 = c0st[0]
         cx = cst[0]
-        gx.add_node(cx,pos=(cx,cx0))
+        gx.add_node(cx,pos=(cx,cx0),val=99)
     for c0st,cst in glx.cycles.items():
         cx0 = c0st[0]
         cx = cst[0]
         gx.add_edge(cx0,cx,color="black")
-    # core states
+    # all nodes
     for cx,cx0mx in glx.core_rxs.items():
         for cimi,nt in cx0mx.items():
             cx0,mx = cimi
-            if cx not in gx.nodes:
-                gx.add_node(cx,pos=(cx,cx0))
+            if cx in gx.nodes:
+                if nt > gx.nodes[cx]["val"]:
+                    gx.add_node(cx,pos=(cx,cx0),val=nt)
+            else:
+                gx.add_node(cx,pos=(cx,cx0),val=nt)
     # relevant edges
     for cx,cx0mx in glx.core_rxs.items():
         for cimi,nt in cx0mx.items():
             cx0,mx = cimi
-            if cx0 not in gx.nodes:
-                gx.add_node(cx0,pos=(cx0,0))
             if (cx0,cx) not in gx.edges and nt>66:
                 if nt>100:
                     col = "red"
@@ -132,25 +123,28 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
                     col = "blue"
                 else:
                     col = "skyblue"
-                #col = "lightblue" if nt<100 else "red"
                 gx.add_edge(cx0,cx,color=col)
     pos = nx.get_node_attributes(gx,"pos")
     colors = [gx[u][v]["color"] for u,v in gx.edges]
     # weights = [gx[u][v]["weight"] for u,v in gx.edges]
     # import pdb; pdb.set_trace()
-    nx.draw(gx,pos,ax=ax24,node_size=0.5,node_color="black",alpha=0.2,with_labels=False,edge_color=colors,width=2,edge_cmap=plt.cm.Blues)
+    nx.draw(gx,pos,ax=ax24,node_size=0.5,node_color="black",alpha=0.2,with_labels=False,edge_color=colors,width=2)
 
     # ax22: environmental related transitions
     ax22.title.set_text("env. based transitions")
     ax22.set_xlim([-5,515])
     ax22.set_ylim([-5,515])
     egx = nx.DiGraph()
-    # core states
+    # mx core states
     for cx,cx0mx in glx.core_rxs.items():
         for cimi,nt in cx0mx.items():
             cx0,mx = cimi
-            if cx not in egx.nodes and mx>0:
-                egx.add_node(cx,pos=(cx,cx0))
+            if mx>0:
+                if cx in egx.nodes:
+                    if nt > gx.nodes[cx]["val"]:
+                        gx.add_node(cx,pos=(cx,cx0),val=nt)
+                else:
+                    egx.add_node(cx,pos=(cx,cx0),val=nt)
     # relevant edges
     for cx,cx0mx in glx.core_rxs.items():
         for cimi,nt in cx0mx.items():
@@ -167,7 +161,7 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
                 egx.add_edge(cx0,cx,color=col)
     pos = nx.get_node_attributes(egx,"pos")
     colors = [egx[u][v]["color"] for u,v in egx.edges]
-    nx.draw(egx,pos,ax=ax22,node_size=0.5,node_color="black",alpha=0.2,with_labels=False,edge_color=colors,width=2)
+    nx.draw(egx,pos,ax=ax22,node_size=2.5,node_color="black",alpha=0.2,with_labels=False,edge_color=colors,width=2)
 
     # to pause the animation and check data
     anim_running = True
