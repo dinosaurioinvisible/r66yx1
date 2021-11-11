@@ -54,6 +54,23 @@ class Xell:
         # 0:3 no signal, 4:7 signal
         self.sx,self.o = (1,rx-4) if rx>3 else (0,rx)
 
+
+
+
+class Zell:
+    def __init__(self,gt):
+        self.type = gt.type
+        self.i = gt.i
+
+        self.di = di
+        self.dj = dj
+        self.do = do
+        self.st = st
+        self.gt = gt
+
+    def update(self, agent_domain):
+
+
 # class Trial:
 #     def __init__(self,tt=100,wdim=20,fill_sd=2.5):
 #         # trial time
