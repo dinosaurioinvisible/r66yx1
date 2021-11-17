@@ -22,11 +22,11 @@ def layer2int(matrix,rot=None):
     x = arr2int(matrix)
     return x
 
-def rhombus2int(rhombus):
+def ring2int(rhombus):
 
 
 # rhomb locations (top to bottom)
-def rhombus_locs(i=0,j=0,r=1,hollow=True):
+def ring_locs(i=0,j=0,r=1,hollow=True):
     locs = []
     for ir in range(-r,r+1):
         ij = set([abs(ir)-r,r-abs(ir)]) if hollow == True else [jx for jx in range(abs(ir)-r,r-abs(ir)+1)]

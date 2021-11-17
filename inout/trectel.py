@@ -1,6 +1,13 @@
 
 import numpy as np
 
+class Ring:
+    def __init__(self,i,j,gt,st0=0):
+        self.i,self.j = i,j
+        self.locs = ring_locs(i=i,j=j,r=2,hollow=True)
+        self.gt = gt
+        self.state = st0
+
 class Trectel:
     def __init__(self,x1,y1,gt1,gt2,st01,st02):
         self.x1,self.y1 = x1,y1
@@ -18,4 +25,3 @@ class Rhombus:
         self.state = st0
 
     def update(self,domain):
-        
