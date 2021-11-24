@@ -2,16 +2,17 @@
 import numpy as np
 
 # convert array > binary > int
-def matrix2int(matrix,rot=None):
-    if r:
-        matrix = np.rot90(matrix,rot)
-    x = int(''.join(matrix.flatten().astype(int).astype(str)),2)
+def arr2int(arr,rot=None):
+    if rot:
+        arr = np.rot90(arr,rot)
+    x = int(''.join(arr.flatten().astype(int).astype(str)),2)
     return x
 
-# convert int number into a NxN matrix
-def int2matrix(nx,dims=3):
-    nx_len = dims**2
-    x = np.array([int(i) for i in np.binary_repr(nx,nx_len)]).reshape(dims,dims)
+# convert int number into an array or a NxN matrix
+def int2arr(n,arr_len,dims=1):
+    x = np.array([int(i) for i in np.binary_repr(n,arr_len)])
+    if dims > 1:
+        x = x.reshape(dims,dims)
     return x
 
 # convert an external layer into int
@@ -22,8 +23,26 @@ def layer2int(matrix,rot=None):
     x = arr2int(matrix)
     return x
 
-def ring2int(rhombus):
+# convert into matrix with ring inside
+def int2ring(n,r):
+    dim = 2*r+1
+    ring_space = np.zeros((dim,dim)).astype(int)
+    ring_len = 4*r
+    sts = int2arr(n,ring_len)
+    locs = ring_locs(i=r,j=r,r=r)
+    for st,[i,j] in zip(sts,locs):
+        ring_space[i][j] = st
+    return ring_space
 
+# convert ring into int
+def ring2int(ring_domain,i,j,r,hollow=True):
+    arr = []
+    locs = ring_locs(i=i,j=j,r=r)
+    for [vi,vj] in locs:
+        vx = ring_domain[vi][vj]
+        arr.append(vx)
+    x = arr2int(np.asarray(arr))
+    return x
 
 # rhomb locations (top to bottom)
 def ring_locs(i=0,j=0,r=1,hollow=True):
