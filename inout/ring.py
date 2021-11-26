@@ -13,7 +13,6 @@ class Ring:
         self.st_shape = int2ring(st0,r)
         self.zells = []
         init_zells()
-        self.history = [st0]
 
     def init_zells(self):
         # relative allocation, initial sts and gts
@@ -34,7 +33,6 @@ class Ring:
             self.st_arr.append(zell.state)
         # update ring
         self.st_int = arr2int(self.st_arr)
-        self.history.append(self.st_int)
         self.st_shape = int2ring(self.st_int,self.r)
 
 

@@ -33,7 +33,10 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
     ax12.title.set_text("zoom")
 
     # ax21: genotype: input/gt responses
-    ax21.title.set_text("genotype")
+    ax21.title.set_text("genotype (integer repr.)")
+    ax21.set_ylabel("outputs")
+    ax21.set_xlabel("inputs")
+    ax21.set_xticks([0,100,200,300,400,512])
     xy = []
     xy = [[ri,rx] for ri,rx in enumerate(glx.exgt)]
     xs,ys = zip(*xy)
@@ -48,6 +51,12 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
     glx_x = [l[1] for l in glx.loc]
     y0,x0 = glx.loc[0]
     y0 = 100-y0
+    # min_xy = min(min(glx_x),min(glx_y))-5
+    # max_xy = max(max(glx_x),max(glx_y))+5
+    # ax13.set_xlim([min_xy,max_xy])
+    # ax13.set_ylim([min_xy,max_xy])
+    # ax13.set_xticks(np.arange(min_xy,max_xy+1,5))
+    # ax13.set_yticks(np.arange(min_xy,max_xy+1,5))
     ax13.set_xlim([min(glx_x)-5,max(glx_x)+5])
     ax13.set_ylim([min(glx_y)-5,max(glx_y)+5])
     ax13.plot(glx_x,glx_y,color="black")
@@ -88,6 +97,9 @@ def glx_anim(glx,world,trajectories=[],dash=None,show=True,save=False,autoclose=
             colors.append(color)
     sx,sy = zip(*sxy)
     ax14.scatter(sx,sy,c=colors,s=sizes,alpha=0.5)
+    #lg = ax14.legend(*scatter.legend_elements(num=5),loc="lower right",title="legend")
+    #ax14.add_artist(lg)
+    ax14.legend()
 
     # ax24 core -> core
     ax24.title.set_text("core transitions: graph")
