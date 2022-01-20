@@ -44,7 +44,7 @@ def ring2int(ring_domain,i,j,r,hollow=True):
     x = arr2int(np.asarray(arr))
     return x
 
-# rhomb locations (top to bottom)
+# ring locations (top to bottom, left to right)
 def ring_locs(i=0,j=0,r=1,hollow=True):
     locs = []
     for ir in range(-r,r+1):

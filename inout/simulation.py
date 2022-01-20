@@ -1,5 +1,17 @@
 
 import numpy as np
+from agent import *
+
+class Simulation:
+    def __init__(self,ring,time=1000,wsize=20):
+        self.time = time
+        self.world = np.zeros((wsize,wsize)).astype(int)
+
+    def single_empty(self,ring):
+        tx = 0
+        world[ring.i,ring.j] = 1
+        for ex in ring.elements:
+            world[ex.i,ex.j] = ex.st
 
 class EmptyWorld:
     def __init__(self,ring,time=500,wsize=20):
