@@ -5,9 +5,25 @@ import networkx as nx
 from collections import defaultdict
 from helper_fxs import *
 
+
 '''
+circularity:
+robustness of the circular dynamics of the agent,
+basically a tree like search
+starting from a given state
+move to every possible subsequent state
+and from that, to all possible states and so on
+analyze for emergent recursiveness
+'''
+def circularity_txmap(gt):
+    transitions = {}
+
+
+
+'''
+selectivity:
 visualization of state transitions:
-gives the transition map
+gives the transition map,
 from some given state of the system (sti) at time t
 to all subsequent system states (stx) at time t+1
 according to every possible environmental condition (envx)
@@ -49,11 +65,12 @@ def env_txmap(gt,sti=6):
     plt.show()
 
 '''
+normativity:
 for every possible state of the system (sti)
 gives all the transitions to a new state (stx)
 given some particular environmental condition
 '''
-def st_txmap(gt,env=0):
+def st_txmap(gt,env=0,norm=True):
     gx = nx.DiGraph()
     st_range = 2**len(gt)
     gx.add_nodes_from(range(st_range))
@@ -76,13 +93,17 @@ def st_txmap(gt,env=0):
         stx = arr2int(np.asarray([elements_stx]))
         transitions[stx] += 1
         # create edges
-        # give colors to valid/invalid transitions
-        nb = np.sum(elements_stx)+envx[4]+envx[5]+envx[10]+envx[11]
-        tx_color = 'blue' if 2 <= nb <= 3 else 'red'
-        gx.add_edge(sti,stx,color=tx_color)
+        if norm:
+            # give colors to valid/invalid transitions
+            nb = np.sum(elements_stx)+envx[4]+envx[5]+envx[10]+envx[11]
+            tx_color = 'blue' if 2 <= nb <= 3 else 'red'
+            gx.add_edge(sti,stx,color=tx_color)
     # plot
-    x,colors = zip(*nx.get_edge_attributes(gx,'color').items())
-    nx.draw_circular(gx,edge_color=colors,with_labels=True)
+    if norm:
+        x,colors = zip(*nx.get_edge_attributes(gx,'color').items())
+        nx.draw_circular(gx,edge_color=colors,with_labels=True)
+    else:
+        nx.draw_circular(gx,with_labels=True)
     plt.show()
 
 
