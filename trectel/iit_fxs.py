@@ -11,27 +11,31 @@ distribution (cr) of the possible past states (stp)
 '''
 def get_repertoires(gt):
     # repertoires are dicts for access and plots
-    cause_rep = {}
-    effect_rep = {}
+    cause_reps = {}
+    effect_reps = {}
+    uce_reps = {}
     # more than 3 elements mechanisms
     emx_names = ['a','b','c','d','ab','ac','bd','cd','abc','abd','acd','bcd','abcd']
     mx3_indexes = [[0,1,2],[0,1,3],[0,2,3],[1,2,3]]
     emx_indexes = [[0],[1],[2],[3],[0,1],[0,2],[1,3],[2,3],[0,1,2],[0,1,3],[0,2,3],[1,2,3],[0,1,2,3]]
     # define repertoires
     for name in emx_names:
-        cause_rep[name] = {}
-        effect_rep[name] = {}
+        cause_reps[name] = {}
+        effect_reps[name] = {}
         # for 3 elements mechanisms
         if len(name) == 1:
-            cause_rep[name][0] = np.zeros(8).astype(int)
-            cause_rep[name][1] = np.zeros(8).astype(int)
-            effect_rep[name][0] = np.zeros(8).astype(int)
-            effect_rep[name][1] = np.zeros(8).astype(int)
+            for stc in [0,1]:
+                cause_reps[name][stc] = np.zeros(8).astype(int)
+                effect_reps[name][stc] = np.zeros(8).astype(int)
         else:
             for bi in range(2**len(name)):
                 bsts = int2arr(bi,arr_len=len(name))
-                cause_rep[name][tuple(bsts)] = np.zeros(16).astype(int)
-                effect_rep[name][tuple(bsts)] = np.zeros(16).astype(int)
+                cause_reps[name][tuple(bsts)] = np.zeros(16).astype(int)
+                effect_reps[name][tuple(bsts)] = np.zeros(16).astype(int)
+        # for unconstrained reps
+        if len(name) == 1:
+            uce_reps[name] = np.zeros(8).astype(int)
+    uce_reps['abcd'] = np.zeros(16).astype(int)
     # full domain (including agent cells)
     domain_range = 2**21
     for domain in tqdm(range(domain_range)):
@@ -67,17 +71,25 @@ def get_repertoires(gt):
                 exs_sti = tuple([mx_sti[i] for i in indexes])
             # cause repertoires: elements (t) -> mechanism (t-1)
             # counts: element st (t+1) -> mechanism st (t)
-            cause_rep[mx_name][exs_stx][mx_sti_index] += 1
+            cause_reps[mx_name][exs_stx][mx_sti_index] += 1
             # effect repertoires: elements (t) -> mechanism (t+1)
             # counts: elements (t) -> mechanism (t+1)
-            effect_rep[mx_name][exs_sti][mx_stx_index] += 1
+            effect_reps[mx_name][exs_sti][mx_stx_index] += 1
+            # unconstrained future repertoire
+            # counts all future states independently of its inputs (current sts)
+            try:
+                uce_reps[mx_name][mx_stx_index] += 1
+            except:
+                uce_reps['abcd'][mx_stx_index] += 1
     # convert counts to distributions
     for name in emx_names:
-        for key,count in cause_rep[name].items():
-            cause_rep[name][key] = count/np.sum(count)
-        for key,count in effect_rep[name].items():
-            effect_rep[name][key] = count/np.sum(count)
-    return cause_rep, effect_rep
+        for key,count in cause_reps[name].items():
+            cause_reps[name][key] = count/np.sum(count)
+        for key,count in effect_reps[name].items():
+            effect_reps[name][key] = count/np.sum(count)
+    for name,count in uce_reps.items():
+        uce_reps[name] = count/np.sum(count)
+    return cause_reps, effect_reps, uce_reps
 
 
 

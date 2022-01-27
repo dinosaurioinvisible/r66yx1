@@ -106,6 +106,72 @@ def st_txmap(gt,env=0,norm=True):
         nx.draw_circular(gx,with_labels=True)
     plt.show()
 
+'''
+repertoires:
+bar plots for intrinsic information
+from cause and effect repertoires
+'''
+def rep_bars(cxs,exs,uxs,st=[0,1,1,0],example='abcd'):
+    # cause, effect, unconstrained repertoires
+    # fig0: example
+    fig,axs = plt.subplots(2,2)
+    fig.subplots_adjust(hspace = 1, wspace = 1)
+    # only causes
+    fig2,axs2 = plt.subplots(4,4)
+    fig2.subplots_adjust(hspace = .5, wspace = .1)
+    # only effects
+    fig3,axs3 = plt.subplots(4,4)
+    fig3.subplots_adjust(hspace = .5, wspace = .1)
+
+    # current state of system and mechanisms
+    sti = arr2int(np.asarray(st))
+    a,b,c,d = st
+    mxs_sts = [a,b,c,d,(a,b),(a,c),(b,d),(c,d),(a,b,c),(a,b,d),(a,c,d),(b,c,d),(a,b,c,d)]
+
+    # example
+    # get example system states
+    example_sti = []
+    for li,lx in enumerate('abcd'):
+        if lx in example:
+            example_sti.append(sti[li])
+    example_sti = tuple(example_sti)
+    # cause repertoire and uc repertoire
+    fcx = cxs[example][example_sti]
+    axs[0][0].bar(x=len(fcx),height=fcx)
+    axs[0][0].set_ylim([0,1])
+    fucx = np.ones(len(fcx))/len(fcx)
+    axs[1][0].bar(x=len(fucx),height=fucx)
+    axs[1][0].set_ylim([0,1])
+    # effect repertoire and uc rep
+    fex = exs[example][example_sti]
+    axs[0][1].bar(x=len(fex),height=fex)
+    axs[0][1].set_ylim([0,1])
+    fuex = uxs[example]
+    axs[1][1].bar(x=len(fuex),height=fuex)
+    axs[1][1].set_ylim([0,1])
+
+    # all plots
+    for mi,mx in enumerate(cxs):
+        # repertoire (dist) for each mechanism given some state (sti)
+        mx_cx = cxs[mx][mxs_sts[mi]]
+        mx_ex = exs[mx][mxs_sts[mi]]
+        # allocate from bottom to top & left to right
+        row = 3-int(mi/4)
+        col = mi%4
+        axs2[row][col].bar(x=np.arange(len(mx_cx)),height=mx_cx)
+        axs2[row][col].set_ylim([0,1])
+        axs3[row][col].bar(x=np.arange(len(mx_ex)),height=mx_ex)
+        axs3[row][col].set_ylim([0,1])
+    plt.show()
+
+
+
+
+
+
+
+
+
 
 # animated
 

@@ -25,8 +25,16 @@ def ring_locs(i=0,j=0,r=1,hollow=True):
     locs = sorted(locs)
     return locs
 
-
-
+# distance matrix
+def dist_matrix(dim=8,cost=0.5):
+    dm = np.zeros((dim,dim))
+    for i in range(dim):
+        bin_i = int2arr(i,3)
+        for j in range(dim):
+            bin_j = int2arr(j,3)
+            dij = np.sum([abs(bi-bj) for bi,bj in zip(bin_i,bin_j)])
+            dm[i][j] = cost * dij
+    return dm
 
 
 
