@@ -3,11 +3,11 @@ import numpy as np
 from helper_fxs import *
 
 '''Ring made of elements with their own genotype'''
-class RingSystem:
-    def __init__(self,gt,i,j,st0):
+class Ringo:
+    def __init__(self,gt,i,j,st0=6):
         # system
-        self.i, self.j = i,j
-        self.core_st = 1
+        self.i,self.j = i,j
+        self.cx_st = 1
         self.st = st0
         # elements
         self.elements = []
@@ -20,17 +20,27 @@ class RingSystem:
     def update(self,world):
         # update elements
         for ex in self.elements:
-            domain = np.sum(world[ex.i-1:ex.i+2,ex.j-1:ex.j+2])
+            domain = world[ex.i-1:ex.i+2,ex.j-1:ex.j+2]
             ex.update(domain)
         # update world
         for ex in self.elements:
             world[ex.i,ex.j] = ex.st
         # update core
-        core_domain = np.sum(world[self.i-1:self.i+2,self.j-1:self.j+2]) - 1
-        self.core_st = 1 if 2 <= core_domain <= 3 else 0
+        cx = world[self.i,self.j]
+        cx_nb = np.sum(world[self.i-1:self.i+2,self.j-1:self.j+2]) - cx
+        self.cx_st = 1 if cx_nb == 3 or (cx==1 and cx_nb==2) else 0
         # update state
-        world[self.i,self.j] = self.core_st
+        world[self.i,self.j] = self.cx_st
         self.st = arr2int(np.asarray([ex.st for ex in self.elements]))
+
+    def reset(self,st0,i=None,j=None):
+        # optional reallocation
+        self.i = i if i else self.i
+        self.j = j if j else self.j
+        # reset initial states (new trial)
+        ex_sts = int2arr(st0,arr_len=len(self.elements))
+        for ei,sti in enumerate(ex_sts):
+            self.elements[ei].st = sti
 
 class Element:
     def __init__(self,gt,i,j,st0):
