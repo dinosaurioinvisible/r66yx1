@@ -25,9 +25,8 @@ class Evol:
 
     def evolve_cont(self,genotypes=[],n_gts=None,n_gens=None,n_parents=None,mut_rate=None,n_trials=None,n_steps=None,world_th0=None):
         # gts
-        self.backup = deepcopy(self.genotypes)
         self.genotypes.extend(genotypes)
-        create_genotypes()
+        self.create_genotypes()
         # opt redefine variables
         self.n_gts = n_gts
         self.n_gens = n_gens
@@ -56,6 +55,7 @@ class Evol:
             for fi,ft in enumerate(fts):
                 print("{} - ft = {}".format(fi+1,round(ft,2)))
             # create new_genotypes
+            self.backup = parents
             self.breeding(parents,fts)
         # output data
         # TODO
