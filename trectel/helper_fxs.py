@@ -39,8 +39,8 @@ def dist_matrix(dim=8,cost=0.5):
 # convert ring world > ring environment > int
 def env2int(world,i=None,j=None):
     # if not centered
-    i = world.shape[0] if not i else i
-    j = world.shape[1] if not j else j
+    i = int(world.shape[0]/2) if not i else i
+    j = int(world.shape[1]/2) if not j else j
     # assuming ring of 4 elements
     env = world[i-2:i+3,j-2:j+3].flatten()
     for dx in [24,20,17,13,12,11,7,4,0]:
@@ -49,10 +49,10 @@ def env2int(world,i=None,j=None):
     return xi
 
 # only for ring envs (16 elements)
-def int2ring_env(xi):
+def int2ring_env(xi,unknown=0):
     env = int2arr(xi,arr_len=16)
     for di in [0,4,7,11,12,13,17,20,24]:
-        env = np.insert(env,di,9)
+        env = np.insert(env,di,unknown)
     env = env.reshape(5,5)
     return env
 

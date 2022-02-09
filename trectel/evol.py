@@ -6,7 +6,7 @@ from copy import deepcopy
 import pickle
 
 class Evol:
-    def __init__(self,genotypes=[],n_gts=100,n_gens=100,n_parents=20,mut_rate=0.15,n_trials=10,n_steps=100,world_th0=0.15):
+    def __init__(self,genotypes=[],n_gts=100,n_gens=100,n_parents=20,mut_rate=0.15,n_trials=10,n_steps=100,world_th0=0.2):
         self.n_gts = n_gts
         self.n_gens = n_gens
         self.n_parents = n_parents

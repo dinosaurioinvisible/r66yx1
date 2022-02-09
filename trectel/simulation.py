@@ -1,13 +1,14 @@
 
 import numpy as np
-from ring_system import Ringo
+from ring_system import Ring
+from helper_fxs import *
 # from copy import deepcopy
 
 '''for multiple trials'''
-def evaluate(gt,mode='gol',st0=6,n_trials=10,n_steps=1000,world_size=11,world_th0=0.15):
+def evaluate(gt,mode='gol',st0=6,n_trials=10,n_steps=1000,world_size=11,world_th0=0.2):
     # same object over multiple trials
     xy = int(world_size/2)
-    ringx = Ringo(gt,i=xy,j=xy,st0=st0)
+    ringx = Ring(gt,i=xy,j=xy,st0=st0)
     fts = []
     for _ in range(n_trials):
         trial_ft = trial(ringx,mode=mode,n_steps=n_steps,world_size=world_size,world_th0=world_th0)
@@ -24,7 +25,7 @@ def evaluate(gt,mode='gol',st0=6,n_trials=10,n_steps=1000,world_size=11,world_th
 
 '''trial for the system ring,
 v1: for simplicity agent and world are processed as independent objects'''
-def trial(ring,mode='gol',n_steps=1000,world_size=11,world_th0=0.15,save_data=False):
+def trial(ring,mode='gol',n_steps=1000,world_size=11,world_th0=0.2,save_data=False):
     # set world
     xy = int(world_size/2)
     # set world
@@ -43,7 +44,7 @@ def trial(ring,mode='gol',n_steps=1000,world_size=11,world_th0=0.15,save_data=Fa
     ft = 0
     if save_data:
         world_st = env2int(world)
-        trial_data = [world_st,ring.st,ring.cx_st]
+        trial_data = [[world_st,ring.st,ring.cx_st]]
     while ti < n_steps:
         # update world
         if mode == 'rain':
@@ -65,9 +66,7 @@ def trial(ring,mode='gol',n_steps=1000,world_size=11,world_th0=0.15,save_data=Fa
         wcopy = world.astype(int)
         ring.update(wcopy)
         # v1: system sts override world sts
-        for ex in ring.elements:
-            world[ex.i,ex.j] = ex.st
-        world[xy,xy] = ring.cx_st
+        world[xy-2:xy+3,xy-2:xy+3] = ring.domain
         ft += ring.cx_st
         # opt save data and advance
         if save_data:
