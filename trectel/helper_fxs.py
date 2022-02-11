@@ -1,5 +1,6 @@
 
 import numpy as np
+import pickle
 
 # convert array > binary > int
 def arr2int(arr,rot=None):
@@ -55,8 +56,6 @@ def int2ring_env(xi,unknown=0):
         env = np.insert(env,di,unknown)
     env = env.reshape(5,5)
     return env
-
-
 
 
 
