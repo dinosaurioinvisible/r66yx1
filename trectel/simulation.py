@@ -2,7 +2,7 @@
 import numpy as np
 from ring_system import Ring
 from helper_fxs import *
-# from copy import deepcopy
+from copy import deepcopy
 
 '''for multiple trials'''
 def evaluate(gt,mode='gol',st0=6,n_trials=10,n_steps=1000,world_size=11,world_th0=0.2):
@@ -44,7 +44,7 @@ def trial(ring,mode='gol',n_steps=1000,world_size=11,world_th0=0.2,save_data=Fal
     ft = 0
     if save_data:
         world_st = env2int(world)
-        trial_data = [[world_st,ring.st,ring.cx_st]]
+        trial_data = [[deepcopy(world),world_st,ring.st,ring.cx_st]]
     while ti < n_steps:
         # update world
         if mode == 'rain':
@@ -71,7 +71,7 @@ def trial(ring,mode='gol',n_steps=1000,world_size=11,world_th0=0.2,save_data=Fal
         # opt save data and advance
         if save_data:
             world_st = env2int(world)
-            trial_data.append([world_st,ring.st,ring.cx_st])
+            trial_data.append([deepcopy(world),world_st,ring.st,ring.cx_st])
         ti += 1
     if save_data:
         return ft,trial_data

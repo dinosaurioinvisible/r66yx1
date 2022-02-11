@@ -6,7 +6,7 @@ from ring_system import Ring
 from simulation import trial
 from helper_fxs import *
 
-def animation_fx(gt=[],fname='',show=True,save=False,trial_mode='gol',trial_steps=100,world_size=11,world_th0=0.25):
+def animation_fx(gt=[],fname='',show=True,save=False,trial_mode='gol',sim_speed=1000,trial_steps=100,world_size=11,world_th0=0.25):
 
     # run simulation
     if len(gt)==0:
@@ -66,9 +66,9 @@ def animation_fx(gt=[],fname='',show=True,save=False,trial_mode='gol',trial_step
 
         # ax1: trial animation
         grid = np.zeros((7,7))
-        world_st,ring_st,core_st = trial_data[i]
+        world,world_st,ring_st,core_st = trial_data[i]
         # world: 0=off (and unknown), 1=on > white, black
-        world = int2ring_env(world_st)
+        ring_env = int2ring_env(world_st)
         # ring: 2=off, 3=on > cyan, blue
         ring = int2arr(ring_st,arr_len=4)+2
         # locations
@@ -80,12 +80,13 @@ def animation_fx(gt=[],fname='',show=True,save=False,trial_mode='gol',trial_step
         # core: 4=off, 5=on > red, green
         world[xy,xy] = core_st+4
         # broadcast colors
-        grid[1:6,1:6] = world
-        grid_rgb = palette[grid.astype(int)]
-        world_im = ax1.imshow(grid_rgb)
+        # grid[1:6,1:6] = world
+        # grid_rgb = palette[grid.astype(int)]
+        world_rgb = palette[world.astype(int)]
+        world_im = ax1.imshow(world_rgb)
 
-        # ax2 : descending sts
-        flat_sti = world.flatten()
+        # ax2 : descending sts on ring domain
+        flat_sti = world[xy-3:xy+2,xy-3:xy+2].flatten()
         # delete corners outside env
         for sx in [24,20,4,0]:
             flat_sti = np.delete(flat_sti,sx)
@@ -101,7 +102,7 @@ def animation_fx(gt=[],fname='',show=True,save=False,trial_mode='gol',trial_step
 
     fig.canvas.mpl_connect('button_press_event', onClick)
     anim=animation.FuncAnimation(fig,animate,
-        init_func=init,frames=trial_steps,interval=500,blit=False,repeat=True)
+        init_func=init,frames=trial_steps,interval=sim_speed,blit=False,repeat=True)
 
     if save:
         if fname == '':

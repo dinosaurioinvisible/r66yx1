@@ -148,12 +148,12 @@ class Evol:
 
     def save_data(self,data,gen,ft,ext="rxs"):
         # define output name
-        filename = '{}g{:04}ft{}.{}'.format(self.fname,gen,round(ft,2),ext)
+        filename = '{}_g{:04}ft{}.{}'.format(self.fname,gen,round(ft),ext)
         filepath = os.path.join(self.path,filename)
         if os.path.isfile(filepath):
             print('file {} already exists, in {}'.format(filename,filepath))
             self.fname = input('define a new filename: ')
-            filename = '{}g{:04}ft{}.{}'.format(self.fname,gen,round(ft,2),ext)
+            filename = '{}_g{:04}ft{}.{}'.format(self.fname,gen,round(ft),ext)
             filepath = os.path.join(self.path,filename)
         # save
         with open(filepath,'wb') as datapath:
