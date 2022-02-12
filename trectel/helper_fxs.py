@@ -1,6 +1,5 @@
 
 import numpy as np
-import pickle
 
 # convert array > binary > int
 def arr2int(arr,rot=None):
@@ -27,7 +26,7 @@ def ring_locs(i=0,j=0,r=1,hollow=True):
     return locs
 
 # distance matrix
-def dist_matrix(dim=8,cost=0.5):
+def dist_matrix(dim=8,cost=1):
     dm = np.zeros((dim,dim))
     for i in range(dim):
         bin_i = int2arr(i,3)

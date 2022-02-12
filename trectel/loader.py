@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 import os
 
-def load(wdir="ring_exps",ext="rxs",default=True,anim=True,save_video=False,return_data=False,return_gts=False):
+def load(wdir="ring_exps",ext="rx",default=True,anim=True,save_video=False,return_gts=False):
     # search dir
     wdir = os.path.join(os.getcwd(),wdir)
     try:
@@ -25,22 +25,27 @@ def load(wdir="ring_exps",ext="rxs",default=True,anim=True,save_video=False,retu
         print("")
         for enum, obj_filename in enumerate(objs):
             print("{} - {}".format(enum, obj_filename))
-        print("\n\"q\" to quit")
+        print("\n\"r\" to return, currently {}".format('off' if not return_gts else 'on'))
+        print("\"q\" to quit")
         # in case of
         print("{}".format(problem_select_obj))
         problem_select_obj=" "
-        # # select object manually
+        # select object manually
         if default==True:
             # optional auto select last object
             n_in = len(objs)-1
-            print("==> auto selected {}\n".format(objs[n_in]))
+            print("==> auto selected {} - {}\n".format(n_in,objs[n_in]))
         else:
-            n_in = input("\nselect object: ")
+            n_in = input("\n> ")
         # options (just pdb, quit and continue here)
         if n_in=="-pdb" or n_in=="--pdb":
             import pdb; pdb.set_trace()
+            gt_menu=False
         elif n_in=="q" or n_in=="-q" or n_in=="quit":
             select_obj=False
+            gt_menu=False
+        elif n_in=="r" or n_in=="return":
+            return_gts = True if return_gts==False else False
             gt_menu=False
         else:
             try:
@@ -52,12 +57,8 @@ def load(wdir="ring_exps",ext="rxs",default=True,anim=True,save_video=False,retu
                     loaded_obj = pickle.load(ea_exp)
                 gt_menu=True
                 # optional return to work with the data
-                if return_data==True:
-                    return loaded_obj
-                # data : [wft, genotype, [fi1,fi2,fi3,fi4]]
                 if return_gts==True:
-                    genotypes = [gi[1] for gi in loaded_obj]
-                    return genotypes,n_obj_filename
+                    return n_obj_filename,list(loaded_obj)
             except:
                 problem_select_obj="\ncouldn't open object, invalid input? --pdb for the pdb.set_trace()\n"
                 gt_menu=False
@@ -68,13 +69,12 @@ def load(wdir="ring_exps",ext="rxs",default=True,anim=True,save_video=False,retu
             world_size = 25
             world_th=0.2
             trial_steps = 100
-            problem_gt_menu=" "
+            problem_gt_menu=""
             while gt_menu==True:
                 g_in = 0
                 print("")
                 # genotypes
-                print('\n{} genotypes loaded, current gt: {}\n'.format(len(loaded_obj),g_in))
-                # TODO
+                print('\n{} genotypes loaded, current gt: {} (best)\n'.format(len(loaded_obj),g_in))
                 # print('\'-n\' to run and sort them all')
                 print("\"-anim\" to (de)active the animation, currently: {}".format("ON" if anim==True else "OFF"))
                 print("\"-save\" to (de)active save video, currently: {}".format("ON" if save_video==True else "OFF"))
@@ -85,7 +85,7 @@ def load(wdir="ring_exps",ext="rxs",default=True,anim=True,save_video=False,retu
                 print("\nreturn to go on")
                 print("\"-pdb\" for pdb")
                 print("\"-x\" to go back")
-                print("\"-q\" to go quit")
+                print("\"-q\" to quit")
                 # just in case
                 print("{}".format(problem_gt_menu))
                 problem_gt_menu=" "
@@ -106,7 +106,7 @@ def load(wdir="ring_exps",ext="rxs",default=True,anim=True,save_video=False,retu
                     save_video=True if save_video==False else True
                 elif g_in=="ws" or g_in=="-ws":
                     try:
-                        sim_speed = int(input("world size? > "))
+                        sim_speed = int(input("sim speed? > "))
                     except:
                         print("invalid input: {}".format(sim_speed))
                 elif g_in=="ws" or g_in=="-ws":
@@ -135,7 +135,7 @@ def load(wdir="ring_exps",ext="rxs",default=True,anim=True,save_video=False,retu
                         gtx = loaded_obj[g_in]
                         animation_fx(gtx,show=anim,save=save_video,sim_speed=sim_speed,trial_steps=trial_steps,world_size=world_size,world_th0=world_th)
                     except:
-                        problem_gt_menu="\ncouldn't load data, invalid input? ({}) --pdb for the pdb.set_trace()".format(gt_menu_in)
+                        problem_gt_menu="\ncouldn't load data, invalid input? ({}) --pdb for the pdb.set_trace()".format(g_in)
 
 
 

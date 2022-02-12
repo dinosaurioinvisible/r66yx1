@@ -2,6 +2,128 @@
 import numpy as np
 from tqdm import tqdm
 from helper_fxs import *
+from pyemd import emd
+
+
+
+
+lx = []
+for i in range(16):
+    lx.append([np.binary_repr(i),i])
+pwi_states = np.zeros(16)
+for li in lx:
+    px = True
+    for pi in pw_indexes:
+        if int(li[0][pi]) != sti[pi]:
+            px = False
+    if px==True:
+        pwi_states[li[1]] += 1
+
+'''
+IIT repertoires
+'''
+def repertoires_fx(gt):
+    cxrep = {}
+    exrep = {}
+
+
+'''
+integrated information
+a) sum of the inf of parts vs inf of the system
+b) minimal partition
+'''
+def ii_fx(sts_data,vxdist,cxrep,exrep,uxrep):
+    # synergistic, intrinsic, integrated
+    info = {}
+    info['syn'] = {}
+    info['int'] = {}
+    info['phi'] = {}
+    # mechanisms
+    mx_sts = [(sta,stb,stc),(sta,stb,std),(sta,stc,std),(stb,stc,std),(sta,stb,stc,std)]
+    mx_names = ['a','b','c','d','abcd']
+    # distance matrix
+    dmx3 = dist_matrix(dim=8,cost=0.5)
+    dmx4 = dist_matrix(dim=16,cost=0.5)
+    # syn_info, int_info, ii_info = [],[],[]
+    for ti in range(1,len(sts_data)-1):
+        # state of every element cell
+        sta,stb,stc,std = int2arr(sts_data[i],arr_len=4)
+        # prediction of next system st from current mechanism sts
+        a_info = vxdist['a'][sta,stb,stc][sts_data[i+1]]
+        b_info = vxdist['b'][sta,stb,std][sts_data[i+1]]
+        c_info = vxdist['c'][sta,stc,std][sts_data[i+1]]
+        d_info = vxdist['d'][stb,stc,std][sts_data[i+1]]
+        # prediction of the system with respect to itself
+        v_info = vxdist['abcd'][sta,stb,stc,std][sts_data[i+1]]
+        # compare
+        dx_info = v_info - sum([a_info,b_info,c_info,d_info])
+        # syn_info.append([a_info,b_info,c_info,d_info,v_info,dx_info])
+        info['syn'][]
+        # b)
+        mx_cei = []
+        for mx,mx_st in zip(mx_names,mx_sts):
+            # intrinsic information for every mechanism
+            # cause info: dist(cause rep | uc past rep (uniform))
+            cx = cxrep[mx][mx_st][sts_data[i-1]]
+            uxp = np.array([1/len(mx_st)]*len(mx_st))
+            dmx = dmx3 if len(mx_st)==3 else dmx4
+            ci = emd(cx,uxp,dmx)
+            info['crep'][mx][ti] = cx
+            info['ci'][mx][ti] = ci
+            # effect information: dist(effect rep | uc fut rep)
+            ex = exrep[mx][mx_st][sts_data[i+1]]
+            uxf = uxrep[mx][mx_st]
+            ei = emd(cx,uxf,dmx)
+            info['erep'][mx][ti] = ex
+            info['ei'][mx][ti] = ei
+            # cause effect information
+            cei = min(ci,ei)
+            info['cei'][mx][ti] = cei
+            mx_cei.append(cei)
+            # integrated information
+            cmip = min(mx_cei)
+
+
+        system_ii = info['cei']['abcd'][ti]
+
+
+        a_ci = cxrep['a'][sta,stb,stc][sts_data[i-1]]
+        b_ci = cxrep['b'][sta,stb,std][sts_data[i-1]]
+        c_ci = cxrep['c'][sta,stc,std][sts_data[i-1]]
+        d_ci = cxrep['d'][stb,stc,std][sts_data[i-1]]
+        v_ci = cxrep['abcd'][sta,stb,stc,std][sts_data[i-1]]
+        ci = [a_ci,b_ci,c_ci,d_ci,v_ci]
+        # effect information for every mechanism
+        a_ei = exrep['a'][sta,stb,stc][sts_data[i+1]]
+        b_ei = exrep['b'][sta,stb,std][sts_data[i+1]]
+        c_ei = exrep['c'][sta,stc,std][sts_data[i+1]]
+        d_ei = exrep['d'][stb,stc,std][sts_data[i+1]]
+        v_ei = exrep['abcd'][sta,stb,stc,std][sts_data[i+1]]
+        ei = [a_ei,b_ei,c_ei,d_ei,v_ei]
+        # intrinsic information
+        a_int = min(a_ci,a_ei)
+        b_int = min(b_ci,b_ei)
+        c_int = min(c_ci,c_ei)
+        d_int = min(d_ci,d_ei)
+        v_int = min(v_ci,v_ei)
+        intrinsic = [a_int,b_int,c_int,d_int,v_int]
+        mip = min(intrinsic)
+        #
+        # save data
+        for ni,xi in enumerate(['a','b','c','d','abcd']):
+            info['ci'][xi][ti] = ci[ni]
+            info['ei'][xi][ti] = ei[ni]
+            info['intrinsic'][xi][ti] = min(ci[ni],ei[ni])
+
+
+        # minimal partition
+
+
+        # save data
+        for ni,xi in zip(['a','b','c','d','abcd'],[a_ci,b_ci,c_ci,d_ci,v_ci]):
+            info['ci'][ni][ti][xi]
+
+
 
 '''
 cause repertoire:
