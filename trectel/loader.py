@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 import os
 
-def load(wdir="ring_exps",ext="rx",default=True,anim=True,save_video=False,return_gts=False):
+def load(wdir="ring_exps",ext="rx",default=True,save_data=False,anim=True,save_anim=False,return_gts=False):
     # search dir
     wdir = os.path.join(os.getcwd(),wdir)
     try:
@@ -67,7 +67,7 @@ def load(wdir="ring_exps",ext="rx",default=True,anim=True,save_video=False,retur
             # simulation parameters
             sim_speed = 1000
             world_size = 25
-            world_th=0.2
+            world_th0=0.2
             trial_steps = 100
             problem_gt_menu=""
             while gt_menu==True:
@@ -77,17 +77,18 @@ def load(wdir="ring_exps",ext="rx",default=True,anim=True,save_video=False,retur
                 print('\n{} genotypes loaded, current gt: {} (best)\n'.format(len(loaded_obj),g_in))
                 # print('\'-n\' to run and sort them all')
                 print("\"-anim\" to (de)active the animation, currently: {}".format("ON" if anim==True else "OFF"))
-                print("\"-save\" to (de)active save video, currently: {}".format("ON" if save_video==True else "OFF"))
-                print("\"-ss\" to change simulation step interval (speed), currently: {}".format(sim_speed))
+                print("\"-save anim\" to (de)active save video, currently: {}".format("ON" if save_anim==True else "OFF"))
+                print("\"-save data\" to (de)active save trial data, currently: {}".format("ON" if save_data==True else "OFF"))
+                print("\"-ss\" to change simulation step interval (anim. speed), currently: {}".format(sim_speed))
                 print("\"-ws\" to change world size, currently: {}".format(world_size))
-                print("\"-wt\" to change world th, currently: {}".format(world_th))
+                print("\"-wt\" to change world th, currently: {}".format(world_th0))
                 print("\"-tt\" to change trial time, currently: {}".format(trial_steps))
-                print("\nreturn to go on")
                 print("\"-pdb\" for pdb")
                 print("\"-x\" to go back")
                 print("\"-q\" to quit")
+                print("\return to continue")
                 # just in case
-                print("{}".format(problem_gt_menu))
+                print("{}\n".format(problem_gt_menu))
                 problem_gt_menu=" "
                 # auto select last object
                 if default==True:
@@ -102,8 +103,10 @@ def load(wdir="ring_exps",ext="rx",default=True,anim=True,save_video=False,retur
                     import pdb; pdb.set_trace()
                 elif g_in=="-anim" or g_in=="anim":
                     anim=True if anim==False else True
-                elif g_in=="-save" or g_in=="save":
-                    save_video=True if save_video==False else True
+                elif g_in=="-save anim" or g_in=="save anim":
+                    save_anim=True if save_anim==False else True
+                elif g_in=="-save data" or g_in=="save data":
+                    save_data=True if save_data==False else True
                 elif g_in=="ws" or g_in=="-ws":
                     try:
                         sim_speed = int(input("sim speed? > "))
@@ -116,9 +119,9 @@ def load(wdir="ring_exps",ext="rx",default=True,anim=True,save_video=False,retur
                         print("invalid input: {}".format(world_size))
                 elif g_in=="wt" or g_in=="-wt":
                     try:
-                        world_th = int(input("world filling threshold? >  "))
+                        world_th0 = int(input("world filling threshold? >  "))
                     except:
-                        print("invalid input: {}".format(world_th))
+                        print("invalid input: {}".format(world_th0))
                 elif g_in=="tt" or g_in=="-tt":
                     try:
                         trial_steps = int(input("number of trial steps? > "))
@@ -133,7 +136,10 @@ def load(wdir="ring_exps",ext="rx",default=True,anim=True,save_video=False,retur
                 else:
                     try:
                         gtx = loaded_obj[g_in]
-                        animation_fx(gtx,show=anim,save=save_video,sim_speed=sim_speed,trial_steps=trial_steps,world_size=world_size,world_th0=world_th)
+                        ij = int(world_size/2)
+                        ringx = Ring(gtx,i=ij,j=ij)
+                        ft,trial_data = trial(ringx,mode='gol',n_steps=trial_steps,world_size=world_size,world_th0=world_th0,save_data=True,animation=anim,save_animation=save_anim)
+                        # animation_fx(gtx,show=anim,save=save_video,sim_speed=sim_speed,trial_steps=trial_steps,world_size=world_size,world_th0=world_th)
                     except:
                         problem_gt_menu="\ncouldn't load data, invalid input? ({}) --pdb for the pdb.set_trace()".format(g_in)
 

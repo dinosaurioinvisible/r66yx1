@@ -25,7 +25,7 @@ def evaluate(gt,mode='gol',st0=6,n_trials=10,n_steps=1000,world_size=11,world_th
 
 '''trial for the system ring,
 v1: for simplicity agent and world are processed as independent objects'''
-def trial(ring,mode='gol',n_steps=1000,world_size=11,world_th0=0.2,save_data=False):
+def trial(ring,mode='gol',n_steps=1000,world_size=11,world_th0=0.2,save_data=False,animation=False,save_animation=False):
     # set world
     xy = int(world_size/2)
     # set world

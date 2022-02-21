@@ -8,12 +8,12 @@ from helper_fxs import *
 
 def animation_fx(gt=[],fname='',show=True,save=False,trial_mode='gol',sim_speed=500,trial_steps=100,world_size=11,world_th0=0.25):
 
-    # run simulation
+    # run simulation (for debugging)
     if len(gt)==0:
         gt = np.random.randint(0,2,size=(4,512))
-    ij = int(world_size/2)
-    ringx = Ring(gt,i=ij,j=ij)
-    ft,trial_data = trial(ringx,mode=trial_mode,n_steps=trial_steps,world_size=world_size,world_th0=world_th0,save_data=True)
+        ij = int(world_size/2)
+        ringx = Ring(gt,i=ij,j=ij)
+        ft,trial_data = trial(ringx,mode=trial_mode,n_steps=trial_steps,world_size=world_size,world_th0=world_th0,save_data=True)
 
     # 4 subplots (rows,columns,index)
     fig = plt.figure(figsize=[10,10],constrained_layout=False)
