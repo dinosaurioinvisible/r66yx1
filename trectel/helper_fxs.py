@@ -5,12 +5,15 @@ import numpy as np
 def arr2int(arr,rot=None):
     if rot:
         arr = np.rot90(arr,rot)
-    x = int(''.join(arr.flatten().astype(int).astype(str)),2)
+    # needs to be reversed for elements order [e0,e1,e2,...]
+    x_str = ''.join(arr.flatten().astype(int).astype(str)) [::-1]
+    x = int(x_str,2)
     return x
 
 # convert int number into an array or a NxN matrix
 def int2arr(n,arr_len,dims=1):
-    x = np.array([int(i) for i in np.binary_repr(n,arr_len)])
+    # needs to be reversed for assignation to elements [e0,e1,e2...]
+    x = np.array([int(i) for i in np.binary_repr(n,arr_len) [::-1]])
     if dims > 1:
         x = x.reshape(dims,dims)
     return x
