@@ -18,6 +18,19 @@ def int2arr(n,arr_len,dims=1):
         x = x.reshape(dims,dims)
     return x
 
+# env int > arr > fills center > matrix > border vectors > ints
+def envint2arrs(n,env_cells=8,fill=2,return_matrix=False):
+    arr = int2arr(n,arr_len=env_cells)
+    arr = np.insert(arr,int(len(arr)/2),fill)
+    dim = int(np.sqrt(arr.size))
+    mat = arr.reshape(dim,dim)
+    # anticlockwise
+    borders = [mat[0],mat[:,0],mat[-1],mat[:,-1]]
+    eints = [arr2int(bi) for bi in borders]
+    if return_matrix:
+        return eints+mat
+    return eints
+
 # distance matrix
 def dist_matrix(dim=8,cost=1):
     dm = np.zeros((dim,dim))
@@ -28,42 +41,6 @@ def dist_matrix(dim=8,cost=1):
             dij = np.sum([abs(bi-bj) for bi,bj in zip(bin_i,bin_j)])
             dm[i][j] = cost * dij
     return dm
-
-# organization
-def organization_fx(gt):
-    st_txs = {}
-
-    txs = {}
-    for sti in range(16):
-        # intitial state
-        sti_a, sti_b, sti_c, sti_d = int2arr(sti,arr_len=4)
-        # syntactic operators/distinctins
-        for envi in range(256):
-            # env states
-            env = int2arr(envi)
-            env = np.insert(env,4,2).reshape(3,3)
-            envi_a = arr2int(env[0])
-            envi_b = arr2int(env[:,0])
-            envi_c = arr2int(env[1])
-            envi_d = arr2int(env[:,1])
-
-            # sti, ei -> stx
-            txs[sti][envi] = stx
-            # syntactic distinctions
-            sobs[sti][stx].add(envi)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
