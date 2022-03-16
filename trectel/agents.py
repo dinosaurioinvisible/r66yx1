@@ -2,6 +2,22 @@
 import numpy as np
 from helper_fxs import *
 
+
+'''It was supposed to be a ring,
+but considering the center element as part of the system
+it basically becomes a blinker'''
+class RingBlinker:
+    def __init__(self,gt,i,j,st0=[0,1,1,1,0]):
+        self.gt = gt
+        self.i,self.j = i,j
+        self.exs_locs = ring_locs(i=i,j=j,r=1,hollow=False)
+        self.exs_dom_locs = ring_locs(i=2,j=2,r=1,hollow=True)
+        self.st = st0
+
+    def update(self,domain):
+        
+
+
 '''Ring made of elements with their own genotype'''
 class Ring:
     def __init__(self,gt,i,j,st0=6):

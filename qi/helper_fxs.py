@@ -2,13 +2,10 @@
 import numpy as np
 
 # convert array > binary > int
-def arr2int(arr,rot=None):
-    if rot:
-        arr = np.rot90(arr,rot)
+def arr2int(arr):
     # needs to be reversed for elements order [e0,e1,e2,...]
     x_str = ''.join(arr.flatten().astype(int).astype(str)) [::-1]
-    x = int(x_str,2)
-    return x
+    return int(x_str,2)
 
 # convert int number into an array or a NxN matrix
 def int2arr(n,arr_len,dims=1):
@@ -17,6 +14,20 @@ def int2arr(n,arr_len,dims=1):
     if dims > 1:
         x = x.reshape(dims,dims)
     return x
+
+# ring locations (top to bottom, left to right, symmetrical)
+def ring_locs(i=0,j=0,r=1,hollow=True,only_edges=False):
+    locs = []
+    for ir in range(-r,r+1):
+        ij = set([abs(ir)-r,r-abs(ir)]) if hollow == True else [jx for jx in range(abs(ir)-r,r-abs(ir)+1)]
+        for jr in ij:
+            if only_edges:
+                if ir%r==0:
+                    locs.append([i+ir,j+jr])
+            else:
+                locs.append([i+ir,j+jr])
+    locs = sorted(locs)
+    return locs
 
 # distance matrix
 def dist_matrix(dim=8,cost=1):
@@ -28,32 +39,6 @@ def dist_matrix(dim=8,cost=1):
             dij = np.sum([abs(bi-bj) for bi,bj in zip(bin_i,bin_j)])
             dm[i][j] = cost * dij
     return dm
-
-# organization
-def organization_fx(gt):
-    st_txs = {}
-
-    txs = {}
-    for sti in range(16):
-        # intitial state
-        sti_a, sti_b, sti_c, sti_d = int2arr(sti,arr_len=4)
-        # syntactic operators/distinctins
-        for envi in range(256):
-            # env states
-            env = int2arr(envi)
-            env = np.insert(env,4,2).reshape(3,3)
-            envi_a = arr2int(env[0])
-            envi_b = arr2int(env[:,0])
-            envi_c = arr2int(env[1])
-            envi_d = arr2int(env[:,1])
-
-            # sti, ei -> stx
-            txs[sti][envi] = stx
-            # syntactic distinctions
-            sobs[sti][stx].add(envi)
-
-
-
 
 
 

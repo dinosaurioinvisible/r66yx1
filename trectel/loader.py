@@ -1,12 +1,13 @@
 
-from ring_system import Ring
-from simulation import trial
-from ring_animation import animation_fx
+from agents import RingBlinker
+from simulations import ring_gol_trial
+from animations import ring_trial_animation
 import numpy as np
-import pickle
 import os
 
-def load(wdir="ring_exps",ext="rx",default=True,save_data=False,anim=True,save_anim=False,return_gts=False):
+
+# basic loading function with menu
+def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,save_animation=False):
     # search dir
     wdir = os.path.join(os.getcwd(),wdir)
     try:
@@ -25,13 +26,13 @@ def load(wdir="ring_exps",ext="rx",default=True,save_data=False,anim=True,save_a
         print("")
         for enum, obj_filename in enumerate(objs):
             print("{} - {}".format(enum, obj_filename))
-        print("\n\"r\" to return, currently {}".format('off' if not return_gts else 'on'))
+        print("\"-pdb\" for pdb")
         print("\"q\" to quit")
         # in case of
         print("{}".format(problem_select_obj))
         problem_select_obj=" "
         # select object manually
-        if default==True:
+        if auto==True:
             # optional auto select last object
             n_in = len(objs)-1
             print("==> auto selected {} - {}\n".format(n_in,objs[n_in]))
@@ -54,98 +55,170 @@ def load(wdir="ring_exps",ext="rx",default=True,save_data=False,anim=True,save_a
                 n_obj_filename = objs[n_obj]
                 obj_path = os.path.join(wdir,n_obj_filename)
                 with open(obj_path, "rb") as ea_exp:
-                    loaded_obj = pickle.load(ea_exp)
+                    genotypes = pickle.load(ea_exp)
                 gt_menu=True
-                # optional return to work with the data
-                if return_gts==True:
-                    return n_obj_filename,list(loaded_obj)
             except:
                 problem_select_obj="\ncouldn't open object, invalid input? --pdb for the pdb.set_trace()\n"
                 gt_menu=False
         # select glider
         if gt_menu==True:
-            # simulation parameters
+            # parameters
             sim_speed = 1000
+            min_sim_speed = 50
+            max_sim_speed = 2500
             world_size = 25
-            world_th0=0.2
-            trial_steps = 100
+            min_world_size = 10
+            max_world_size = 100
+            world_th0= 0.3
+            min_world_th0 = 0
+            max_world_th0 = 0.9
+            timesteps = 100
+            min_timesteps = 10
+            max_timesteps = 9999
             problem_gt_menu=""
+            g_in = 0
+            # display menu
             while gt_menu==True:
-                g_in = 0
                 print("")
+                ring_load = False
                 # genotypes
-                print('\n{} genotypes loaded, current gt: {} (best)\n'.format(len(loaded_obj),g_in))
-                # print('\'-n\' to run and sort them all')
-                print("\"-anim\" to (de)active the animation, currently: {}".format("ON" if anim==True else "OFF"))
-                print("\"-save anim\" to (de)active save video, currently: {}".format("ON" if save_anim==True else "OFF"))
-                print("\"-save data\" to (de)active save trial data, currently: {}".format("ON" if save_data==True else "OFF"))
-                print("\"-ss\" to change simulation step interval (anim. speed), currently: {}".format(sim_speed))
-                print("\"-ws\" to change world size, currently: {}".format(world_size))
-                print("\"-wt\" to change world th, currently: {}".format(world_th0))
-                print("\"-tt\" to change trial time, currently: {}".format(trial_steps))
-                print("\"-pdb\" for pdb")
-                print("\"-x\" to go back")
-                print("\"-q\" to quit")
-                print("\return to continue")
-                # just in case
-                print("{}\n".format(problem_gt_menu))
+                g_in = g_in if type(g_in)==int and 0<=g_in<len(genotypes) else 0
+                print('\n{} genotypes loaded from: {}\n'.format(len(genotypes),n_obj_filename))
+                print("\"gt\" to change genotype, current gt: {}".format(g_in))
+                print("\"x\" to return genotypes")
+                # animation
+                print("\"anim\" to (de)active the animation, currently: {}".format("ON" if animation==True else "OFF"))
+                print("\"save anim\" to (de)active save video, currently: {}".format("ON" if save_animation==True else "OFF"))
+                print("\"ss\" to change simulation step interval (anim. speed), currently: {}".format(sim_speed))
+                # simulation parameters
+                print("\"return data\" to return trial data, currently: {}".format("ON" if return_data==True else "OFF"))
+                print("\"ws\" to change world size, currently: {}".format(world_size))
+                print("\"wt\" to change world th, currently: {}".format(world_th0))
+                print("\"tt\" to change trial timesteps, currently: {}".format(timesteps))
+                # auto
+                print("\"pdb\" for pdb")
+                print("\"b\" to go back")
+                print("\"q\" to quit")
+                print("return to continue to simulation")
+                # for invalid inputs
+                print("\n{}\n".format(problem_gt_menu))
                 problem_gt_menu=" "
                 # auto select last object
-                if default==True:
+                if auto==True:
                     g_in = 0
                     print("\n==> auto selected gt{}\n".format(0))
-                    default=False
+                    auto=False
                 else:
                     gt_menu_in = input("> ")
                     g_in = gt_menu_in if gt_menu_in != '' else g_in
-                # options
-                if g_in=="-pdb" or g_in=="--pdb":
+                # options: change current gt object
+                if g_in=="gt":
+                    gt_in = input("genotype? (0:{}) > ".format(len(genotypes)-1))
+                    try:
+                        if 0<=int(gt_in)<len(genotypes):
+                            g_in = int(gt_in)
+                        else:
+                            problem_gt_menu = "there are {} loaded genotypes (0:{}); input given: {}".format(len(genotypes),len(genotypes)-1,gt_in)
+                    except:
+                        problem_gt_menu = "there are {} loaded genotypes (0:{}); input given: {}".format(len(genotypes),len(genotypes)-1,gt_in)
+                # options: return genotypes
+                elif g_in=="x" or g_in=="return":
+                    return genotypes
+                # options: pdb
+                elif g_in=="pdb":
                     import pdb; pdb.set_trace()
-                elif g_in=="-anim" or g_in=="anim":
-                    anim=True if anim==False else True
-                elif g_in=="-save anim" or g_in=="save anim":
-                    save_anim=True if save_anim==False else True
-                elif g_in=="-save data" or g_in=="save data":
-                    save_data=True if save_data==False else True
-                elif g_in=="ws" or g_in=="-ws":
+                # options: animation
+                elif g_in=="anim":
+                    animation=True if animation==False else False
+                # options: save animation
+                elif g_in=="save anim" or g_in=="save-anim":
+                    save_animation=True if save_animation==False else False
+                # options: save data
+                elif g_in=="data" or g_in=="return data" or g_in=="return-data":
+                    return_data=True if return_data==False else False
+                # options: simulation speed (frames per second)
+                elif g_in=="ss":
+                    ss_in = input("sim speed? (100:2500) > ")
                     try:
-                        sim_speed = int(input("sim speed? > "))
+                        if min_sim_speed<=int(ss_in)<=max_sim_speed:
+                            sim_speed = int(ss_in)
+                        else:
+                            problem_gt_menu = "sim speed must be a integer between {} and {}; input given: {}".format(min_sim_speed,max_sim_speed,ss_in)
                     except:
-                        print("invalid input: {}".format(sim_speed))
-                elif g_in=="ws" or g_in=="-ws":
+                        problem_gt_menu = "sim speed must be a integer between {} and {}; input given: {}".format(min_sim_speed,max_sim_speed,ss_in)
+                # options: world size
+                elif g_in=="ws":
+                    ws_in = input("world size? > ")
                     try:
-                        world_size = int(input("world size? > "))
+                        if min_world_size<=int(ws_in)<=max_world_size:
+                            world_size = int(ws_in)
+                        else:
+                            problem_gt_menu = "world size must be an integer between {} and {}; input given: {}".format(min_world_size,max_world_size,ws_in)
                     except:
-                        print("invalid input: {}".format(world_size))
-                elif g_in=="wt" or g_in=="-wt":
+                        problem_gt_menu = "world size must be an integer between {} and {}; input given: {}".format(min_world_size,max_world_size,ws_in)
+                # options: world initial threshold for filling
+                elif g_in=="wt":
+                    wt_in = input("world init filling threshold? >  ")
                     try:
-                        world_th0 = int(input("world filling threshold? >  "))
+                        if min_world_th0<=float(wt_in)<=max_world_th0:
+                            world_th0 = float(wt_in)
+                        else:
+                            problem_gt_menu = "world init threshold must a float between {} and {}; input given: {}".format(min_world_th0,max_world_th0,wt_in)
                     except:
-                        print("invalid input: {}".format(world_th0))
-                elif g_in=="tt" or g_in=="-tt":
+                        problem_gt_menu = "world init threshold must a float between {} and {}; input given: {}".format(min_world_th0,max_world_th0,wt_in)
+                # options: timesteps
+                elif g_in=="tt":
+                    tt_in = input("number of timesteps? > ")
                     try:
-                        trial_steps = int(input("number of trial steps? > "))
+                        if min_timesteps<=int(tt_in)<=max_timesteps:
+                            timesteps = int(tt_in)
+                        else:
+                            problem_gt_menu = "timesteps must be an integer between {} and {}; input given: {}".format(min_timesteps,max_timesteps,tt_in)
                     except:
-                        print("invalid input: {}".format(trial_steps))
-                elif g_in=="x" or g_in=="-x" or g_in=="back":
+                        problem_gt_menu = "timesteps must be an integer between {} and {}; input given: {}".format(min_timesteps,max_timesteps,tt_in)
+                # options: go back or quit
+                elif g_in=="b" or g_in=="-b" or g_in=="back":
                     gt_menu=False
                 elif g_in=="q" or g_in=="-q" or g_in=="quit":
                     gt_menu=False
                     select_obj=False
-                # animation
+                # try to load object
                 else:
                     try:
-                        gtx = loaded_obj[g_in]
+                        gtx = genotypes[g_in]
                         ij = int(world_size/2)
                         ringx = Ring(gtx,i=ij,j=ij)
-                        ft,trial_data = trial(ringx,mode='gol',n_steps=trial_steps,world_size=world_size,world_th0=world_th0,save_data=True,animation=anim,save_animation=save_anim)
-                        # animation_fx(gtx,show=anim,save=save_video,sim_speed=sim_speed,trial_steps=trial_steps,world_size=world_size,world_th0=world_th)
+                        ring_load = True
                     except:
-                        problem_gt_menu="\ncouldn't load data, invalid input? ({}) --pdb for the pdb.set_trace()".format(g_in)
+                        problem_gt_menu="couldn't load data, invalid input? ({}) --pdb for the pdb.set_trace()".format(g_in)
+                    # load and run
+                    if ring_load:
+                        ring,ft,trial_data = ring_gol_trial(timesteps=timesteps,world_size=world_size,world_th0=world_th0,save_data=True)
+                        print("\nfitness = {}".format(round(ft,4)))
+                        # animation
+                        if animation:
+                            ring_trial_animation(ring,ft,trial_data,sim_speed=sim_speed,save_animation=save_animation)
+                        # data
+                        if return_data:
+                            return ring,ft,trial_data
+                        # in case return data is false
+                        ask_return_data = True
+                        while ask_return_data == True:
+                            return_data = input("\nreturn data? (y/n/pdb) > ")
+                            if return_data == "y" or return_data == "yes":
+                                return ring,ft,trial_data
+                            elif return_data == "n" or return_data == "no":
+                                return_data = False
+                                ask_return_data = False
+                            elif return_data == "pdb":
+                                import pdb; pdb.set_trace()
+                            else:
+                                print("\ninvalid input ({})".format(ask_return_data))
 
 
 
-#load()
+
+load()
 
 
 

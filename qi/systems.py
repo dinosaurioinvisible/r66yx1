@@ -2,6 +2,31 @@
 import numpy as np
 from helper_fxs import *
 
+
+
+'''A ring surrounding a 3x3 space
+in this case environment is inside the system'''
+class ContainerRing:
+    def __init__(self,gt,i=3,j=3,exs=8,st0=[]):
+        # gt = nxm matrix, n=elements, m=responses
+        self.gt = gt
+        self.i,self.j = i,j
+        # disconnected (4) or full ring (8)
+        edges = True if exs==4 else False
+        self.exs_ij = ring_locs(i=i,j=j,r=2,hollow=True,only_edges=edges)
+        self.st = np.asarray(st0) if len(st0)==exs else np.random.randint(0,2,size=(exs))
+
+    def update(self,world):
+        for ex,[ei,ej] in enumerate(self.exs_ij):
+            # sum to int pos in gt => other sts=(0:7)+env=(0/1) => (0:8)
+            ex_in = min(np.sum(world[ei-1:ei+2,ej-1:ej+2])-world[ei,ej],3)
+            # retreive response from gt
+            self.st[ex] = self.gt[ex][ex_in]
+
+
+
+
+
 '''
 A 1-cell size system that floats over the GoL grid.
 (The GoL updating is independent from the system).
@@ -52,7 +77,13 @@ class HoverElement:
         self.st = self.gt[ce_in]
 
 
-
+# if self.edges:
+    # binary to int pos in gt => r1_out = gt[r1][int(ek,r2,r3,r4)]
+    # ex_net = np.delete(self.st,ex)
+    # ek = 1 if np.sum(world[ei-1:ei+2,ej-1:ej+2])-world[ei,ej]>0 else 0
+    # ex_in = arr2int(np.append(ek,ex_net))
+# else:
+# st_copy = list(self.st)
 
 
 
