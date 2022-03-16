@@ -2,9 +2,7 @@
 import numpy as np
 
 # convert array > binary > int
-def arr2int(arr,rot=None):
-    if rot:
-        arr = np.rot90(arr,rot)
+def arr2int(arr):
     # needs to be reversed for elements order [e0,e1,e2,...]
     x_str = ''.join(arr.flatten().astype(int).astype(str)) [::-1]
     x = int(x_str,2)

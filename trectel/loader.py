@@ -1,7 +1,7 @@
 
-from agents import RingBlinker
 from simulations import ring_gol_trial
-from animations import ring_trial_animation
+from animations import ringb_animation
+import pickle
 import numpy as np
 import os
 
@@ -26,11 +26,11 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
         print("")
         for enum, obj_filename in enumerate(objs):
             print("{} - {}".format(enum, obj_filename))
-        print("\"-pdb\" for pdb")
+        print("\n\"-pdb\" for pdb")
         print("\"q\" to quit")
         # in case of
         print("{}".format(problem_select_obj))
-        problem_select_obj=" "
+        problem_select_obj=""
         # select object manually
         if auto==True:
             # optional auto select last object
@@ -39,14 +39,11 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
         else:
             n_in = input("\n> ")
         # options (just pdb, quit and continue here)
-        if n_in=="-pdb" or n_in=="--pdb":
+        if n_in=="pdb":
             import pdb; pdb.set_trace()
             gt_menu=False
-        elif n_in=="q" or n_in=="-q" or n_in=="quit":
+        elif n_in=="q" or n_in=="quit":
             select_obj=False
-            gt_menu=False
-        elif n_in=="r" or n_in=="return":
-            return_gts = True if return_gts==False else False
             gt_menu=False
         else:
             try:
@@ -63,7 +60,7 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
         # select glider
         if gt_menu==True:
             # parameters
-            sim_speed = 1000
+            sim_speed = 2000
             min_sim_speed = 50
             max_sim_speed = 2500
             world_size = 25
@@ -102,7 +99,7 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
                 print("return to continue to simulation")
                 # for invalid inputs
                 print("\n{}\n".format(problem_gt_menu))
-                problem_gt_menu=" "
+                problem_gt_menu=""
                 # auto select last object
                 if auto==True:
                     g_in = 0
@@ -186,36 +183,45 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
                 else:
                     try:
                         gtx = genotypes[g_in]
-                        ij = int(world_size/2)
-                        ringx = Ring(gtx,i=ij,j=ij)
+                        ring,ft,trial_data = ring_gol_trial(ring_gt=gtx,timesteps=timesteps,world_size=world_size,world_th0=world_th0,save_data=True)
+                        print("\nfitness = {}".format(round(ft,4)))
                         ring_load = True
                     except:
-                        problem_gt_menu="couldn't load data, invalid input? ({}) --pdb for the pdb.set_trace()".format(g_in)
+                        problem_gt_menu="couldn't run simulation (input: {}) --pdb for the pdb.set_trace()".format(g_in)
                     # load and run
                     if ring_load:
-                        ring,ft,trial_data = ring_gol_trial(timesteps=timesteps,world_size=world_size,world_th0=world_th0,save_data=True)
-                        print("\nfitness = {}".format(round(ft,4)))
                         # animation
                         if animation:
-                            ring_trial_animation(ring,ft,trial_data,sim_speed=sim_speed,save_animation=save_animation)
+                            ringb_animation(ring,ft,trial_data,sim_speed=sim_speed,save_animation=save_animation)
                         # data
                         if return_data:
                             return ring,ft,trial_data
                         # in case return data is false
-                        ask_return_data = True
-                        while ask_return_data == True:
-                            return_data = input("\nreturn data? (y/n/pdb) > ")
-                            if return_data == "y" or return_data == "yes":
+                        ask_after_sim = True
+                        after_sim_menu_problem = ""
+                        while ask_after_sim == True:
+                            print("\n\'data\' to return data")
+                            print("\'anim\' to animate again")
+                            print("\'pdb\' for pdb")
+                            print("\'b\' to go back")
+                            print("\'q\' to quit")
+                            print(after_sim_menu_problem)
+                            after_sim_in = input("\n > ")
+                            if after_sim_in == "data":
                                 return ring,ft,trial_data
-                            elif return_data == "n" or return_data == "no":
-                                return_data = False
-                                ask_return_data = False
-                            elif return_data == "pdb":
+                            elif after_sim_in == "anim":
+                                ringb_animation(ring,ft,trial_data,sim_speed=sim_speed,save_animation=save_animation)
+                            elif after_sim_in == "pdb":
+                                print("\nvars: ring, ft, trial_data\n")
                                 import pdb; pdb.set_trace()
+                            elif after_sim_in=="b" or after_sim_in=="back":
+                                ask_after_sim = False
+                            elif after_sim_in=="q" or after_sim_in=="quit":
+                                ask_after_sim=False
+                                gt_menu=False
+                                select_obj=False
                             else:
-                                print("\ninvalid input ({})".format(ask_return_data))
-
-
+                                after_sim_menu_problem = "\ninvalid input ({})".format(ask_return_data)
 
 
 load()

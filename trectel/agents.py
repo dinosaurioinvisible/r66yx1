@@ -6,16 +6,24 @@ from helper_fxs import *
 '''It was supposed to be a ring,
 but considering the center element as part of the system
 it basically becomes a blinker'''
-class RingBlinker:
+class RingB:
     def __init__(self,gt,i,j,st0=[0,1,1,1,0]):
         self.gt = gt
         self.i,self.j = i,j
-        self.exs_locs = ring_locs(i=i,j=j,r=1,hollow=False)
-        self.exs_dom_locs = ring_locs(i=2,j=2,r=1,hollow=True)
-        self.st = st0
+        self.locs = ring_locs(i=i,j=j,r=1,hollow=False)
+        self.dom_locs = ring_locs(i=2,j=2,r=1,hollow=True)
+        self.st = np.asarray(st0) if len(st0)==5 else np.random.randint(0,2,size=(5))
 
     def update(self,domain):
-        
+        # update outer elements
+        for rx,[ri,rj] in enumerate(self.dom_locs):
+            rx_dom = arr2int(domain[ri-1:ri+2,rj-1:rj+2])
+            self.st[rx] = self.gt[rx][rx_dom]
+        # update core
+        cx = np.sum(domain[1:4,1:4]) - self.st[2]
+        self.st[2] = 1 if cx==3 or (self.st[2]==1 and cx==2) else 0
+
+
 
 
 '''Ring made of elements with their own genotype'''

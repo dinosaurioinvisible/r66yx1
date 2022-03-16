@@ -1,8 +1,7 @@
 
 import numpy as np
-from ring_system import Ring
+from agents import RingB
 from helper_fxs import *
-from ring_animation import animation_fx
 
 '''for multiple trials'''
 def evaluate(gt,mode='gol',st0=6,n_trials=10,n_steps=1000,world_size=11,world_th0=0.2):
@@ -26,17 +25,19 @@ def evaluate(gt,mode='gol',st0=6,n_trials=10,n_steps=1000,world_size=11,world_th
 '''trial for the system ring,
 world behaves following Game of Life rules
 agent and world are processed as independent objects'''
-def ring_gol_trial(ring,timesteps=1000,world_size=50,world_th0=0.25,save_data=False):
+def ring_gol_trial(ring_gt,timesteps=1000,world_size=50,world_th0=0.25,save_data=False):
     # set world (system's immediate environment is empty at first)
     xy = int(world_size/2)
     world = np.random.uniform(size=(world_size,world_size))
     world = np.where(world<world_th0,1,0).astype(int)
     world[xy-2:xy+3,xy-2:xy+3] = 0
+    # set ring
+    ring = RingB(ring_gt,xy,xy)
     # data
     if save_data:
         data = [[world.astype(int),ring.st]]
     # trial
-    ti,ft = 0
+    ti,ft = 0,0
     while ti<timesteps:
         # update ring (env triggers st transition)
         ring_domain = world[ring.i-2:ring.i+3,ring.j-2:ring.j+3]
@@ -49,12 +50,12 @@ def ring_gol_trial(ring,timesteps=1000,world_size=50,world_th0=0.25,save_data=Fa
                 nb = np.sum(wcopy[max(wi-1,0):wi+2,max(wj-1,0):wj+2]) - wij
                 world[wi,wj] = 1 if nb==3 or (wij==1 and nb==2) else 0
         # re-allocate ring
-        for ex_st,[exi,exj] in zip(ring.st,ring.exs_locs):
-            world[exi,exj] = ex_st
-        ft += world[ring.i,ring.j]
+        for rv,[ri,rj] in zip(ring.st,ring.locs):
+            world[ri,rj] = rv
+        ft += ring.st[2]
         # save data
         if save_data:
-            data = [[world.astype(int),ring.st]]
+            data.append([world.astype(int),ring.st.astype(int)])
         ti += 1
     # data
     if save_data:

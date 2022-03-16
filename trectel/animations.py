@@ -2,11 +2,82 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from ring_system import Ring
-from simulation import trial
+from agents import RingB
+from simulations import ring_gol_trial
 from helper_fxs import *
 
-def animation_fx(gt=[],fname='',show=True,save=False,trial_mode='gol',sim_speed=500,trial_steps=100,world_size=11,world_th0=0.25):
+def ringb_animation(ring,ft,trial_data,sim_speed=1000,save_animation=False):
+
+    # 3 subplots (trial, transitions, information)
+    fig = plt.figure(figsize=[15,10],constrained_layout=True)
+    ax1 = fig.add_subplot(1,3,1)
+    ax1.set_title("trial")
+    ax2 = fig.add_subplot(1,3,2)
+    ax2.set_title("transitions")
+    ax3 = fig.add_subplot(1,3,3)
+    ax3.set_title("information")
+    fig.suptitle("fitness = {}".format(round(ft,2)),ha='center',va='center')
+    time = fig.text(0.5,0.94,'',ha='center',va='center')
+
+    # to pause the animation and check data
+    anim_running = True
+    def onClick(event):
+        nonlocal anim_running
+        if anim_running:
+            anim.event_source.stop()
+            anim_running = False
+        else:
+            anim.event_source.start()
+            anim_running = True
+        rx,tdx = ring,trial_data
+        print("\n\nvars: rx=ring, tdx=trial_data\n")
+        import pdb; pdb.set_trace()
+
+    # 0:white, 1:black, 2:cyan, 3:blue, 4:red, 5:green
+    palette = np.array([[255,255,255],[0,0,0],[0,255,255],[0,0,255],[255,0,0],[0,255,0]])
+    timesteps = len(trial_data)
+
+    # to start
+    def init():
+        return True
+
+    def animate(i):
+        time.set_text("time={}/{}".format(i,timesteps))
+
+        # trial
+        for rx,[ri,rj] in enumerate(ring.locs):
+            trial_data[i][0][ri,rj] += 2
+        ax_trial = ax1.imshow(palette[trial_data[i][0]])
+
+        # transitions
+
+        # information
+
+        return ax_trial
+
+    fig.canvas.mpl_connect('button_press_event',onClick)
+    anim=animation.FuncAnimation(fig,animate,
+        init_func=init,frames=timesteps,interval=500,blit=False,repeat=True)
+
+    if save_animation:
+        if fname == '':
+            fname = 'ring_animation_{}'.format(np.random.uniform(0,9999))
+        writer = animation.FFMpegWriter(fps=30)
+        try:
+            anim.save("{}.mp4".format(fname),writer=writer)
+        except:
+            print("\ncould\'t save animation...\n")
+            import pdb; pdb.set_trace()
+    plt.show()
+    plt.close('all')
+
+
+
+
+
+
+
+def ring_trial_animation(gt=[],fname='',show=True,save=False,trial_mode='gol',sim_speed=500,trial_steps=100,world_size=11,world_th0=0.25):
 
     # run simulation (for debugging)
     if len(gt)==0:
