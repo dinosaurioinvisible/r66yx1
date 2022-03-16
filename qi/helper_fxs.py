@@ -15,6 +15,7 @@ def int2arr(n,arr_len,dims=1):
         x = x.reshape(dims,dims)
     return x
 
+<<<<<<< HEAD
 # ring locations (top to bottom, left to right, symmetrical)
 def ring_locs(i=0,j=0,r=1,hollow=True,only_edges=False):
     locs = []
@@ -28,6 +29,20 @@ def ring_locs(i=0,j=0,r=1,hollow=True,only_edges=False):
                 locs.append([i+ir,j+jr])
     locs = sorted(locs)
     return locs
+=======
+# env int > arr > fills center > matrix > border vectors > ints
+def envint2arrs(n,env_cells=8,fill=2,return_matrix=False):
+    arr = int2arr(n,arr_len=env_cells)
+    arr = np.insert(arr,int(len(arr)/2),fill)
+    dim = int(np.sqrt(arr.size))
+    mat = arr.reshape(dim,dim)
+    # anticlockwise
+    borders = [mat[0],mat[:,0],mat[-1],mat[:,-1]]
+    eints = [arr2int(bi) for bi in borders]
+    if return_matrix:
+        return eints+mat
+    return eints
+>>>>>>> de49d4b7e2bab1d3ba6afd764a10eaf9f0dee87b
 
 # distance matrix
 def dist_matrix(dim=8,cost=1):
@@ -40,6 +55,7 @@ def dist_matrix(dim=8,cost=1):
             dm[i][j] = cost * dij
     return dm
 
+<<<<<<< HEAD
 
 
 
@@ -50,6 +66,8 @@ def dist_matrix(dim=8,cost=1):
 
 
 
+=======
+>>>>>>> de49d4b7e2bab1d3ba6afd764a10eaf9f0dee87b
 
 
 
