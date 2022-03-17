@@ -4,21 +4,22 @@ from agents import RingB
 from helper_fxs import *
 
 '''for multiple trials'''
-def evaluate(gt,mode='gol',st0=6,n_trials=10,n_steps=1000,world_size=11,world_th0=0.2):
+def evaluate(gt,mode='gol',st0=6,n_trials=10,timesteps=1000,world_size=10,world_th0=0.2):
     # same object over multiple trials
     xy = int(world_size/2)
-    ringx = Ring(gt,i=xy,j=xy,st0=st0)
+    #ringx = Ring(gt,i=xy,j=xy,st0=st0)
     fts = []
     for _ in range(n_trials):
-        trial_ft = trial(ringx,mode=mode,n_steps=n_steps,world_size=world_size,world_th0=world_th0)
-        ringx.reset(st0=st0)
+        trial_ft = ring_gol_trial(ring_gt=gt,timesteps=timesteps,world_size=world_size,world_th0=world_th0)
         fts.append(trial_ft)
     # compute overall fitness and return
     sorted_fts = sorted(fts,reverse=True)
     ft = 0
+    ft_max = 0
     for ti,fti in enumerate(sorted_fts):
         ft += (ti+1)*fti
-    ft = ft/((n_trials+1)*n_trials/2)
+        ft_max += (ti+1)*timesteps
+    ft /= ft_max
     return ft
 
 
