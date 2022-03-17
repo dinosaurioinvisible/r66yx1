@@ -7,7 +7,7 @@ import os
 
 
 # basic loading function with menu
-def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,save_animation=False):
+def load(wdir="ring_exps",ext="rx",auto=True,return_gts=False,animation=True,save_animation=False):
     # search dir
     wdir = os.path.join(os.getcwd(),wdir)
     try:
@@ -17,7 +17,7 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
         print("something's wrong with: {}".format(wdir))
         select_obj = False
     if len(objs)==0:
-        print("didn't find objects at dir: {}".format(wdir))
+        print("\ndidn't find \'.{}\' objects at dir: {}".format(ext,wdir))
         select_obj = False
     # display objects
     problem_select_obj=" "
@@ -53,6 +53,8 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
                 obj_path = os.path.join(wdir,n_obj_filename)
                 with open(obj_path, "rb") as ea_exp:
                     genotypes = pickle.load(ea_exp)
+                if return_gts:
+                    return genotypes
                 gt_menu=True
             except:
                 problem_select_obj="\ncouldn't open object, invalid input? --pdb for the pdb.set_trace()\n"
@@ -88,7 +90,6 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
                 print("\"save anim\" to (de)active save video, currently: {}".format("ON" if save_animation==True else "OFF"))
                 print("\"ss\" to change simulation step interval (anim. speed), currently: {}".format(sim_speed))
                 # simulation parameters
-                print("\"return data\" to return trial data, currently: {}".format("ON" if return_data==True else "OFF"))
                 print("\"ws\" to change world size, currently: {}".format(world_size))
                 print("\"wt\" to change world th, currently: {}".format(world_th0))
                 print("\"tt\" to change trial timesteps, currently: {}".format(timesteps))
@@ -130,9 +131,6 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
                 # options: save animation
                 elif g_in=="save anim" or g_in=="save-anim":
                     save_animation=True if save_animation==False else False
-                # options: save data
-                elif g_in=="data" or g_in=="return data" or g_in=="return-data":
-                    return_data=True if return_data==False else False
                 # options: simulation speed (frames per second)
                 elif g_in=="ss":
                     ss_in = input("sim speed? (100:2500) > ")
@@ -193,21 +191,30 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
                         # animation
                         if animation:
                             ringb_animation(ring,ft,trial_data,sim_speed=sim_speed,save_animation=save_animation)
-                        # data
-                        if return_data:
-                            return ring,ft,trial_data
                         # in case return data is false
                         ask_after_sim = True
                         after_sim_menu_problem = ""
                         while ask_after_sim == True:
-                            print("\n\'data\' to return data")
-                            print("\'anim\' to animate again")
+                            print("\n\'anim\' to animate again")
+                            print("\'s\' to save data (pickle)")
+                            print("\'x\' to return data")
                             print("\'pdb\' for pdb")
                             print("\'b\' to go back")
                             print("\'q\' to quit")
                             print(after_sim_menu_problem)
                             after_sim_in = input("\n > ")
-                            if after_sim_in == "data":
+                            if after_sim_in=="s" or after_sim_in=="save":
+                                data = [ring,ft,trial_data]
+                                filename = "loadsim_ft={}_file={}".format(round(ft,2),n_obj_filename)
+                                filepath = os.path.join(self.path,filename)
+                                if os.path.isfile(filepath):
+                                    dx_name = input('file already exists, new name? > ')
+                                    filename = "loadsim_ft={}_file={}_{}".format(round(ft,2),n_obj_filename,dx_name)
+                                    filepath = os.path.join(self.path,filename)
+                                with open(filepath,'wb') as datapath:
+                                    pickle.dump(data,datapath)
+                                print("\nsaved at: {}".format(filepath))
+                            elif after_sim_in == "x" or after_sim_in=="return":
                                 return ring,ft,trial_data
                             elif after_sim_in == "anim":
                                 ringb_animation(ring,ft,trial_data,sim_speed=sim_speed,save_animation=save_animation)
@@ -221,10 +228,10 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_data=False,animation=True,sa
                                 gt_menu=False
                                 select_obj=False
                             else:
-                                after_sim_menu_problem = "\ninvalid input ({})".format(ask_return_data)
+                                after_sim_menu_problem = "\ninvalid input ({})".format(after_sim_in)
 
 
-load()
+#load()
 
 
 
