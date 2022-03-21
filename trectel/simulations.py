@@ -1,10 +1,11 @@
 
 import numpy as np
 from agents import RingB
+from fast_gol import gol_tx
 from helper_fxs import *
 
 '''for multiple trials'''
-def evaluate(gt,mode='gol',st0=6,n_trials=10,timesteps=1000,world_size=10,world_th0=0.2):
+def evaluate(gt,mode='gol',st0=6,n_trials=10,timesteps=1000,world_size=25,world_th0=0.2):
     # same object over multiple trials
     xy = int(world_size/2)
     #ringx = Ring(gt,i=xy,j=xy,st0=st0)
@@ -26,7 +27,7 @@ def evaluate(gt,mode='gol',st0=6,n_trials=10,timesteps=1000,world_size=10,world_
 '''trial for the system ring,
 world behaves following Game of Life rules
 agent and world are processed as independent objects'''
-def ring_gol_trial(ring_gt,timesteps=1000,world_size=50,world_th0=0.25,save_data=False):
+def ring_gol_trial(ring_gt,timesteps=1000,world_size=25,world_th0=0.2,save_data=False):
     # set world (system's immediate environment is empty at first)
     xy = int(world_size/2)
     world = np.random.uniform(size=(world_size,world_size))
@@ -43,17 +44,17 @@ def ring_gol_trial(ring_gt,timesteps=1000,world_size=50,world_th0=0.25,save_data
         # update ring (env triggers st transition)
         ring_domain = world[ring.i-2:ring.i+3,ring.j-2:ring.j+3]
         ring.update(ring_domain)
-        # update env (agent is blind to env changes)
-        wcopy = world.astype(int)
-        for wi in range(world_size):
-            for wj in range(world_size):
-                wij = wcopy[wi,wj]
-                nb = np.sum(wcopy[max(wi-1,0):wi+2,max(wj-1,0):wj+2]) - wij
-                world[wi,wj] = 1 if nb==3 or (wij==1 and nb==2) else 0
-        # re-allocate ring
+        # update env 'in parallel' (agent is blind to env changes)
+        world = gol_tx(world)
+        # update world with ring values
         for rv,[ri,rj] in zip(ring.st,ring.locs):
             world[ri,rj] = rv
         ft += ring.st[2]
+        # refill world from borders if needed (min world size=11)
+        if np.sum(world) < world_size:
+            center = world[xy-4:xy+5,xy-4:xy+5].astype(int)
+            world = np.random.random(world_size*world_size).reshape((world_size,world_size)).round()
+            world[xy-4:xy+5,xy-4:xy+5] = center
         # save data
         if save_data:
             data.append([world.astype(int),ring.st.astype(int)])

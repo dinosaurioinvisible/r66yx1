@@ -45,9 +45,10 @@ def ringb_animation(ring,ft,trial_data,sim_speed=1000,save_animation=False):
         time.set_text("time={}/{}".format(i,timesteps))
 
         # trial
+        world = trial_data[i][0].astype(int)
         for rx,[ri,rj] in enumerate(ring.locs):
-            trial_data[i][0][ri,rj] += 2
-        ax_trial = ax1.imshow(palette[trial_data[i][0]])
+            world[ri,rj] += 2
+        ax_trial = ax1.imshow(palette[world])
 
         # transitions
 

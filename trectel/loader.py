@@ -4,7 +4,7 @@ from animations import ringb_animation
 import pickle
 import numpy as np
 import os
-
+import sys
 
 # basic loading function with menu
 def load(wdir="ring_exps",ext="rx",auto=True,return_gts=False,animation=True,save_animation=False):
@@ -54,7 +54,7 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_gts=False,animation=True,sav
                 with open(obj_path, "rb") as ea_exp:
                     genotypes = pickle.load(ea_exp)
                 if return_gts:
-                    return genotypes
+                    return genotypes,n_obj_filename
                 gt_menu=True
             except:
                 problem_select_obj="\ncouldn't open object, invalid input? --pdb for the pdb.set_trace()\n"
@@ -66,8 +66,8 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_gts=False,animation=True,sav
             min_sim_speed = 50
             max_sim_speed = 2500
             world_size = 25
-            min_world_size = 10
-            max_world_size = 100
+            min_world_size = 11
+            max_world_size = 101
             world_th0= 0.3
             min_world_th0 = 0
             max_world_th0 = 0.9
@@ -179,12 +179,14 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_gts=False,animation=True,sav
                     select_obj=False
                 # try to load object
                 else:
-                    try:
+                    #try:
+                    if 1==1:
                         gtx = genotypes[g_in]
                         ring,ft,trial_data = ring_gol_trial(ring_gt=gtx,timesteps=timesteps,world_size=world_size,world_th0=world_th0,save_data=True)
                         print("\nfitness = {}".format(round(ft,4)))
                         ring_load = True
-                    except:
+                    #except:
+                    else:
                         problem_gt_menu="couldn't run simulation (input: {}) --pdb for the pdb.set_trace()".format(g_in)
                     # load and run
                     if ring_load:
@@ -231,7 +233,18 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_gts=False,animation=True,sav
                                 after_sim_menu_problem = "\ninvalid input ({})".format(after_sim_in)
 
 
-#load()
+auto_run = sys.argv[1] if len(sys.argv)>1 else None
+auto_load = sys.argv[2] if len(sys.argv)>2 else None
+file_ext = sys.argv[3] if len(sys.argv)>3 else None
+if sys.argv[0]=='loader.py':
+    if auto_run:
+        if auto_load:
+            if file_ext:
+                load(auto=auto_load,ext=file_ext)
+            else:
+                load(auto=auto_load)
+        else:
+            load()
 
 
 
