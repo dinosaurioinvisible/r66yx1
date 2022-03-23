@@ -1,5 +1,64 @@
 
 
+for u in range(self.sxs):
+    m1 = self.mu1[u]
+    # causes
+    self.mu_crep[u,1] = np.sum(self.tm[:,ek][m1],axis=0)
+    self.mu_crep[u,0] = np.sum(self.tm[:,ek],axis=0) - self.crep[u][1]
+    # effects
+    self.mu_erep[u,1] = np.sum(self.tm[:,ek].T[m1],axis=0)
+    self.mu_erep[u,0] = np.sum(self.tm[:,ek].T,axis=0) - self.erep[u][1]
+
+def system_reps(gt):
+    # iit containers
+    cause_reps = defaultdict()
+    # containers
+    sel = defaultdict(set)
+    atm = np.zeros((32,32)).astype(int)
+    cxu = np.zeros((5,2,32))
+    exu = np.zeros((5,2,32))
+    # 2d domain objects
+    sys_ijs = ddxlocs(r=5)
+    sys_ddt = ddxtensor(r=5)
+    env_ddt = ddxtensor(r=16)
+    # system initial states
+    for si in range(2**5):
+        # elements initial states
+        sti = (ai,bi,ci,di,ei) = [sys_ddt[i,j,si] for i,j in sys_ijs]
+        # environment
+        for ek in range(2**16):
+            # combine system & env sts
+            domain = sys_ddt[:,:,si] + env_ddt[:,:,ek]
+            # local domains
+            ds = [domain[i-1:i+2,j-1:j+2].flatten() for i,j in sys_ijs]
+            # resulting states (genotype)
+            stx = [gt[u][arr2int(du)] for u,du in enumerate(np.delete(ds,2,0))]
+            # resulting central st (GoL rule)
+            nbc = np.sum(ds[2]) - ci
+            cx = 1 if nbc==3 or (nbc==2 and ci==1) else 0
+            stx.insert(2,cx)
+            # system selectivity: all ek : (sti,ek) -> stx
+            sel[sti,stx].add(ek)
+            # transition matrix (counts)
+            atm[sti][stx] += 1
+    # transition matrices (elementary mechanisms)
+    for u,(ui,uj) in enumerate(sys_ijs):
+        # system states in which mu=1
+        mu1 = sys_ddt[ui,uj,:].nonzero()
+        # cause transition matrix for mu
+        cxu[u,1,:] = np.sum(atm[mu1],axis=0)
+        cxu[u,0,:] = np.sum(atm,axis=0) - cxu[u,1,:]
+        # effect matrix
+        exu[u,1,:] = np.sum(atm.T[mu1],axis=0)
+        exu[u,0,:] = np.sum(atm.T,axis=0) - exu[u,1,:]
+    # IIT transition matrices (sti,ek,stx)
+    iit_tm = np.zeros((2**5,2**16,2**5))
+    # cause = iit_tm[:,ek,stx], effect = iit_tm[sti,ek,:]
+    for (sti,stx),envs in sel.items():
+        for ek in envs:
+            iit_tm[sti,ek,stx]
+
+
 lx = []
 for i in range(16):
     lx.append([np.binary_repr(i),i])

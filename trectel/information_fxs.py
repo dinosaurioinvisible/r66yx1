@@ -3,137 +3,125 @@ import numpy as np
 from tqdm import tqdm
 from helper_fxs import *
 from pyemd import emd
-from collections import defauldict
+from collections import defaultdict
 
-''' enaction categories:
-(autonomous distinctions, selectivity)
-enaction = {envk} forall k : (sti,envk) -> stx '''
-def cat_fx(gt):
-    # iit containers
-    cause_reps = defauldict
-    # containers
-    enact = defauldict(set)
-    # ring's elements locations
-    locs = ring_locs(i=2,j=2,r=1,hollow=False)
-    # system initial states
-    for sti_int in range(2**5):
-        # elements initial states
-        sti_a,sti_b,sti_c,sti_d,sti_d = int2arr(sti_int,arr_len=5)
-        sti = (sti_a,sti_b,sti_c,sti_d,sti_e)
-        # environment
-        for ek in range(2**16):
-            # 2d domain
-            domain = int2arr(ek,arr_len=16)
-            domain = np.insert(domain,11,sti_d)
-            domain = np.insert(domain,8,[sti_b,sti_c_sti_d])
-            domain = np.insert(domain,5,sti_a)
-            domain = domain.reshape(5,5)
-            # resulting states
-            ek_a = arr2int(domain[:3,1:4])
-            stx_a = gt[0][ek_a]
-            ek_b = arr2int(domain[1:4,:3])
-            stx_b = gt[1][ek_b]
-            ek_c = np.sum(domain[1:4,1:4])-sti_c
-            stx_c = 1 if ek_c==3 or (ek_c==2 and sti_c==1) else 0
-            ek_d = arr2int(domain[1:4,2:])
-            stx_d = gt[2][ek_d]
-            ek_e = arr2int(domain[2:,1:4])
-            stx_e = gt[3][ek_e]
-            # stx = arr2int(np.asarray([stx_a,stx_b,stx_c,stx_d,stx_d]))
-            stx = (stx_a,stx_b,stx_c,stx_d,stx_e)
-            # system enactions: all ek : (sti,ek) -> stx
-            enact[sti,stx].add(ek)
-            # system cause reps: all sti : (sti,ek) -> stx, (ek='env_t-1')
-            # system effect reps: all stx : (sti,ek) -> stx, (ek='env_t')
-            # cause[stx][ek][sti] += 1, effect[sti][ek][stx] += 1
-            # but would be expensive and redundant, so:
-            # if env in enact[keys]; if stx=x => stx[sti] += 1
-            # if env in enact[keys]; if sti=i => sti[stx] += 1
-            # elements enactions (local envs are implied in ek):
-            # sti,mx: all mx_ek : (sti,ek)->stx & mx=vx in stx
-            # if enact[stx[mx]==vx];
-            # mi,stx: all ek : (sti,ek)->stx & mi=vi in sti
+''' repertoires:
+This fx makes:
+(1) A selectivity repertoire (dict):
+sel(i,x) = all envs ek : (sti=i,ek) -> stx=x
+sel[sti,stx] = {ek0,ek1,...,ekn}
+(2) An autonomous transition matrix:
+atm = all (sti,sel(sti,stx)) -> stx
+autonomous cause rep = atm cols
+atm[:,x] = all (sti,sel(sti,x)) -> stx=x
+autonomous effect rep = atm rows
+atm[i] = all (sti=i,sel(i,stx)) -> stx
+(3) atm for single elements/mechanisms (me)
+implicit in atm, but made for speed:
+cause rep: sum of all atm[:,stx] where stx(me)=mx
+effect rep: sum of all atm[sti] where sti(me)=mi
+IIT cause & effect reps can be obtained by:
+cause: atm[:,x] where ek in sel[sti,stx=x]
+effect: atmx[i] where ek in sel[sti=i,stx]
+same goes for elemental mechanisms
+'''
+class SystemInfo:
+    def __init__(self,gt,system_cells=5,env_cells=16):
+        self.gt = gt.astype(int)
+        self.sxs,self.exs = system_cells,env_cells
+        self.sysr = 2**system_cells
+        self.envr = 2**env_cells
+        # transition matrix (sti,ek,stx)
+        self.tm = np.zeros((self.sysr,self.envr,self.sysr))
+        # transition matrix for selectivity counts
+        self.atm = np.zeros((self.sysr,self.sysr))
+        # selectivity sets (all ek : sti,ek -> stx)
+        self.sel = defaultdict(set)
+        # repertoires (0=a,1=b,2=c,3=d,4=e,5=system)
+        # IIt reps: (system st, ek, mech st)
+        self.crep = {}
+        self.erep = {}
+        self.at_crep = {}
+        self.at_erep = {}
+        for u in range(self.sxs):
+            self.crep[u] = np.zeros((2,self.sysr))
+            self.erep[u] = np.zeros((2,self.sysr))
+            self.at_crep[u] = np.zeros((2,self.sysr))
+            self.at_erep[u] = np.zeros((2,self.sysr))
+        # 2d domain objects
+        self.sys_locs = ddxlocs(r=5)
+        self.sys_doms = ddxtensor(r=5)
+        self.env_doms = ddxtensor(r=16)
+        # system sts in which mu=1
+        self.mu1 = [self.sys_doms[ui,uj,:].nonzero() for ui,uj in self.sys_locs]
+        # get tx matrix and selectivity sets
+        self.system_txs()
 
-            # elements repertoires:
-            # cause[stx][ek][mx][sti] += 1; effect[sti][ek][mi][stx] += 1
-            # if env in enact[keys]; if stx[mx]==vx => mx[sti] += 1
-            # if env in enact[keys]; if sti[mi]==vi => mi[stx] += 1
-        # transitions
-        enact_pi = {}
-        enact_xf = {}
-        # given a current enaction
-        for st_int in range(2**5):
-            st = tuple(int2arr(st,arr_len=5))
-            enact_pi[st] = np.zeros(2**5).astype(int)
-            enact_xf[st] = np.zeros(2**5).astype(int)
-            # distributions (counts actually)
-            for sti,stx in enact.keys():
-                if stx==st:
-                    # previous enactions
-                    enact_pi[stx][sti,stx] += len(enact(sti,stx))
-                if sti==st:
-                    # following enactions
-                    enact_xf[sti][sti,stx] += len(enact(sti,sxt))
+    def system_txs(self):
+        # system initial states
+        for sti in tqdm(range(self.sysr)):
+            # elements/elementary-mechanisms initial states
+            stis = [self.sys_doms[i,j,sti] for i,j in self.sys_locs]
+            # environmental sts
+            for ek in range(self.envr):
+                # combine system & env domains
+                dom = self.sys_doms[:,:,sti] + self.env_doms[:,:,ek]
+                # local domains
+                ds = [dom[i-1:i+2,j-1:j+2].flatten() for i,j in self.sys_locs]
+                # resulting sts (genotype) & core (GoL rule)
+                stxs = [self.gt[u][arr2int(du)] for u,du in enumerate(np.delete(ds,2,0))]
+                nbc = np.sum(ds[2]) - stis[2]
+                cx = 1 if nbc==3 or (nbc==2 and stis[2]==1) else 0
+                stxs.insert(2,cx)
+                stx = arr2int(np.asarray(stxs))
+                # transition matrix & selectivity sets
+                self.tm[sti,ek,stx] = 1
+                self.sel[sti,stx].add(ek)
+        # at (env selective) tx matrix
+        for (sti,stx),envs in self.sel.items():
+            self.atm[sti,stx] = len(envs)
+
+    # iit cause & effect reps
+    def iit_reps(self,st,ek):
+        # causes = iit_tm[:,ek,stx], effects = iit_tm[sti,ek,:]
+        for u in range(self.sxs):
+            # system sts in which mu=1
+            mu1 = self.mu1[u]
+            # causes
+            self.crep[u][1] = np.sum(self.tm[:,ek][mu1],axis=0)
+            self.crep[u][0] = np.sum(self.tm[:,ek],axis=0) - self.crep[u][1]
+            # effects
+            self.erep[u][1] = np.sum(self.tm[:,ek].T[mu1],axis=0)
+            self.erep[u][0] = np.sum(self.tm[:,ek].T,axis=0) - self.erep[u][1]
+        # system purviews
+        self.crep[5] = self.tm[:,ek,st]
+        self.erep[5] = self.tm[st,ek,:]
+        # return for analysis
+        return self.crep,self.erep
+
+    def auto_reps(self,st):
+        # cause transition matrix for mu
+        for u in range(self.sxs):
+            mu1 = self.mu1[u]
+            self.at_crep[u][1] = np.sum(self.atm[mu1],axis=0)
+            self.at_crep[u][0] = np.sum(self.atm,axis=0)-self.at_crep[u][1]
+            self.at_erep[u][1] = np.sum(self.atm.T[mu1],axis=0)
+            self.at_erep[u][0] = np.sum(self.atm.T[mu1],axis=0)-self.at_erep[u][1]
+        self.at_crep[5] = self.atm[:,st]
+        self.at_erep[5] = self.atm[st]
+        return self.at_crep,self.at_erep
+
+    # all combinations mediated by sti,ek,stx
+    def selectivity_detail(self,sti,ek,stx):
+        sti_sel = np.transpose(self.tm[sti,:,:].nonzero())
+        env_sel = np.transpose(self.tm[:,ek,:].nonzero())
+        stx_sel = np.transpose(self.tm[:,:,stx].nonzero())
+        return sti_sel,env_sel,stx_sel
 
 
 
 
 
-
-
-def enactive_categories(gt):
-    # dictionaries for categories
-    cx_a = defauldict(set)
-    cx_b = defauldict(set)
-    cx_c = defauldict(set)
-    cx_d = defauldict(set)
-    cx_e = defauldict(set)
-    cx = defauldict(set)
-    # tx matrices for category distributions
-    dxp_a = ?
-
-
-    # for all 2**21 domain (system+env) sts
-    for dom_st in range(2**21):
-        # domain as 2d space
-        domain = np.zeros((5,5)).astype(int)
-        dx = int2arr(dom_st,arr_len=21)
-        domain[0][1:4] = dx[:3]
-        domain[1:4] = dx[3:18].reshape(3,5)
-        domain[4][1:4] = dx[18:]
-        # states and domains
-        sti_a = domain[1,2]
-        sti_b,sti_c,sti_d = domain[2,1:4]
-        sti_e = domain[3,2]
-        sti = arr2int(np.asarray([sti_a,sti_b,sti_c,sti_d,sti_e]))
-        dom_a = arr2int(domain[:3,1:4])
-        dom_b = arr2int(domain[1:4,:3])
-        dom_c = np.sum(domain[1:4,1:4])-domain[2,2]
-        dom_d = arr2int(domain[1:4,2:])
-        dom_e = arr2int(domain[2:,1:4])
-        dom = arr2int(np.concatenate((dx[:5],dx[6:9],dx[12:15],dx[16:])))
-        # transitions
-        stx_a = gt[0][dom_a]
-        stx_b = gt[1][dom_b]
-        stx_c = 1 if dom_c==3 or (dom_c==2 and domain[2,2]==1) else 0
-        stx_d = gt[2][dom_d]
-        stx_e = gt[3][dom_e]
-        stx = arr2int(np.asarray(stx_a,stx_b,stx_c,stx_d,stx_e))
-        # categories
-        cx_a[sti_a,stx_a].add(dom_a)
-        cx_b[sti_b,stx_b].add(dom_b)
-        cx_c[sti_c,stx_c].add(dom_c)
-        cx_d[sti_d,stx_d].add(dom_d)
-        cx_e[sti_e,stx_e].add(dom_e)
-        cx[sti,stx].add(dom)
-        # past distributions ('cause repertoires')
-        dxp_a[stx_a][stx,sti] += 1
-        ?
-        cxrep_a[stx][stx_a][sti] += 1
-        ?
-        # future distributions ('effect repertoires')
-
-    return
 
 
 

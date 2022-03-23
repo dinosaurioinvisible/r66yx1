@@ -3,10 +3,8 @@ import numpy as np
 
 # convert array > binary > int
 def arr2int(arr):
-    # needs to be reversed for elements order [e0,e1,e2,...]
-    x_str = ''.join(arr.flatten().astype(int).astype(str)) [::-1]
-    x = int(x_str,2)
-    return x
+    xi = sum([x<<e for e,x in enumerate(arr)])
+    return xi
 
 # convert int number into an array or a NxN matrix
 def int2arr(n,arr_len,dims=1):
@@ -15,6 +13,55 @@ def int2arr(n,arr_len,dims=1):
     if dims > 1:
         x = x.reshape(dims,dims)
     return x
+
+# list of bin<->int conversions
+# (to avoid calling the fxs all the time)
+def binint(n):
+    blen = len(np.binary_repr(n))
+    i2b = []
+    b2i = {}
+    for n_int in range(n):
+        n_bin = int2arr(n_int,arr_len=blen)
+        i2b.append(n_bin)
+        b2i[tuple(n_bin)] = n_int
+    return i2b,b2i
+
+# cell locations (domain=21, env=16, sys=5)
+def ddxlocs(r):
+    ij = []
+    env_js = [[1,2,3],[0,1,3,4],[0,4],[0,1,3,4],[1,2,3]]
+    sys_js = [[],[2],[1,2,3],[2],[]]
+    for i in range(5):
+        # domain
+        if r==21:
+            j0,jn = (1,4) if i%4==0 else (0,5)
+            for j in range(j0,jn):
+                ij.append([i,j])
+        # environment only
+        elif r==16:
+            for j in env_js[i]:
+                ij.append([i,j])
+        # ring system
+        elif r==5:
+            for j in sys_js[i]:
+                ij.append([i,j])
+    return ij
+
+# tensor for 2d domains
+def ddxtensor(r):
+    # non empty locations
+    ij = ddxlocs(r)
+    # tensor object
+    ddx = np.zeros((5,5,2**r))
+    for er,[ei,ej] in enumerate(ij):
+        ezr = 2**er
+        ez0 = np.zeros(ezr)
+        ez1 = np.ones(ezr)
+        ez01 = np.concatenate((ez0,ez1))
+        dez = 2**(r-er-1)
+        ezt = np.full((dez,len(ez01)),ez01).flatten()
+        ddx[ei,ej,:] = ezt
+    return ddx.astype(int)
 
 # ring locations (top to bottom, left to right)
 def ring_locs(i=0,j=0,r=1,hollow=True):

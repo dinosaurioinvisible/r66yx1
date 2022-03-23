@@ -195,10 +195,8 @@ class EvolRingB:
             pickle.dump(self.cb_genotypes,datapath)
         print('\nsaved at: {}\n'.format(filepath))
 
-
-auto_run = sys.argv[1] if len(sys.argv)>1 else None
+# auto run
 if sys.argv[0]=='evol.py':
-    if auto_run=='run':
         EvolRingB()
 
 
