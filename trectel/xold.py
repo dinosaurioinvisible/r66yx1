@@ -1,5 +1,30 @@
 
 
+# for the ABC iit example system
+# elementary tx matrices:
+abc = np.zeros((8,8))
+abc[0,1]=1
+abc[1,4]=1
+abc[2,5]=1
+abc[3,1]=1
+abc[4,1]=1
+abc[5,7]=1
+abc[6,5]=1
+abc[7,3]=1
+va1 = np.array([0,1,0,1,0,1,0,1])
+va0 = np.absolute(va1-1)
+vb1 = np.array([0,0,1,1,0,0,1,1])
+vb0 = np.absolute(vb1-1)
+vc1 = np.array([0,0,0,0,1,1,1,1])
+vc0 = np.absolute(vc1-1)
+abc_a = np.sum(abc*va1,axis=1).reshape(8,1)*va1+np.sum(abc*va0,axis=1).reshape(8,1)*va0
+abc_b = np.sum(abc*vb1,axis=1).reshape(8,1)*vb1+np.sum(abc*vb0,axis=1).reshape(8,1)*vb0
+abc_c = np.sum(abc*vc1,axis=1).reshape(8,1)*vc1+np.sum(abc*vc0,axis=1).reshape(8,1)*vc0
+uc_a = np.sum(abc_a,axis=0)
+uc_b = np.sum(abc_b,axis=0)
+uc_c = np.sum(abc_c,axis=0)
+uc_future = uc_a/8*uc_b/8*uc_c/8
+
 for u in range(self.sxs):
     m1 = self.mu1[u]
     # causes
