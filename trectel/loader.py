@@ -233,18 +233,16 @@ def load(wdir="ring_exps",ext="rx",auto=True,return_gts=False,animation=True,sav
                                 after_sim_menu_problem = "\ninvalid input ({})".format(after_sim_in)
 
 
-auto_run = sys.argv[1] if len(sys.argv)>1 else None
-auto_load = sys.argv[2] if len(sys.argv)>2 else None
-file_ext = sys.argv[3] if len(sys.argv)>3 else None
+auto_load = sys.argv[1] if len(sys.argv)>1 else None
+file_ext = sys.argv[2] if len(sys.argv)>2 else None
 if sys.argv[0]=='loader.py':
-    if auto_run:
-        if auto_load:
-            if file_ext:
-                load(auto=auto_load,ext=file_ext)
-            else:
-                load(auto=auto_load)
+    if auto_load:
+        if file_ext:
+            load(auto=auto_load,ext=file_ext)
         else:
-            load()
+            load(auto=auto_load)
+    else:
+        load()
 
 
 

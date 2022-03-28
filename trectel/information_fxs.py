@@ -6,28 +6,14 @@ from pyemd import emd
 from copy import deepcopy
 from collections import defaultdict
 
-''' repertoires:
-This fx makes:
-(1) A selectivity repertoire (dict):
-sel(i,x) = all envs ek : (sti=i,ek) -> stx=x
-sel[sti,stx] = {ek0,ek1,...,ekn}
-(2) An autonomous transition matrix:
-atm = all (sti,sel(sti,stx)) -> stx
-autonomous cause rep = atm cols
-atm[:,x] = all (sti,sel(sti,x)) -> stx=x
-autonomous effect rep = atm rows
-atm[i] = all (sti=i,sel(i,stx)) -> stx
-(3) atm for single elements/mechanisms (me)
-implicit in atm, but made for speed:
-cause rep: sum of all atm[:,stx] where stx(me)=mx
-effect rep: sum of all atm[sti] where sti(me)=mi
-IIT cause & effect reps can be obtained by:
-cause: atm[:,x] where ek in sel[sti,stx=x]
-effect: atmx[i] where ek in sel[sti=i,stx]
-same goes for elemental mechanisms
+'''
+1) IIT intrinsic information
+2) autonomous homolog information search
+3) ix information sti-><-stx
 '''
 class SystemInfo:
     def __init__(self,gt,system_cells=5,env_cells=16):
+        # basic paramaters
         self.gt = gt.astype(int)
         self.sxs,self.exs = system_cells,env_cells
         self.sysr = 2**system_cells
@@ -36,17 +22,17 @@ class SystemInfo:
         self.sys_locs = ddxlocs(r=self.sxs)
         self.sys_doms = ddxtensor(r=self.sxs)
         self.env_doms = ddxtensor(r=self.exs)
-        # emd distance matrix
+        # emd distance matrix & int<>bin conversions
         self.emd_matrix = dist_matrix(dim=self.sysr,cost=1)
-        # system sts in which mechanisms=1
-        # self.m1 = [self.sys_doms[ui,uj,:].nonzero()[0] for ui,uj in self.sys_locs]
+        self.sys_i2b = int2bin(self.sxs)
+        self.dom_b2i = bin2int(9)
         # iit tx matrix for the system (sti,ek,stx) and elem. mechanisms
         self.tm = np.zeros((self.sysr,self.envr,self.sysr))
-        self.tms = []
+        self.creps = []
+        self.ereps = []
         # iit unconstrained distributions (past=uniform)
         self.ucp = np.ones(self.sysr)/self.sysr
-        self.ucf_ek = np.ones(self.sysr)
-        self.ucf_gt = np.ones(self.sysr)
+        self.ucf = np.ones(self.sysr)
         # (autonomous) transition matrix (selectivity counts)
         self.atm = np.zeros((self.sysr,self.sysr))
         # at cause/effect reps (only mechanisms)
@@ -54,9 +40,13 @@ class SystemInfo:
         self.atm_es = np.zeros((self.sxs,2,self.sysr))
         # at unconstrained future (past also uniform)
         self.atm_ucf = np.zeros(self.sysr)
-        # get transition matrices
+        # run
         self.system_txs()
+        self.make_iit_reps()
+        self.make_atm_reps()
 
+
+    '''main fx, creates the sti:ek:stx tx matrix'''
     def system_txs(self):
         # system initial states
         for sti in tqdm(range(self.sysr)):
@@ -69,78 +59,67 @@ class SystemInfo:
                 # local domains
                 ds = [dom[i-1:i+2,j-1:j+2].flatten() for i,j in self.sys_locs]
                 # resulting sts (genotype) & core (GoL rule)
-                stxs = [self.gt[u][arr2int(du)] for u,du in enumerate(np.delete(ds,2,0))]
+                stxs = [self.gt[u][self.dom_b2i[tuple(du)]] for u,du in enumerate(np.delete(ds,2,0))]
                 nbc = np.sum(ds[2]) - stis[2]
                 cx = 1 if nbc==3 or (nbc==2 and stis[2]==1) else 0
                 stxs.insert(2,cx)
                 stx = arr2int(np.asarray(stxs))
                 # transition matrix
                 self.tm[sti,ek,stx] = 1
-
-    def auto_tm(self):
         # atm: tx matrix with counts for env. selective categorization
         for si in range(self.sysr):
             for sj in range(self.sysr):
                 self.atm[si,sj] = self.tm[si,:,sj].nonzero()[0].shape[0]
 
-    def iit_tms(self):
-        # iit mechanisms are analyzed over same fixed envs
-        self.tms = [deepcopy(self.tm) for _ in range(self.sxs)]
+    ''' IIT tx matrices, cause, effect, uc repertoires & info'''
+
+    def make_iit_reps(self):
+        # iit mechanisms are analyzed over the same fixed envs
+        self.creps = [np.zeros((2,self.envr,self.sysr)) for _ in range(self.sxs)]
+        self.ereps = [np.zeros((2,self.envr,self.sysr)) for _ in range(self.sxs)]
+        vu0 = np.ones((1,1,self.sysr))
+        vu1 = np.ones((1,1,self.sysr))
+        # given ek and stx(mx=vx), get all possible stis
         for u,(ui,uj) in enumerate(self.sys_locs):
-            # vu1,vu0: system sts where mu_st=1 & 0 respectively
-            vu1 = self.sys_doms[ui,uj,:]
-            vu0 = np.absolute(vu1-1)
-            # convert every (sti,ek)->stx into (sti,ek) -> stx(mx=vx)
-            # it iterates through stis (instead of envs) just for speed
-            for si in range(self.sysr):
-                # if mx=1 => all stxs(mx=1)=1 & stxs(mx=0)=0; if mx=0 viceversa
-                # sti,ek -> stx is unique, but for -> stx(mx) has many options (all mx=1/0)
-                self.tms[u][si,:,:] = np.sum(self.tm[si,:,:]*vu1,axis=1).reshape(self.envr,1)*np.full((self.envr,self.sysr),vu1)+np.sum(self.tm[si,:,:]*vu0,axis=1).reshape(self.envr,1)*np.full((self.envr,self.sysr),vu0)
+            # arrays indicating where mu=1/0
+            vu1[0,0] = self.sys_doms[ui,uj,:]
+            vu0[0,0] = np.absolute(vu1-1)
+            # transition matrix for mu
+            tmu = np.sum(self.tm*vu1,axis=2).reshape(self.sysr,self.envr,1)*vu1+np.sum(self.tm*vu0,axis=2).reshape(self.sysr,self.envr,1)*vu0
+            # causes: given ek, all sti->stx where stx(mx=vx) (horizontal sums)
+            self.creps[u][0,:,:] = np.sum(tmu*vu0,axis=2).T
+            self.creps[u][1,:,:] = np.sum(tmu*vu1,axis=2).T
+            # effects: given ek, all sti->stx where sti(mi=vi) (vertical sums)
+            self.ereps[u][0,:,:] = np.sum(tmu*vu0.T,axis=0)
+            self.ereps[u][1,:,:] = np.sum(tmu*vu1.T,axis=0)
+            # uc future: dist of future st with uc inputs
+            self.ucf *= np.sum(tmu[:,0,:],axis=0)/self.sysr
 
-    def iit_reps(self,st,ek):
-        # TODO purview: system only for now
-        # iit cause and effect repertoires (+1 for system dists)
-        creps = np.zeros((self.sxs+1,self.sysr))
-        ereps = np.zeros((self.sxs+1,self.sysr))
-        # for every elementary mechanism
-        for u,(ui,uj) in enumerate(self.sys_locs):
-            # system states in which the mu==vu
-            vus = np.where(self.sys_doms[ui,uj,:]==st[u],1,0)
-            # given ek, sums of all sti->stx : stx(mx=vx); sti,ek -> mx
-            cmu = np.sum(self.tms[u][:,ek,:]*vus,axis=1)
-            # given ek, sums of all sti(mi=vi)->stx; mi,ek -> stx
-            emu = np.sum(self.tms[u][:,ek,:]*vus.reshape(self.sysr,1),axis=0)
-            # counts to dists
-            creps[u] = cmu/np.sum(cmu)
-            ereps[u] = emu/np.sum(emu)
-        # for the whole system
-        stu = arr2int(st)
-        creps[self.sxs] = self.tm[:,ek,stu]/max(1,np.sum(self.tm[:,ek,stu]))
-        ereps[self.sxs] = self.tm[stu,ek,:]/max(1,np.sum(self.tm[stu,ek,:]))
-        return creps,ereps
+    def iit_reps(self,ek,st):
+        # system st int -> binary array of sts
+        stb = self.sys_i2b[st]
+        # elementary cause/effect repertoires
+        crs = [cru[vu,ek,:]/max(1,np.sum(cru[vu,ek,:])) for vu,cru in zip(stb,self.creps)]
+        ers = [eru[vu,ek,:]/max(1,np.sum(eru[vu,ek,:])) for vu,eru in zip(stb,self.ereps)]
+        # system repertoires
+        crs.append(self.tm[:,ek,st]/max(1,np.sum(self.tm[:,ek,st])))
+        ers.append(self.tm[st,ek,:]/max(1,np.sum(self.tm[:,ek,st])))
+        return crs,ers
 
-    def iit_ucf_fixed_ek(self,ek=0):
-        # future dist. of sts with unconstrained inputs
-        # (in iit 2014 is obtained for ek=0)
-        for tmu in self.tms:
-            # mechanisms acting independently (no causal globality)
-            self.ucf_ek *= np.sum(tmu[:,ek,:],axis=0)/self.sysr
+    def iit_info(self,ek,st):
+        # repertoires
+        crs,ers = self.iit_reps(ek,st)
+        # cause/effect info: Dist(cause/effect reps || uc past/future)
+        cis = [emd(cu,self.ucp,self.emd_matrix) for cu in crs]
+        eis = [emd(eu,self.ucf,self.emd_matrix) for eu in ers]
+        # cause-effect info: shared (min) ci,ei
+        ceis = [min(ci,ei) for ci,ei in zip(cis,eis)]
+        return cis,eis,ceis
 
-    def iit_ucf_gt(self):
-        # uc future dist. of sts from gt (independent mechs.)
-        for u,(ui,uj) in enumerate(self.sys_locs):
-            # mu = 1/0
-            vu1 = self.sys_doms[ui,uj,:]
-            vu0 = np.absolute(vu1-1)
-            # mapping gt(mu=1/0) -> stx (uc. by system causal structure)
-            ucgt = np.ones((self.sysr,self.sysr))
-            gtu1 = self.gt[u].nonzero()[0]
-            gtu0 = len(gt[u])-gtu1
-            # probabilities
-            self.ucf_gt *= np.sum(ucgt*vu1*gtu1+ucgt*vu0*gtu0,axis=0)/(len(self.gt[u])*self.sysr)
+    '''autonomous homolog functions'''
 
-    def auto_reps(self):
-        # autonomous like repertoires (calculated once and stored)
+    def make_atm_reps(self):
+        # autonomous like repertoires
         # elements/mechanisms (mu (0:4), mu sts (0/1), system sts(0:32))
         for u,(ui,uj) in enumerate(self.sys_locs):
             # system sts where st[u]=vu (1/0)
@@ -153,41 +132,41 @@ class SystemInfo:
             # atm*vus.reshape is just for clarity; atm.T*vus is the same
             self.atm_es[u,0] = np.sum(self.atm*vu0.reshape(self.sysr,1),axis=0)/np.sum(self.atm.T*vu0)
             self.atm_es[u,1] = np.sum(self.atm*vu1.reshape(self.sysr,1),axis=0)/np.sum(self.atm.T*vu1)
-
-    def at_uc_future(self):
         # un inputs for future enaction
-        self.at_ucf = np.sum(self.atm,axis=0)/np.sum(self.atm)
+        self.atm_ucf = np.sum(self.atm,axis=0)/np.sum(self.atm)
 
-    def atm_creps(self,st):
-        # input: system st = [1/0,...,1/0]
-        return [self.atm_cs[u,st[u]] for u in range(self.sxs)]
+    def atm_reps(self,st):
+        # int to bin
+        stb = self.sys_i2b[st]
+        # at. cause/effect reps
+        atm_crs = [self.atm_cs[u,stb[u]] for u in range(self.sxs)]
+        atm_ers = [self.atm_es[u,stb[u]] for u in range(self.sxs)]
+        # system
+        atm_crs.append(self.atm[:,st]/np.sum(self.atm[:,st]))
+        atm_ers.append(self.atm[st]/np.sum(self.atm[st]))
+        return atm_crs,atm_ers
 
-    def atm_ereps(self,st):
-        return [self.atm_es[u,st[u]] for u in range(self.sxs)]
+    def atm_info(self,st):
+        # repertoires
+        atm_crs,atm_ers = self.atm_reps(st)
+        # cause, effect & cause-effect info
+        atm_cis = [emd(cu,self.ucp,self.emd_matrix) for cu in atm_crs]
+        atm_eis = [emd(eu,self.atm_ucf,self.emd_matrix) for eu in atm_ers]
+        atm_ceis = [min(ci,ei) for ci,ei in zip(atm_cis,atm_eis)]
+        return atm_cis,atm_eis,atm_ceis
 
-    def at_system_crep(self,st):
-        # very straight forward for atm
-        return self.atm[:,st]/np.sum(self.atm[:,st])
+    '''atm, intrinsic time'''
 
-    def at_system_erep(self,st):
-        return self.atm[st]/np.sum(self.atm[st])
+    def ix_info(self,st):
+        # chiasmatic info: sti,ek -> <- ek,stx
+        stb = self.sys_i2b[st]
+        ix = [emd(self.atm_cs[u,stb[u]],self.atm_es[u,stb[u]],self.emd_matrix) for u in range(self.sxs)]
+        cix = self.atm[:,st]/np.sum(self.atm[:,st])
+        eix = self.atm[st]/np.sum(self.atm[st])
+        ix.append(emd(cix,eix,self.emd_matrix))
+        return ix
 
-    def iit_info(self,st,ek):
-        creps,ereps = self.iit_reps(st,ek)
-        cis = [emd(crmu,self.ucp,self.emd_matrix) for crmu in creps]
-        eis_ek = [emd(ermu,self.ucf_ek,self.emd_matrix) for ermu in ereps]
-        eis_gt = [emd(ermu,self.ucf_gt,self.emd_matrix) for ermu in ereps]
-        ceis_ek = [min(ci,ei) for ci,ei in zip(cis,eis_ek)]
-        ceis_gt = [min(ci,ei) for ci,ei in zip(cis,eis_gt)]
-        return [creps,ereps,cis,eis_ek,eis_gt,ceis_ek,ceis_gt]
-
-    def at_info(self,st):
-        atm_crs = self.atm_creps(st)+[self.at_system_crep(st)]
-        atm_ers = self.atm_ereps(st)+[self.at_system_erep(st)]
-        cis = [emd(cu,self.ucp,self.emd_matrix) for cu in atm_crs]
-        eis = [emd(eu,self.at_ucf,self.emd_matrix) for eu in atm_ers]
-        ceis = [min(ci,ei) for ci,ei in zip(cis,eis)]
-        return [atm_crs,atm_ers,cis,eis,ceis]
+    '''other methods'''
 
     def selectivity_ix(self,sti,stx):
         return self.tm[sti,:,stx].nonzero()[0]

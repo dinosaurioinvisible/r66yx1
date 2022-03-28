@@ -1,4 +1,94 @@
 
+def atm_creps(self,st):
+    # input: system st = [1/0,...,1/0]
+    return [self.atm_cs[u,st[u]] for u in range(self.sxs)]
+
+def atm_ereps(self,st):
+    return [self.atm_es[u,st[u]] for u in range(self.sxs)]
+
+def at_system_crep(self,st):
+    # very straight forward for atm
+    return self.atm[:,st]/np.sum(self.atm[:,st])
+
+def at_system_erep(self,st):
+    return self.atm[st]/np.sum(self.atm[st])
+
+
+    def iit_info(self,st,ek):
+        creps,ereps = self.iit_reps(st,ek)
+        cis = [emd(crmu,self.ucp,self.emd_matrix) for crmu in creps]
+        eis_ek = [emd(ermu,self.ucf_ek,self.emd_matrix) for ermu in ereps]
+        eis_gt = [emd(ermu,self.ucf_gt,self.emd_matrix) for ermu in ereps]
+        ceis_ek = [min(ci,ei) for ci,ei in zip(cis,eis_ek)]
+        ceis_gt = [min(ci,ei) for ci,ei in zip(cis,eis_gt)]
+        return [creps,ereps,cis,eis_ek,eis_gt,ceis_ek,ceis_gt]
+
+# for the system
+stu = arr2int(st)
+creps[self.sxs] = self.tm[:,ek,stu]/max(1,np.sum(self.tm[:,ek,stu]))
+ereps[self.sxs] = self.tm[stu,ek,:]/max(1,np.sum(self.tm[stu,ek,:]))
+
+    def iit_ucf_fixed_ek(self,ek=0):
+        # future dist. of sts with unconstrained inputs
+        # (in iit 2014 is obtained for ek=0)
+        for tmu in self.tms:
+            # mechanisms acting independently (no causal globality)
+            self.ucf_ek *= np.sum(tmu[:,ek,:],axis=0)/self.sysr
+
+
+    def iit_ucf_gt(self):
+        # uc future dist. of sts from gt (independent mechs.)
+        for u,(ui,uj) in enumerate(self.sys_locs):
+            # mu = 1/0
+            vu1 = self.sys_doms[ui,uj,:]
+            vu0 = np.absolute(vu1-1)
+            # mapping gt(mu=1/0) -> stx (uc. by system causal structure)
+            ucgt = np.ones((self.sysr,self.sysr))
+            gtu1 = self.gt[u].nonzero()[0]
+            gtu0 = len(gt[u])-gtu1
+            # probabilities
+            self.ucf_gt *= np.sum(ucgt*vu1*gtu1+ucgt*vu0*gtu0,axis=0)/(len(self.gt[u])*self.sysr)
+
+
+    def iit_tms(self):
+        # iit mechanisms are analyzed over same fixed envs
+        self.tms = [deepcopy(self.tm) for _ in range(self.sxs)]
+        for u,(ui,uj) in enumerate(self.sys_locs):
+            # vu1,vu0: system sts where mu_st=1 & 0 respectively
+            vu1 = self.sys_doms[ui,uj,:]
+            vu0 = np.absolute(vu1-1)
+            # convert every (sti,ek)->stx into (sti,ek) -> stx(mx=vx)
+            # it iterates through stis (instead of envs) just for speed
+            for si in range(self.sysr):
+                # if mx=1 => all stxs(mx=1)=1 & stxs(mx=0)=0; if mx=0 viceversa
+                # sti,ek -> stx is unique, but for -> stx(mx) has many options (all mx=1/0)
+                self.tms[u][si,:,:] = np.sum(self.tm[si,:,:]*vu1,axis=1).reshape(self.envr,1)*np.full((self.envr,self.sysr),vu1)+np.sum(self.tm[si,:,:]*vu0,axis=1).reshape(self.envr,1)*np.full((self.envr,self.sysr),vu0)
+
+    def iit_reps(self,st,ek):
+        # TODO purview: system only for now
+        # iit cause and effect repertoires (+1 for system dists)
+        creps = np.zeros((self.sxs+1,self.sysr))
+        ereps = np.zeros((self.sxs+1,self.sysr))
+        # for every elementary mechanism
+        for u,(ui,uj) in enumerate(self.sys_locs):
+            # system states in which the mu==vu
+            vus = np.where(self.sys_doms[ui,uj,:]==st[u],1,0)
+            # given ek, sums of all sti->stx : stx(mx=vx); sti,ek -> mx
+            cmu = np.sum(self.tms[u][:,ek,:]*vus,axis=1)
+            # given ek, sums of all sti(mi=vi)->stx; mi,ek -> stx
+            emu = np.sum(self.tms[u][:,ek,:]*vus.reshape(self.sysr,1),axis=0)
+            # counts to dists
+            creps[u] = cmu/np.sum(cmu)
+            ereps[u] = emu/np.sum(emu)
+        # for the whole system
+        stu = arr2int(st)
+        creps[self.sxs] = self.tm[:,ek,stu]/max(1,np.sum(self.tm[:,ek,stu]))
+        ereps[self.sxs] = self.tm[stu,ek,:]/max(1,np.sum(self.tm[stu,ek,:]))
+        return creps,ereps
+
+# system sts in which mechanisms are 1/0
+self.mu1 = [self.sys_doms[ui,uj,:].nonzero()[0] for ui,uj in self.sys_locs]
+self.mu0 = [np.absolute(m1-1) for m1 in self.mu1]
 
 # for the ABC iit example system
 # elementary tx matrices:

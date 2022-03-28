@@ -9,7 +9,7 @@ from helper_fxs import *
 def ringb_animation(ring,ft,trial_data,sim_speed=1000,save_animation=False):
 
     # 3 subplots (trial, transitions, information)
-    fig = plt.figure(figsize=[15,10],constrained_layout=True)
+    fig = plt.figure(figsize=[15,12],constrained_layout=True)
     ax1 = fig.add_subplot(1,3,1)
     ax1.set_title("trial")
     ax2 = fig.add_subplot(1,3,2)

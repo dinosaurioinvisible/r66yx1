@@ -3,7 +3,7 @@ import numpy as np
 
 # convert array > binary > int
 def arr2int(arr):
-    xi = sum([x<<e for e,x in enumerate(arr)])
+    xi = np.sum([x<<e for e,x in enumerate(arr.flatten().astype(int))])
     return xi
 
 # convert int number into an array or a NxN matrix
@@ -16,15 +16,19 @@ def int2arr(n,arr_len,dims=1):
 
 # list of bin<->int conversions
 # (to avoid calling the fxs all the time)
-def binint(n):
-    blen = len(np.binary_repr(n))
-    i2b = []
+def bin2int(n):
     b2i = {}
-    for n_int in range(n):
-        n_bin = int2arr(n_int,arr_len=blen)
-        i2b.append(n_bin)
-        b2i[tuple(n_bin)] = n_int
-    return i2b,b2i
+    for ni in range(2**n):
+        nb = int2arr(ni,arr_len=n)
+        b2i[tuple(nb)] = ni
+    return b2i
+
+def int2bin(n):
+    i2b = {}
+    for ni in range(2**n):
+        nb = int2arr(ni,arr_len=n)
+        i2b[ni] = nb
+    return i2b
 
 # cell locations (domain=21, env=16, sys=5)
 def ddxlocs(r):
