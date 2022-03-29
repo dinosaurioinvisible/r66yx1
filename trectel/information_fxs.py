@@ -80,7 +80,7 @@ class SystemInfo:
         vu0 = np.ones((1,1,self.sysr))
         vu1 = np.ones((1,1,self.sysr))
         # given ek and stx(mx=vx), get all possible stis
-        for u,(ui,uj) in enumerate(self.sys_locs):
+        for u,(ui,uj) in tqdm(enumerate(self.sys_locs)):
             # arrays indicating where mu=1/0
             vu1[0,0] = self.sys_doms[ui,uj,:]
             vu0[0,0] = np.absolute(vu1-1)
@@ -121,7 +121,7 @@ class SystemInfo:
     def make_atm_reps(self):
         # autonomous like repertoires
         # elements/mechanisms (mu (0:4), mu sts (0/1), system sts(0:32))
-        for u,(ui,uj) in enumerate(self.sys_locs):
+        for u,(ui,uj) in tqdm(enumerate(self.sys_locs)):
             # system sts where st[u]=vu (1/0)
             vu1 = self.sys_doms[ui,uj,:]
             vu0 = np.absolute(vu1-1)
