@@ -2,10 +2,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from information_fxs import SystemInfo
+from simulations import ring_gol_trial
 from helper_fxs import *
 
 
-def info_plots(ring,simdata):
+def random_info(tt=100,wsize=25,wth0=0.2):
+    rdm_gt = np.random.random((4,512)).round().astype(int)
+    rdm_ring,rdm_ft,rdm_simdata = ring_gol_trial(rdm_gt,timesteps=tt,world_size=wsize,world_th0=wth0,save_data=True)
+    print('\nrandom gt fitness: {}'.format(rdm_ft))
+    rdm_info_object,rdm_info = info_plots(rdm_ring,rdm_ft,rdm_simdata)
+    return rdm_info_object,rdm_info
+
+def info_plots(ring,ft,simdata,info_object=None):
     # envs & system sts for every timestep
     env_ijs = ddxlocs(16)
     env = np.zeros(len(simdata)).astype(int)
@@ -21,8 +29,8 @@ def info_plots(ring,simdata):
     atm_ei = np.zeros((7,len(simdata)))
     atm_cei = np.zeros((7,len(simdata)))
     ix_info = np.zeros((7,len(simdata)))
-    # info class
-    y = SystemInfo(ring.gt)
+    # info object
+    y = info_object if info_object else SystemInfo(ring.gt)
     # information
     for t,(ek,st) in enumerate(zip(env,sts)):
         # iit
@@ -40,7 +48,7 @@ def info_plots(ring,simdata):
         ix_info[:,t] = ix+[np.sum(ix[:-1])]
     # plots IIT
     fig,axs = plt.subplots(3,sharex=True,sharey=True)
-    fig.suptitle('IIT intrinsic information')
+    fig.suptitle('IIT intrinsic information (ft={})'.format(ft))
     axs[0].plot(iit_ci.T)
     axs[1].plot(iit_ei.T)
     axs[2].plot(iit_cei.T,label=[u for u in 'abcdeXS'])
@@ -54,7 +62,7 @@ def info_plots(ring,simdata):
     plt.show()
     # plots ATM
     fig,axs = plt.subplots(3,sharex=True,sharey=True)
-    fig.suptitle('AT intrinsic information')
+    fig.suptitle('AT intrinsic information (ft={})'.format(ft))
     axs[0].plot(atm_ci.T)
     axs[1].plot(atm_ei.T)
     axs[2].plot(atm_cei.T,label=[u for u in 'abcdeXS'])
@@ -69,11 +77,10 @@ def info_plots(ring,simdata):
     # plots IX
     plt.plot(ix_info.T,label=[u for u in 'abcdeXS'])
     plt.legend()
-    plt.title('ix intrinsic information')
+    plt.title('ix intrinsic information (ft={})'.format(ft))
     plt.xlabel('Time')
     plt.ylabel('Information')
     plt.show()
-    import pdb; pdb.set_trace()
     return y,[iit_ci,iit_ei,iit_cei,atm_ci,atm_ei,atm_cei,ix_info]
 
 
