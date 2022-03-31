@@ -130,8 +130,8 @@ class SystemInfo:
             self.atm_cs[u,1] = np.sum(self.atm*vu1,axis=1)/np.sum(self.atm*vu1)
             # effects: all (mi,E)-> stx, for all stxs
             # atm*vus.reshape is just for clarity; atm.T*vus is the same
-            self.atm_es[u,0] = np.sum(self.atm*vu0.reshape(self.sysr,1),axis=0)#/np.sum(self.atm.T*vu0)
-            self.atm_es[u,1] = np.sum(self.atm*vu1.reshape(self.sysr,1),axis=0)#/np.sum(self.atm.T*vu1)
+            self.atm_es[u,0] = np.sum(self.atm*vu0.reshape(self.sysr,1),axis=0)/np.sum(self.atm.T*vu0)
+            self.atm_es[u,1] = np.sum(self.atm*vu1.reshape(self.sysr,1),axis=0)/np.sum(self.atm.T*vu1)
         # un inputs for future enaction
         self.atm_ucf = np.sum(self.atm,axis=0)/np.sum(self.atm)
 

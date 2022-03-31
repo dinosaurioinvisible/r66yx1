@@ -55,8 +55,12 @@ def info_plots(ring,ft,simdata,info_object=None):
     axs[0].set_ylabel('cause')
     axs[1].set_ylabel('effect')
     axs[2].set_ylabel('cause-effect')
-    fig.supylabel('Information')
-    fig.supxlabel('Time')
+    # depends on python/plt version
+    try:
+        fig.supylabel('Information')
+        fig.supxlabel('Time')
+    except:
+        pass
     handles,labels = axs[2].get_legend_handles_labels()
     fig.legend(handles,labels,loc='center right')
     plt.show()
@@ -69,8 +73,12 @@ def info_plots(ring,ft,simdata,info_object=None):
     axs[0].set_ylabel('cause')
     axs[1].set_ylabel('effect')
     axs[2].set_ylabel('cause-effect')
-    fig.supylabel('Information')
-    fig.supxlabel('Time')
+    # depends on python/plt version
+    try:
+        fig.supylabel('Information')
+        fig.supxlabel('Time')
+    except:
+        pass
     handles,labels = axs[2].get_legend_handles_labels()
     fig.legend(handles,labels,loc='center right')
     plt.show()
