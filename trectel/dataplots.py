@@ -189,9 +189,27 @@ class ABC:
         self.max_cei = np.amax(self.cei)
 
     def mip(self):
+        # partitions
+        # ab/a
+        #   a/[] x b/a
+        #   a/a  x b/[]
+        # ab/ab
+        #   a/[] x b/ab
+        #   a/a  x b/b
+        #   a/b  x b/a
+        #   a/ab x b/[]
+        # ab/abc
+        #   a/[] x b/abc
+        #   a/a  x b/bc
+        #   a/b  x b/ab
+        #   a/c  x b/ac
+        #   a/ab x b/c
+        #   a/ac x b/b
+        #   a/bc x b/a
+        #   a/abc x b/[]
         va,vb,vc = self.state
         cx_sys = self.cxs[6,va,vb,vc]
-        cx_sys_mip = ?
+        cx_sys_mip = 0
 
 
 
