@@ -194,10 +194,12 @@ class ABC:
     def info(self):
         sta,stb,stc = self.state
         self.ci,self.ei = np.zeros((7,7)),np.zeros((7,7))
-        # for all mechanisms (A,B,C,AB,BC,AC,ABC)
+        # for all mechanisms (A,B,C,AB,BC,AC,ABC) (rows)
         for u,[va,vb,vc] in enumerate(self.mu_sts):
-            # for all purviews
+            # for all purviews (columns)
+            # cause repertoires
             crs = self.cxs[:,va,vb,vc]/np.sum(self.cxs[:,va,vb,vc],axis=1).reshape(7,1)
+            # earth mover's distance (cause rep, uc rep)
             self.ci[u] = [emd(cr,self.ucp,self.emd_tm) for cr in crs]
             ers = self.exs[:,va,vb,vc]/np.sum(self.exs[:,va,vb,vc],axis=1).reshape(7,1)
             self.ei[u] = [emd(er,ucf,self.emd_tm) for er,ucf in zip(ers,self.ucf)]
@@ -274,8 +276,6 @@ class ABC:
         va,vb,vc = vu
         cx_mip = self.cxs[pu[0],va,vb,vc]/self.cxs[pu[0],va,vb,vc].sum()
         self.cmip[6,6] = emd(cx,cx_mip,self.emd_tm)
-        self.ci = self.ci.round(2)
-        self.cmip = self.cmip.round(2)
         # quick version for effects
         self.emip[:3,:3] = self.ei[:3,:3]
         for u,[px,py] in enumerate([[0,1],[1,2],[0,2]]):
@@ -285,10 +285,14 @@ class ABC:
             self.emip[6,u+3] = (self.ei[6,u+3]-np.amax(self.emip[3:6,u+3]))*np.where(np.amax(self.emip[3:6,u+3])>0,1,0)
         self.emip[6,:3] = (self.ei[6,:3]-np.amax(self.emip[:,:3],axis=0)).clip(0)
         self.emip[:,6] = (self.ei[:,6]-np.amax(self.ei[:,:6],axis=1)).clip(0)
+        # round for vis
+        self.ci = self.ci.round(2)
         self.ei = self.ei.round(2)
+        self.cei = self.cei.round(2)
+        self.cmip = self.cmip.round(2)
         self.emip = self.emip.round(2)
         # max phi
-        
+
 
 
 
