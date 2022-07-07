@@ -1,6 +1,14 @@
 
 import numpy as np
 
+# tensor with n matrix reps
+def matrix_reps(x,n=3,m=3):
+    t = np.zeros((x,n,m))
+    for i in range(x):
+        xmn = int2arr(i,n*m,2)
+        t[i] = xmn
+    return t
+
 # convert array > binary > int
 def arr2int(arr):
     xi = np.sum([x<<e for e,x in enumerate(arr.flatten().astype(int))])

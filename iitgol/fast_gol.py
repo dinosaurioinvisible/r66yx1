@@ -21,12 +21,14 @@ def gol_tx(state,k=None):
     if k==None:
         m,n = state.shape
         k = np.zeros((m,n))
-        k[int(m/2-1):int(m/2+2),int(n/2-1):int(n/2+2)] = np.array([[1,1,1],[1,0,1],[1,1,1]])
+        k[int(m/2)-1:int(m/2)+2,int(n/2)-1:int(n/2)+2] = np.array([[1,1,1],[1,0,1],[1,1,1]])
+    print(k)
     # computes sums around each pixel
     b = fft_convolve2d(state,k).round()
+    print(b)
     c = np.zeros(b.shape)
     c[np.where((b==2) & (state==1))] = 1
-    c[np.where(b==3)] = 1
-    # c[np.where(b==3) & (state==0)] = 1
-    # c[np.where(b==3) & (state==1)] = 1
+    # c[np.where(b==3)] = 1
+    c[np.where((b==3) & (state==1))] = 1
+    c[np.where((b==3) & (state==0))] = 1
     return c
