@@ -79,6 +79,7 @@ class ABC:
                 self.cxs[pwi,mx,my,mz] = self.cxs[pwi,mx,2,2] * self.cxs[pwi,2,my,2] * self.cxs[pwi,2,2,mz]
         # unconstrained (all homogeneous)
         self.cxs[:,2,2,2] = np.ones((7,8))
+        #
         # first order effects
         # for effects: ABC/AB=10 -> A/AB=10 x B/AB=10 x C/AB=10
         # matrices for effects, including virtual elements not currently constrained
@@ -261,7 +262,7 @@ class ABC:
         self.ix_info = self.ix_info.round(2)
         self.xi_info = self.xi_info.round(2)
         # min between both
-        self.at_info[stu,st] = np.minimum(self.ix_info,self.xi_info)
+        # self.at_info[stu,st] = np.minimum(self.ix_info,self.xi_info)
 
 
 
