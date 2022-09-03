@@ -3,8 +3,7 @@ import numpy as np
 from aux import *
 from pyemd import emd
 
-
-class GliderABC:
+class GliderABCs:
     def __init__(self):
         # glider sts, tx matrix, cells sts, pws indx, exs matrices
         self.gx,self.tm,self.gs,self.fpws,self.ems = mkglider()
