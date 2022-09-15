@@ -28,7 +28,7 @@ but still there is a loss of complete information (AB)
 '''
 
 class Glider:
-    def __init__(self,pw_mode=1):
+    def __init__(self):
         # current st
         self.st = 0
         # glider past,current,future sts for all canonical cfgs
@@ -132,22 +132,69 @@ class Glider:
         return self.sts[self.st,1]
 
     def mk_reps(self):
-        # first order causes
+        # causes
         for cfg in range(16):
-            # indices for purviews
-            pwi = self.sts[cfg,1,1:-1,1:-1].flatten().nonzero()[0]
-            # all purviews for every elementary mechanism
-            for me in range(5):
-                # everything works using matmul, but sum,axis for causal clarity
-                mx = self.mxs[cfg,me]
-                # valid past sts leading to current mx=1
+            # everything works using matmul, but sum,axis for causal clarity
+            for me,mx in enumerate(self.mxs[cfg]):
+                # valid past gl cfgs leading to current mx=1
                 glp_mx = np.sum(self.tm*mx,axis=1)
-                #
+                # for each purview
+                for pwi,pwx in enumerate(self.ppws[cfg][:-1]):
+                    # past pws vals leading to current cfg, where: mx = c pws = 1
+                    self.cxs[cfg,me,pwi] = np.sum(np.sum(glp_mx*pwx,axis=1).reshape(len(pwx),1)*pwx,axis=0)
+                # system purview
+                self.cxs[cfg,me,30] = np.sum(self.cxs[cfg,me,:5],axis=0)
+                # as distributions
+                mx_sums = np.sum(self.cxs[cfg,me],axis=1)
+                mx_sums = np.where(mx_sums==0,1,0).reshape(31,1)
+                self.cxs[cfg,me] = self.cxs[cfg,me]/mx_sums
+        # effects
+        for cfg in range(16):
+            # is similar, but not the same, so better apart for clarity
+            for me,mx in enumerate(self.mxs[cfg]):
+                # elementary purviews
+                a0,a1 = self.fpws[cfg][0]
+                b0,b1 = self.fpws[cfg][1]
+                c0,c1 = self.fpws[cfg][2]
+                d0,d1 = self.fpws[cfg][3]
+                e0,e1 = self.fpws[cfg][4]
+                # likelihood of fut values for pw=0 and pw=1
+                fa = np.sum(self.tm*a0)*a0 + np.sum(self.tm*a1)*a1
+                fb = np.sum(self.tm*b0)*b0 + np.sum(self.tm*b1)*b1
+                fc = np.sum(self.tm*c0)*c0 + np.sum(self.tm*c1)*c1
+                fd = np.sum(self.tm*d0)*d0 + np.sum(self.tm*d1)*d1
+                fe = np.sum(self.tm*e0)*e0 + np.sum(self.tm*e1)*e1
+                # valid fut values for pws, given that mx = 1 = current pw
+                m1 = np.sum(self.tm * mx.T,axis=0)
+                mxa = np.sum(m1*a0)*a0 + np.sum(m1*a1)*a1
+                mxb = np.sum(m1*b0)*b0 + np.sum(m1*b1)*b1
+                mxc = np.sum(m1*c0)*c0 + np.sum(m1*c1)*c1
+                mxd = np.sum(m1*d0)*d0 + np.sum(m1*d1)*d1
+                mxe = np.sum(m1*e0)*e0 + np.sum(m1*e1)*e1
+                # elementary pws fut values, given mechanism mx = 1
+                self.exs[cfg,me,0] = mxa * fb*fc*fd*fe
+                self.exs[cfg,me,1] = fa* mxb *fc*fd*fe
+                self.exs[cfg,me,2] = fa*fb* mxc *fd*fe
+                self.exs[cfg,me,3] = fa*fb*fc* mxd *fe
+                self.exs[cfg,me,4] = fa*fb*fc*fd * mxe
 
                 import pdb; pdb.set_trace()
+                # higher order purview
+                for pwi,pwx in enumerate(self.fpws[cfg][5:-1]):
+                    # fut pws vals given current cfg, where mx = c pws = 1
 
 
+                    import pdb; pdb.set_trace()
 
+
+        # fut values for a=0 and a=1 (pws without mechanisms yet)
+        # fa = np.sum(self.tm*self.a0)*self.a0 + np.sum(self.tm*self.a1)*self.a1
+        # fb = np.sum(self.tm*self.b0)*self.b0 + np.sum(self.tm*self.b1)*self.b1
+        # fc = np.sum(self.tm*self.c0)*self.c0 + np.sum(self.tm*self.c1)*self.c1
+        # mechanisms
+        # m1 = np.sum(self.tm * self.a1.T,axis=0)
+        # mx1 = np.sum(m1*self.a0)*self.a0 + np.sum(m1*self.a1)*self.a1
+        # cxa1 = mx1 * fb * fc
 
         # # first order causes
         # for cfg in range(16):

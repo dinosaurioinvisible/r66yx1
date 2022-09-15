@@ -3,7 +3,7 @@ import numpy as np
 from pyemd import emd
 from helper_fxs import *
 
-class ABC:
+class ABCex:
     def __init__(self,st=100):
         # int<>bin dicts
         self.i2b = int2bin(3)
