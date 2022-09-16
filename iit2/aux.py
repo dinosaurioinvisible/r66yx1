@@ -1,5 +1,6 @@
 
 import numpy as np
+from itertools import combinations
 
 # int > binary array
 def int2arr(n,arr_len):
@@ -30,6 +31,15 @@ def matrix_reps(n=3,m=3):
         xmn = int2arr(i,n*m).reshape(n,m).astype(int)
         t[i] = xmn
     return t
+
+# list of powerset combinations
+def powerset(ne,min_set_size=1,max_set_size=0):
+    # ne: number of elements
+    max_set_size = ne+1 if max_set_size<min_set_size else max_set_size
+    pset = []
+    for i in range(min_set_size,max_set_size+1):
+        pset.extend(list(combinations(np.arange(ne),i)))
+    return pset
 
 # dict for int reps
 def int_reps(mreps):

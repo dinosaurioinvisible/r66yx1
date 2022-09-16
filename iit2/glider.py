@@ -2,7 +2,6 @@
 import numpy as np
 from aux import *
 from pyemd import emd
-from itertools import combinations,chain
 
 '''
 There are 6 options for measuring phi, that i can think of:
@@ -38,11 +37,12 @@ class Glider:
         # active mechanisms vals for every cfg, given current gl cfg (cfg,mxs,vals)
         self.mxs = np.zeros((16,31,16))
         # cell 1/0 vals in past & fut (from current cfg pov)
-        self.ppws = []
-        self.fpws = []
+        self.ppws = np.zeros((16,5,16))
+        self.fpws = np.zeros((16,5,16))
         self.mk_glider()
         # cause and effect repertoires (cfgs,mxs,pws,dists)
         self.cxs = np.zeros((16,31,31,16))
+        self.mk_cxs()
         self.exs = np.zeros((16,31,31,16))
         self.mk_reps()
 
@@ -60,95 +60,163 @@ class Glider:
             # past=0 and future=2 sts
             self.sts[4*r:4*(r+1),0] = np.roll(self.sts[4*r:4*(r+1),1],1,axis=0)
             self.sts[4*r:4*(r+1),2] = np.roll(self.sts[4*r:4*(r+1),1],-1,axis=0)
-            # horizontal motion
-            dj = 1 if r == 0 or r == 1 else -1
-            self.sts[4*r,2] = np.roll(self.sts[4*r,2],dj,axis=1)
-            self.sts[4*r+1,0] = np.roll(self.sts[4*r+1,0],-dj,axis=1)
-            # vertical motion
-            di = 1 if r == 0 or r == 2 else -1
-            self.sts[4*r+2,2] = np.roll(self.sts[4*r+2,2],di,axis=0)
-            self.sts[4*r+3,0] = np.roll(self.sts[4*r+3,0],di,axis=0)
             # txs, only for the empty case
             self.tm[4*r:4*(r+1),4*r:4*(r+1)] = np.roll(np.diag((1,1,1,1)),1,axis=1)
+        # override past/future sts where there is translation
+        for cfg in [0,6,8,14]:
+            # horizontal
+            dj = 1 if cfg in [0,6] else -1
+            self.sts[cfg,2] = np.roll(self.sts[cfg,2],dj,axis=1)
+            self.sts[cfg+1,0] = np.roll(self.sts[cfg+1,0],-dj,axis=1)
+        # current (t) -> future <=> past <- current (t+1)
+        for cfg in [2,4,10,12]:
+            # vertical
+            di = 1 if cfg in [2,12] else -1
+            self.sts[cfg,2] = np.roll(self.sts[cfg,2],di,axis=0)
+            self.sts[cfg+1,0] = np.roll(self.sts[cfg+1,0],-di,axis=0)
         # make mechanisms
-        # domain of active cells (5) for each ('current/present') glider cfg
-        cfgs = self.sts[:,1,1:-1,1:-1].reshape(16,9)
         # for composition of higher order subsys (AB,ABC,ABCD,etc) (31, omitting all zeroes)
-        xis = list(chain.from_iterable([list(combinations(np.arange(5),i)) for i in range(2,6)]))
+        mx_subsys = powerset(5,min_set_size=2)
         # first order mechanisms (active cells)
         ### (this could be also made by taking indices only, and building all 512 subsys once)
         for cfg in range(16):
-            # active cells (5), acting as causal mechanisms for given cfg
+            # active cells (5), acting as causal elementary mechanisms for given cfg
             ### (in an empty space, all cells=0 become part of the env(?))
-            cfg_mxs = cfgs[cfg].nonzero()[0]
-            # gl cfgs where these cells are active (i.e. mechanisms) from the 16 cgs
-            self.mxs[cfg][:5] = cfgs.T[cfg_mxs]
+            cfg_mxs = self.sts[cfg,1,1:-1,1:-1].flatten().nonzero()[0]
+            # gl cfgs where these cells are active (i.e. mechanisms) from the 16 cfgs
+            self.mxs[cfg,:5] = self.sts[:,1,1:-1,1:-1].reshape(16,9).T[cfg_mxs]
             # higher order mechanisms
-            for me,mx in enumerate(xis):
-                # combination of the 5 1st order mechanisms
-                self.mxs[cfg][me+5] = np.product(self.mxs[cfg][np.asarray(mx)],axis=0)
-        # past/fut purviews (considering system motion to avoid ill refs like c0==c1)
-        pp1 = self.sts[:,0,1:-1,1:-1].reshape(16,9).T
-        pps = [np.abs(pp1-1),pp1]
-        fp1 = self.sts[:,2,1:-1,1:-1].reshape(16,9).T
-        fps = [np.abs(fp1-1),fp1]
-        # until i find a better way to do this
+            for me,mx in enumerate(mx_subsys):
+                # all combinations of the (5) 1st order mechanisms
+                self.mxs[cfg,me+5] = np.product(self.mxs[cfg][np.asarray(mx)],axis=0)
+        # make purviews
+        # cfgs as future and past from other cgfs (considering production/motion)
+        ### (this is to avoid ill references/comparisons like c0==c1)
+        self.as_fsts = np.zeros((16,5,5))
         for cfg in range(16):
-            ppws,fpws = [],[]
-            cfg_pws = cfgs[cfg].nonzero()[0]
-            # first order
-            for pi in cfg_pws:
-                ppws.append([pps[0][pi],pps[1][pi]])
-                fpws.append([fps[0][pi],fps[1][pi]])
-            # second order
-            for a,b in list(combinations(cfg_pws,2)):
-                ppws.append([pps[0][a]*pps[0][b],pps[0][a]*pps[1][b],pps[1][a]*pps[0][b],pps[1][a]*pps[1][b]])
-                fpws.append([fps[0][a]*fps[0][b],fps[0][a]*fps[1][b],fps[1][a]*fps[0][b],fps[1][a]*fps[1][b]])
-            # third order
-            for a,b,c in list(combinations(cfg_pws,3)):
-                p3p,p3f = [],[]
-                for u in range(8):
-                    i,j,k = int2arr(u,3)
-                    p3p.extend([pps[i][a]*pps[j][b]*pps[k][c]])
-                    p3f.extend([fps[i][a]*fps[j][b]*fps[k][c]])
-                ppws.append(p3p)
-                fpws.append(p3f)
-            # 4th order
-            for a,b,c,d in list(combinations(cfg_pws,4)):
-                p4p,p4f = [],[]
-                for u in range(16):
-                    i,j,k,l = int2arr(u,4)
-                    p4p.extend([pps[i][a]*pps[j][b]*pps[k][c]*pps[l][d]])
-                    p4f.extend([fps[i][a]*fps[j][b]*fps[k][c]*fps[l][d]])
-                ppws.append(p4p)
-                fpws.append(p4f)
-            # system pw
-            # easier using tm
-            self.ppws.append(ppws)
-            self.fpws.append(fpws)
+            # following the transition matrix
+            fst = self.tm[:,cfg].nonzero()[0]
+            # get current cfg's fut from the cfg which future is current cfg
+            self.as_fsts[cfg] = self.sts[fst,2]
+        # pasts are the pasts of every next cfg in self.sts
+        self.as_psts = np.roll(self.sts[:,0],-1,axis=0)
+        # past/fut elementary purviews
+        for cfg in range(16):
+            # current active cells (elementary purviews)
+            cfg_pws = self.sts[0,1,1:-1,1:-1].flatten().nonzero()[0]
+            # for every active cell in current cfg, all cfgs vals 0/1
+            self.fpws[cfg] = self.as_fsts[:,1:-1,1:-1].reshape(16,9).T[cfg_pws]
+            self.ppws[cfg] = self.as_psts[:,1:-1,1:-1].reshape(16,9).T[cfg_pws]
+
+    def mk_cxs(self):
+        # for higher order combinations of purviews
+        pws2 = powerset(5,min_set_size=2,max_set_size=2)
+        pws3 = powerset(5,min_set_size=3,max_set_size=3)
+        pws4 = powerset(5,min_set_size=4,max_set_size=4)
+        # for causes, for each mx we need all pws
+        for cfg in range(16):
+            # all can be done with matmul, but i prefer sum,axis for clarity
+            for me,mx in enumerate(self.mxs[cfg]):
+                # past gl cfgs that could have led to mx=1
+                psmx = np.sum(self.tm*mx,axis=1)
+                # cxs from elementary purviews for mx
+                self.cxs[cfg,me,:5] = np.sum(self.ppws[cfg]*psmx,axis=1).reshape(5,1)*self.ppws[cfg] + np.sum(np.abs(self.ppws[cfg]-1)*psmx,axis=1).reshape(5,1)*np.abs(self.ppws[cfg]-1)
+                # second order pws (10)
+                for pwe,pwi in enumerate(pws2):
+                    # for every subsystem of 2 elements
+                    ab = self.ppws[cfg][np.asarray(pwi)]
+                    # a1b1, b1a0, a0b0, b0a1
+                    pwx = np.vstack((ab,np.abs(ab-1))) * np.roll(np.vstack((ab,np.abs(ab-1))),-1,axis=0)
+                    self.cxs[cfg,me,5+pwe] = np.sum(np.sum(pwx*psmx,axis=1).reshape(4,1)*pwx,axis=0)
+                # third order pws (10)
+                for pwe,pwi in enumerate(pws3):
+                    # for each subsystem of 3 elements
+                    a,b,c = self.ppws[cfg][np.asarray(pwi)]
+                    # a0x4,a1x4 * b0x2,b1x2;x2 * c0c1;x4
+                    pwx = np.repeat([np.abs(a-1),a],[4,4],axis=0) * np.tile([np.abs(b-1),b],(2,2)).reshape(8,16) * np.tile([np.abs(c-1),c],(4,1))
+                    self.cxs[cfg,me,15+pwe] = np.sum(np.sum(pwx*psmx,axis=1).reshape(8,1)*pwx,axis=0)
+                # fourth order (5)
+                for pwe,pwi in enumerate(pws4):
+                    # for each subsystem of 4 elements
+                    a,b,c,d = self.ppws[cfg][np.asarray(pwi)]
+                    # same, but a0x8,a1x8, etc
+                    pwx = np.repeat([np.abs(a-1),a],[8,8],axis=0) * np.tile([np.abs(b-1),b],(2,4)).reshape(16,16) * np.tile([np.abs(c-1),c],(4,2)).reshape(16,16) * np.tile([np.abs(d-1),d],(8,1))
+                    self.cxs[cfg,me,25+pwe] = np.sum(np.sum(pwx*psmx,axis=1).reshape(16,1)*pwx,axis=0)
+                # all elements together (whole system) (1)
+                a,b,c,d,e = self.ppws[cfg]
+                pwx = np.repeat([np.abs(a-1),a],[16,16],axis=0) * np.tile([np.abs(b-1),b],(2,8)).reshape(32,16) * np.tile([np.abs(c-1),c],(4,4)).reshape(32,16) * np.tile([np.abs(d-1),d],(8,2)).reshape(32,16) * np.tile([np.abs(e-1),e],(16,1))
+                self.cxs[cfg,me,30] = np.sum(np.sum(pwx*psmx,axis=1).reshape(32,1)*pwx,axis=0)
+                # turn counts into distributions
+                self.cxs[cfg,me] /= np.sum(self.cxs[cfg,me],axis=1).reshape(31,1)
+
+        import pdb; pdb.set_trace()
+
+        # self.lx_ppws,self.lx_fpws = [],[]
+        # pp1 = self.sts[:,0,1:-1,1:-1].reshape(16,9).T
+        # pps = [np.abs(pp1-1),pp1]
+        # fp1 = self.sts[:,2,1:-1,1:-1].reshape(16,9).T
+        # fps = [np.abs(fp1-1),fp1]
+        # # until i find a better way to do this
+        # for cfg in range(16):
+        #     ppws,fpws = [],[]
+        #     cfg_pws = self.sts[cfg,1,1:-1,1:-1].nonzero()[0]
+        #     # first order
+        #     for pi in cfg_pws:
+        #         ppws.append([pps[0][pi],pps[1][pi]])
+        #         fpws.append([fps[0][pi],fps[1][pi]])
+        #     # second order
+        #     for a,b in list(combinations(cfg_pws,2)):
+        #         ppws.append([pps[0][a]*pps[0][b],pps[0][a]*pps[1][b],pps[1][a]*pps[0][b],pps[1][a]*pps[1][b]])
+        #         fpws.append([fps[0][a]*fps[0][b],fps[0][a]*fps[1][b],fps[1][a]*fps[0][b],fps[1][a]*fps[1][b]])
+        #     # third order
+        #     for a,b,c in list(combinations(cfg_pws,3)):
+        #         p3p,p3f = [],[]
+        #         for u in range(8):
+        #             i,j,k = int2arr(u,3)
+        #             p3p.extend([pps[i][a]*pps[j][b]*pps[k][c]])
+        #             p3f.extend([fps[i][a]*fps[j][b]*fps[k][c]])
+        #         ppws.append(p3p)
+        #         fpws.append(p3f)
+        #     # 4th order
+        #     for a,b,c,d in list(combinations(cfg_pws,4)):
+        #         p4p,p4f = [],[]
+        #         for u in range(16):
+        #             i,j,k,l = int2arr(u,4)
+        #             p4p.extend([pps[i][a]*pps[j][b]*pps[k][c]*pps[l][d]])
+        #             p4f.extend([fps[i][a]*fps[j][b]*fps[k][c]*fps[l][d]])
+        #         ppws.append(p4p)
+        #         fpws.append(p4f)
+        #     # system pw
+        #     #
+        #     # easier using tm
+        #     self.lx_ppws.append(ppws)
+        #     self.lx_fpws.append(fpws)
+        # import pdb; pdb.set_trace()
 
     def glst(self):
-        # simple return glider state as 2d rep
-        return self.sts[self.st,1]
+        # simple return glider st as 2d rep & active cells indices
+        return self.sts[self.st,1],self.sts[self.st,1,1:-1,1:-1].flatten().nonzero()[0]
 
     def mk_reps(self):
-        # causes
-        for cfg in range(16):
-            # everything works using matmul, but sum,axis for causal clarity
-            for me,mx in enumerate(self.mxs[cfg]):
-                # valid past gl cfgs leading to current mx=1
-                glp_mx = np.sum(self.tm*mx,axis=1)
-                # for each purview
-                for pwi,pwx in enumerate(self.ppws[cfg][:-1]):
-                    # past pws vals leading to current cfg, where: mx = c pws = 1
-                    self.cxs[cfg,me,pwi] = np.sum(np.sum(glp_mx*pwx,axis=1).reshape(len(pwx),1)*pwx,axis=0)
-                # system purview
-                self.cxs[cfg,me,30] = np.sum(self.cxs[cfg,me,:5],axis=0)
-                # as distributions
-                mx_sums = np.sum(self.cxs[cfg,me],axis=1)
-                mx_sums = np.where(mx_sums==0,1,0).reshape(31,1)
-                self.cxs[cfg,me] = self.cxs[cfg,me]/mx_sums
+        # # causes
+        # for cfg in range(16):
+        #     # everything works using matmul, but sum,axis for causal clarity
+        #     for me,mx in enumerate(self.mxs[cfg]):
+        #         # valid past gl cfgs leading to current mx=1
+        #         glp_mx = np.sum(self.tm*mx,axis=1)
+        #         # for each purview
+        #         for pwi,pwx in enumerate(self.lx_ppws[cfg][:-1]):
+        #             # past pws vals leading to current cfg, where: mx = c pws = 1
+        #             self.cxs[cfg,me,pwi] = np.sum(np.sum(glp_mx*pwx,axis=1).reshape(len(pwx),1)*pwx,axis=0)
+        #         # system purview
+        #         self.cxs[cfg,me,30] = np.sum(self.cxs[cfg,me,:5],axis=0)
+        #         # as distributions
+        #         mx_sums = np.sum(self.cxs[cfg,me],axis=1)
+        #         mx_sums = np.where(mx_sums==0,1,0).reshape(31,1)
+        #         self.cxs[cfg,me] = self.cxs[cfg,me]/mx_sums
+        # import pdb; pdb.set_trace()
         # effects
+        return
         for cfg in range(16):
             # is similar, but not the same, so better apart for clarity
             for me,mx in enumerate(self.mxs[cfg]):
@@ -178,13 +246,13 @@ class Glider:
                 self.exs[cfg,me,3] = fa*fb*fc* mxd *fe
                 self.exs[cfg,me,4] = fa*fb*fc*fd * mxe
 
-                import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
                 # higher order purview
                 for pwi,pwx in enumerate(self.fpws[cfg][5:-1]):
                     # fut pws vals given current cfg, where mx = c pws = 1
+                    pass
 
-
-                    import pdb; pdb.set_trace()
+                    # import pdb; pdb.set_trace()
 
 
         # fut values for a=0 and a=1 (pws without mechanisms yet)
