@@ -34,18 +34,21 @@ class Glider:
         self.sts = np.zeros((16,3,5,5))
         # transition matrix in empty env
         self.tm = np.zeros((16,16)).astype(int)
+        self.mk_glider()
         # active mechanisms vals for every cfg, given current gl cfg (cfg,mxs,vals)
         self.mxs = np.zeros((16,31,16))
+        self.mk_mxs()
         # cell 1/0 vals in past & fut (from current cfg pov)
         self.ppws = np.zeros((16,5,16))
         self.fpws = np.zeros((16,5,16))
-        self.mk_glider()
+        self.mk_pws()
         # cause and effect repertoires (cfgs,mxs,pws,dists)
         self.cxs = np.zeros((16,31,31,16))
         self.mk_cxs()
         self.exs = np.zeros((16,31,31,16))
-        self.mk_reps()
-
+        self.mk_exs()
+        # small phi: intrinsic information
+        self.mk_phi()
 
     def mk_glider(self):
         # glider base sts (SE)
@@ -74,6 +77,8 @@ class Glider:
             di = 1 if cfg in [2,12] else -1
             self.sts[cfg,2] = np.roll(self.sts[cfg,2],di,axis=0)
             self.sts[cfg+1,0] = np.roll(self.sts[cfg+1,0],-di,axis=0)
+
+    def mk_mxs(self):
         # make mechanisms
         # for composition of higher order subsys (AB,ABC,ABCD,etc) (31, omitting all zeroes)
         mx_subsys = powerset(5,min_set_size=2)
@@ -89,6 +94,8 @@ class Glider:
             for me,mx in enumerate(mx_subsys):
                 # all combinations of the (5) 1st order mechanisms
                 self.mxs[cfg,me+5] = np.product(self.mxs[cfg][np.asarray(mx)],axis=0)
+
+    def mk_pws(self):
         # make purviews
         # cfgs as future and past from other cgfs (considering production/motion)
         ### (this is to avoid ill references/comparisons like c0==c1)
@@ -114,8 +121,10 @@ class Glider:
         pws3 = powerset(5,min_set_size=3,max_set_size=3)
         pws4 = powerset(5,min_set_size=4,max_set_size=4)
         # for causes, for each mx we need all pws
+        # AB/BC=00 => AB/B=0 * AB/C=0
         for cfg in range(16):
             # all can be done with matmul, but i prefer sum,axis for clarity
+            # i could've multiplied the higher order mxs, but it was as expensive as this
             for me,mx in enumerate(self.mxs[cfg]):
                 # past gl cfgs that could have led to mx=1
                 psmx = np.sum(self.tm*mx,axis=1)
@@ -149,7 +158,46 @@ class Glider:
                 # turn counts into distributions
                 self.cxs[cfg,me] /= np.sum(self.cxs[cfg,me],axis=1).reshape(31,1)
 
-        import pdb; pdb.set_trace()
+    def mk_exs(self):
+        # effects prob. distributions
+        for cfg in range(16):
+            #
+            import pdb; pdb.set_trace()
+            for me,mx in enumerate(self.mxs[cfg]):
+                # elementary purviews
+                a0,a1 = self.fpws[cfg][0]
+                b0,b1 = self.fpws[cfg][1]
+                c0,c1 = self.fpws[cfg][2]
+                d0,d1 = self.fpws[cfg][3]
+                e0,e1 = self.fpws[cfg][4]
+                # likelihood of fut values for pw=0 and pw=1
+                fa = np.sum(self.tm*a0)*a0 + np.sum(self.tm*a1)*a1
+                fb = np.sum(self.tm*b0)*b0 + np.sum(self.tm*b1)*b1
+                fc = np.sum(self.tm*c0)*c0 + np.sum(self.tm*c1)*c1
+                fd = np.sum(self.tm*d0)*d0 + np.sum(self.tm*d1)*d1
+                fe = np.sum(self.tm*e0)*e0 + np.sum(self.tm*e1)*e1
+                # valid fut values for pws, given that mx = 1 = current pw
+                m1 = np.sum(self.tm * mx.T,axis=0)
+                mxa = np.sum(m1*a0)*a0 + np.sum(m1*a1)*a1
+                mxb = np.sum(m1*b0)*b0 + np.sum(m1*b1)*b1
+                mxc = np.sum(m1*c0)*c0 + np.sum(m1*c1)*c1
+                mxd = np.sum(m1*d0)*d0 + np.sum(m1*d1)*d1
+                mxe = np.sum(m1*e0)*e0 + np.sum(m1*e1)*e1
+                # elementary pws fut values, given mechanism mx = 1
+                self.exs[cfg,me,0] = mxa * fb*fc*fd*fe
+                self.exs[cfg,me,1] = fa* mxb *fc*fd*fe
+                self.exs[cfg,me,2] = fa*fb* mxc *fd*fe
+                self.exs[cfg,me,3] = fa*fb*fc* mxd *fe
+                self.exs[cfg,me,4] = fa*fb*fc*fd * mxe
+
+                # import pdb; pdb.set_trace()
+                # higher order purview
+                # for pwi,pwx in enumerate(self.fpws[cfg][5:-1]):
+                    # fut pws vals given current cfg, where mx = c pws = 1
+
+
+                import pdb; pdb.set_trace()
+
 
         # self.lx_ppws,self.lx_fpws = [],[]
         # pp1 = self.sts[:,0,1:-1,1:-1].reshape(16,9).T
@@ -197,7 +245,7 @@ class Glider:
         # simple return glider st as 2d rep & active cells indices
         return self.sts[self.st,1],self.sts[self.st,1,1:-1,1:-1].flatten().nonzero()[0]
 
-    def mk_reps(self):
+    # def mk_reps(self):
         # # causes
         # for cfg in range(16):
         #     # everything works using matmul, but sum,axis for causal clarity
@@ -216,44 +264,6 @@ class Glider:
         #         self.cxs[cfg,me] = self.cxs[cfg,me]/mx_sums
         # import pdb; pdb.set_trace()
         # effects
-        return
-        for cfg in range(16):
-            # is similar, but not the same, so better apart for clarity
-            for me,mx in enumerate(self.mxs[cfg]):
-                # elementary purviews
-                a0,a1 = self.fpws[cfg][0]
-                b0,b1 = self.fpws[cfg][1]
-                c0,c1 = self.fpws[cfg][2]
-                d0,d1 = self.fpws[cfg][3]
-                e0,e1 = self.fpws[cfg][4]
-                # likelihood of fut values for pw=0 and pw=1
-                fa = np.sum(self.tm*a0)*a0 + np.sum(self.tm*a1)*a1
-                fb = np.sum(self.tm*b0)*b0 + np.sum(self.tm*b1)*b1
-                fc = np.sum(self.tm*c0)*c0 + np.sum(self.tm*c1)*c1
-                fd = np.sum(self.tm*d0)*d0 + np.sum(self.tm*d1)*d1
-                fe = np.sum(self.tm*e0)*e0 + np.sum(self.tm*e1)*e1
-                # valid fut values for pws, given that mx = 1 = current pw
-                m1 = np.sum(self.tm * mx.T,axis=0)
-                mxa = np.sum(m1*a0)*a0 + np.sum(m1*a1)*a1
-                mxb = np.sum(m1*b0)*b0 + np.sum(m1*b1)*b1
-                mxc = np.sum(m1*c0)*c0 + np.sum(m1*c1)*c1
-                mxd = np.sum(m1*d0)*d0 + np.sum(m1*d1)*d1
-                mxe = np.sum(m1*e0)*e0 + np.sum(m1*e1)*e1
-                # elementary pws fut values, given mechanism mx = 1
-                self.exs[cfg,me,0] = mxa * fb*fc*fd*fe
-                self.exs[cfg,me,1] = fa* mxb *fc*fd*fe
-                self.exs[cfg,me,2] = fa*fb* mxc *fd*fe
-                self.exs[cfg,me,3] = fa*fb*fc* mxd *fe
-                self.exs[cfg,me,4] = fa*fb*fc*fd * mxe
-
-                # import pdb; pdb.set_trace()
-                # higher order purview
-                for pwi,pwx in enumerate(self.fpws[cfg][5:-1]):
-                    # fut pws vals given current cfg, where mx = c pws = 1
-                    pass
-
-                    # import pdb; pdb.set_trace()
-
 
         # fut values for a=0 and a=1 (pws without mechanisms yet)
         # fa = np.sum(self.tm*self.a0)*self.a0 + np.sum(self.tm*self.a1)*self.a1
