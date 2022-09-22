@@ -32,6 +32,8 @@ class Glider:
         self.st = 0
         # glider past,current,future sts for all canonical cfgs
         self.sts = np.zeros((16,3,5,5))
+        # indices for active cells for every cfg (for analysis)
+        self.ids = np.zeros((16,5)).astype(int)
         # transition matrix in empty env
         self.tm = np.zeros((16,16)).astype(int)
         self.mk_glider()
@@ -46,9 +48,16 @@ class Glider:
         self.cxs = np.zeros((16,31,31,16))
         self.mk_cxs()
         self.exs = np.zeros((16,31,31,16))
+        # unconstrained futures for every cfg
+        self.ucf = np.zeros((16,16))
         self.mk_exs()
-        # small phi: intrinsic information
-        self.mk_phi()
+        # small phi: intrinsic information (cfg,mx,pw info)
+        self.cxinfo = np.zeros((16,31,31))
+        self.exinfo = np.zeros((16,31,31))
+        self.info = np.zeros((16,31))
+        self.get_info()
+        # analysis
+        self.analyze()
 
     def mk_glider(self):
         # glider base sts (SE)
@@ -87,15 +96,17 @@ class Glider:
         for cfg in range(16):
             # active cells (5), acting as causal elementary mechanisms for given cfg
             ### (in an empty space, all cells=0 become part of the env(?))
-            cfg_mxs = self.sts[cfg,1,1:-1,1:-1].flatten().nonzero()[0]
+            self.ids[cfg] = self.sts[cfg,1,1:-1,1:-1].flatten().nonzero()[0]
             # gl cfgs where these cells are active (i.e. mechanisms) from the 16 cfgs
-            self.mxs[cfg,:5] = self.sts[:,1,1:-1,1:-1].reshape(16,9).T[cfg_mxs]
+            self.mxs[cfg,:5] = self.sts[:,1,1:-1,1:-1].reshape(16,9).T[self.ids[cfg]]
             # higher order mechanisms
             for me,mx in enumerate(mx_subsys):
                 # all combinations of the (5) 1st order mechanisms
                 self.mxs[cfg,me+5] = np.product(self.mxs[cfg][np.asarray(mx)],axis=0)
 
-    def mk_pws(self):
+    '''this yields strangely high values of information,
+    specially for the elementary effects'''
+    def mk_pws_motion(self):
         # make purviews
         # cfgs as future and past from other cgfs (considering production/motion)
         ### (this is to avoid ill references/comparisons like c0==c1)
@@ -110,10 +121,31 @@ class Glider:
         # past/fut elementary purviews
         for cfg in range(16):
             # current active cells (elementary purviews)
-            cfg_pws = self.sts[0,1,1:-1,1:-1].flatten().nonzero()[0]
+            cfg_pws = self.sts[cfg,1,1:-1,1:-1].flatten().nonzero()[0]
             # for every active cell in current cfg, all cfgs vals 0/1
             self.fpws[cfg] = self.as_fsts[:,1:-1,1:-1].reshape(16,9).T[cfg_pws]
             self.ppws[cfg] = self.as_psts[:,1:-1,1:-1].reshape(16,9).T[cfg_pws]
+
+    def mk_pws_direct(self):
+        # make purviews, simpler version
+        # pasts and futures cfg of every cfg
+        ppws = self.sts[:,0,1:-1,1:-1].reshape(16,9).T
+        fpws = self.sts[:,2,1:-1,1:-1].reshape(16,9).T
+        # for every cfg
+        for cfg in range(16):
+            # active cells (i.e. that can act as pws) for current cfg
+            cfg_pws = self.sts[cfg,1,1:-1,1:-1].flatten().nonzero()[0]
+            self.ppws[cfg] = ppws[cfg_pws]
+            self.fpws[cfg] = fpws[cfg_pws]
+
+    def mk_pws(self):
+        for cfg in range(16):
+            # active cells (i.e. that can act as pws) for current cfg and past or future
+            ppws_ids = (self.sts[cfg,0]*self.sts[cfg,1])[1:-1,1:-1].flatten().nonzero()[0]
+            fpws_ids = (self.sts[cfg,1]*self.sts[cfg,2])[1:-1,1:-1].flatten().nonzero()[0]
+            # elementary purviews (should be 3 for each)
+            self.ppws[cfg,:ppws_ids.shape[0]] = self.sts[:,0,1:-1,1:-1].reshape(16,9).T[ppws_ids]
+            self.fpws[cfg,:fpws_ids.shape[0]] = self.sts[:,2,1:-1,1:-1].reshape(16,9).T[fpws_ids]
 
     def mk_cxs(self):
         # for higher order combinations of purviews
@@ -121,7 +153,7 @@ class Glider:
         pws3 = powerset(5,min_set_size=3,max_set_size=3)
         pws4 = powerset(5,min_set_size=4,max_set_size=4)
         # for causes, for each mx we need all pws
-        # AB/BC=00 => AB/B=0 * AB/C=0
+        # AB/BC=00 => AB/B=0 * AB/C=0 (mxs can be multiplied)
         for cfg in range(16):
             # all can be done with matmul, but i prefer sum,axis for clarity
             # i could've multiplied the higher order mxs, but it was as expensive as this
@@ -159,171 +191,98 @@ class Glider:
                 self.cxs[cfg,me] /= np.sum(self.cxs[cfg,me],axis=1).reshape(31,1)
 
     def mk_exs(self):
+        # purviews powerset, for higher order purviews
+        pwset = powerset(5,min_set_size=2)
         # effects prob. distributions
+        # for effects: ABC/AB=10 => A/AB=10 * B/AB=10 * C/AB=10
+        # purviews can be multiplied, for the same mechanisms
         for cfg in range(16):
-            #
-            import pdb; pdb.set_trace()
+            # elementary pws (5) future cfgs where fpw = 1
+            # a1,b1,c1,d1,e1 = [fpwi.reshape(1,16) for fpwi in self.fpws[cfg]]
+            # effect matrices, including virtual uc elements
+            # likelihood of fut pws vals =0 or =1
+            tma,tmb,tmc,tmd,tme = [np.sum(self.tm*np.abs(pwi-1),axis=1).reshape(16,1)*np.abs(pwi-1)+np.sum(self.tm*pwi,axis=1).reshape(16,1)*pwi for pwi in self.fpws[cfg]]
+            # unconstrained future pws
+            ufa,ufb,ufc,ufd,ufe = [np.sum(tm,axis=0) for tm in [tma,tmb,tmc,tmd,tme]]
+            # elementary purviews for every mechanism
             for me,mx in enumerate(self.mxs[cfg]):
-                # elementary purviews
-                a0,a1 = self.fpws[cfg][0]
-                b0,b1 = self.fpws[cfg][1]
-                c0,c1 = self.fpws[cfg][2]
-                d0,d1 = self.fpws[cfg][3]
-                e0,e1 = self.fpws[cfg][4]
-                # likelihood of fut values for pw=0 and pw=1
-                fa = np.sum(self.tm*a0)*a0 + np.sum(self.tm*a1)*a1
-                fb = np.sum(self.tm*b0)*b0 + np.sum(self.tm*b1)*b1
-                fc = np.sum(self.tm*c0)*c0 + np.sum(self.tm*c1)*c1
-                fd = np.sum(self.tm*d0)*d0 + np.sum(self.tm*d1)*d1
-                fe = np.sum(self.tm*e0)*e0 + np.sum(self.tm*e1)*e1
-                # valid fut values for pws, given that mx = 1 = current pw
-                m1 = np.sum(self.tm * mx.T,axis=0)
-                mxa = np.sum(m1*a0)*a0 + np.sum(m1*a1)*a1
-                mxb = np.sum(m1*b0)*b0 + np.sum(m1*b1)*b1
-                mxc = np.sum(m1*c0)*c0 + np.sum(m1*c1)*c1
-                mxd = np.sum(m1*d0)*d0 + np.sum(m1*d1)*d1
-                mxe = np.sum(m1*e0)*e0 + np.sum(m1*e1)*e1
-                # elementary pws fut values, given mechanism mx = 1
-                self.exs[cfg,me,0] = mxa * fb*fc*fd*fe
-                self.exs[cfg,me,1] = fa* mxb *fc*fd*fe
-                self.exs[cfg,me,2] = fa*fb* mxc *fd*fe
-                self.exs[cfg,me,3] = fa*fb*fc* mxd *fe
-                self.exs[cfg,me,4] = fa*fb*fc*fd * mxe
+                # elementary pws fut vals, given mx=1
+                self.exs[cfg,me,0] = np.sum(tma*mx.reshape(16,1),axis=0) * ufb*ufc*ufd*ufe
+                self.exs[cfg,me,1] = ufa* np.sum(tmb*mx.reshape(16,1),axis=0) *ufc*ufd*ufe
+                self.exs[cfg,me,2] = ufa*ufb* np.sum(tmc*mx.reshape(16,1),axis=0) *ufd*ufe
+                self.exs[cfg,me,3] = ufa*ufb*ufc* np.sum(tmd*mx.reshape(16,1),axis=0) *ufe
+                self.exs[cfg,me,4] = ufa*ufb*ufc*ufd * np.sum(tme*mx.reshape(16,1),axis=0)
+                # higher order purviews
+                for pwi,pwx in enumerate(pwset):
+                    self.exs[cfg,me,5+pwi] = np.product(self.exs[cfg,me][np.asarray(pwx)],axis=0)
+                # turn mx counts into distributions
+                self.exs[cfg,me] /= np.sum(self.exs[cfg,me],axis=1).reshape(31,1)
+            # uncontrained future (different for every cfg)
+            ucf = ufa*ufb*ufc*ufd*ufe
+            self.ucf[cfg] = ucf/np.sum(ucf)
 
-                # import pdb; pdb.set_trace()
-                # higher order purview
-                # for pwi,pwx in enumerate(self.fpws[cfg][5:-1]):
-                    # fut pws vals given current cfg, where mx = c pws = 1
+    def get_info(self):
+        # distance matrix, uc past (homogeneous for all)
+        dm = mk_dm(16)
+        ucp = np.ones(16)/16
+        # for every cfg, mechanism and purview
+        for cfg in range(16):
+            for me in range(31):
+                for pwi in range(31):
+                    # compare with unconstrained past and future
+                    self.cxinfo[cfg,me,pwi] = emd(self.cxs[cfg,me,pwi],ucp,dm)
+                    self.exinfo[cfg,me,pwi] = emd(self.exs[cfg,me,pwi],self.ucf[cfg],dm)
+                # intrinsic info: minimum between causes and effects
+                self.info[cfg,me] = np.min((np.max(self.cxinfo[cfg,me]),np.max(self.exinfo[cfg,me])))
 
+    def analyze(self):
+        # combinations (subsystems) of mechanisms
+        pset = powerset(5)
+        # max intrinsic info (present from past & future)
+        self.maxinfo = np.zeros(16)
+        self.maxinfo_ids = []
+        self.maxinfo_sxe = np.zeros(16)
+        # synergy: current sys info of past, present & fut
+        # (16 cfgs, 3 timeframes: 0:p/c, 1:c/ii(p,f), 2:f/c)
+        # em/em, em/sys, diff
+        # self.synems = np.zeros((16,3,5,3))
+        # (sys/em,sys/ems,sum(ems)/sys) - diff (with sys/sys)
+        self.synsys = np.zeros((16,3,7,2))
+        # different for every cfg
+        for cfg in range(16):
+            # IIT
+            # max informative mechanism
+            maxinfo = np.max(self.info[cfg])
+            self.maxinfo[cfg] = maxinfo
+            # all mechanisms/subsystems providing max info
+            maxids = np.where(self.info[cfg]==maxinfo)[0]
+            self.maxinfo_ids.append([self.ids[cfg][np.asarray(pset[mid])] for mid in maxids])
+            # system info versus the sum of all elementary mxs info
+            # (this shouldn't be useful, due to purview mismatch (sys/sys? <> elems/elems?), but just in case)
+            self.maxinfo_sxe[cfg] = self.info[cfg][30] - np.sum(self.info[cfg,:5])
+        # synergies (1:present, 0:past, 2:future)
+        # past
+        self.synsys[:,0,:,0] = np.hstack((self.cxinfo[:,30,:5],self.cxinfo[:,30,30].reshape(16,1),np.sum(self.cxinfo[:,30,:5],axis=1).reshape(16,1)))
+        self.synsys[:,0,:,1] = np.tile(self.cxinfo[:,30,30],(7,1)).T - self.synsys[:,0,:,0]
+        # future
+        self.synsys[:,2,:,0] = np.hstack((self.exinfo[:,30,:5],self.exinfo[:,30,30].reshape(16,1),np.sum(self.exinfo[:,30,:5],axis=1).reshape(16,1)))
+        self.synsys[:,2,:,1] = np.tile(self.exinfo[:,30,30],(7,1)).T - self.synsys[:,2,:,0]
+        # present (for sys/sum(ems) we need to add the mins from past & fut)
+        self.synsys[:,1,:,0] = np.minimum(self.synsys[:,0,:,0],self.synsys[:,2,:,0])
+        self.synsys[:,1,6,0] = np.sum(self.synsys[:,1,:5,0],axis=1)
+        self.synsys[:,1,:,1] = np.tile(np.minimum(self.cxinfo[:,30,30],self.exinfo[:,30,30]),(7,1)).T - self.synsys[:,1,:,0]
 
-                import pdb; pdb.set_trace()
-
-
-        # self.lx_ppws,self.lx_fpws = [],[]
-        # pp1 = self.sts[:,0,1:-1,1:-1].reshape(16,9).T
-        # pps = [np.abs(pp1-1),pp1]
-        # fp1 = self.sts[:,2,1:-1,1:-1].reshape(16,9).T
-        # fps = [np.abs(fp1-1),fp1]
-        # # until i find a better way to do this
-        # for cfg in range(16):
-        #     ppws,fpws = [],[]
-        #     cfg_pws = self.sts[cfg,1,1:-1,1:-1].nonzero()[0]
-        #     # first order
-        #     for pi in cfg_pws:
-        #         ppws.append([pps[0][pi],pps[1][pi]])
-        #         fpws.append([fps[0][pi],fps[1][pi]])
-        #     # second order
-        #     for a,b in list(combinations(cfg_pws,2)):
-        #         ppws.append([pps[0][a]*pps[0][b],pps[0][a]*pps[1][b],pps[1][a]*pps[0][b],pps[1][a]*pps[1][b]])
-        #         fpws.append([fps[0][a]*fps[0][b],fps[0][a]*fps[1][b],fps[1][a]*fps[0][b],fps[1][a]*fps[1][b]])
-        #     # third order
-        #     for a,b,c in list(combinations(cfg_pws,3)):
-        #         p3p,p3f = [],[]
-        #         for u in range(8):
-        #             i,j,k = int2arr(u,3)
-        #             p3p.extend([pps[i][a]*pps[j][b]*pps[k][c]])
-        #             p3f.extend([fps[i][a]*fps[j][b]*fps[k][c]])
-        #         ppws.append(p3p)
-        #         fpws.append(p3f)
-        #     # 4th order
-        #     for a,b,c,d in list(combinations(cfg_pws,4)):
-        #         p4p,p4f = [],[]
-        #         for u in range(16):
-        #             i,j,k,l = int2arr(u,4)
-        #             p4p.extend([pps[i][a]*pps[j][b]*pps[k][c]*pps[l][d]])
-        #             p4f.extend([fps[i][a]*fps[j][b]*fps[k][c]*fps[l][d]])
-        #         ppws.append(p4p)
-        #         fpws.append(p4f)
-        #     # system pw
-        #     #
-        #     # easier using tm
-        #     self.lx_ppws.append(ppws)
-        #     self.lx_fpws.append(fpws)
-        # import pdb; pdb.set_trace()
-
-    def glst(self):
-        # simple return glider st as 2d rep & active cells indices
-        return self.sts[self.st,1],self.sts[self.st,1,1:-1,1:-1].flatten().nonzero()[0]
-
-    # def mk_reps(self):
-        # # causes
-        # for cfg in range(16):
-        #     # everything works using matmul, but sum,axis for causal clarity
-        #     for me,mx in enumerate(self.mxs[cfg]):
-        #         # valid past gl cfgs leading to current mx=1
-        #         glp_mx = np.sum(self.tm*mx,axis=1)
-        #         # for each purview
-        #         for pwi,pwx in enumerate(self.lx_ppws[cfg][:-1]):
-        #             # past pws vals leading to current cfg, where: mx = c pws = 1
-        #             self.cxs[cfg,me,pwi] = np.sum(np.sum(glp_mx*pwx,axis=1).reshape(len(pwx),1)*pwx,axis=0)
-        #         # system purview
-        #         self.cxs[cfg,me,30] = np.sum(self.cxs[cfg,me,:5],axis=0)
-        #         # as distributions
-        #         mx_sums = np.sum(self.cxs[cfg,me],axis=1)
-        #         mx_sums = np.where(mx_sums==0,1,0).reshape(31,1)
-        #         self.cxs[cfg,me] = self.cxs[cfg,me]/mx_sums
-        # import pdb; pdb.set_trace()
-        # effects
-
-        # fut values for a=0 and a=1 (pws without mechanisms yet)
-        # fa = np.sum(self.tm*self.a0)*self.a0 + np.sum(self.tm*self.a1)*self.a1
-        # fb = np.sum(self.tm*self.b0)*self.b0 + np.sum(self.tm*self.b1)*self.b1
-        # fc = np.sum(self.tm*self.c0)*self.c0 + np.sum(self.tm*self.c1)*self.c1
-        # mechanisms
-        # m1 = np.sum(self.tm * self.a1.T,axis=0)
-        # mx1 = np.sum(m1*self.a0)*self.a0 + np.sum(m1*self.a1)*self.a1
-        # cxa1 = mx1 * fb * fc
-
-        # # first order causes
-        # for cfg in range(16):
-        #     # active cells forming the glider
-        #     ces = self.sts[cfg,1,1:-1,1:-1].flatten().nonzero()[0]
-        #     # for every purview
-        #     for pwi in range(1,32):
-        #         pwx = ces*self.pws[pwi]
-        #         # for each single mechanism
-        #         for e,ce in enumerate(ces):
-        #             # values for the cxs reps indexes
-        #             cis = np.zeros(5).astype(int)
-        #             cis[e] = 1
-        #             c0,c1,c2,c3,c4 = cis
-        #             # glider pasts that could have led to cell = 1
-        #             # valid txs in which cell stx == 1 (mechanism)
-        #             # gps = np.sum(self.tm*self.cvw[ce,1],axis=1)
-        #             gps = np.matmul(self.tm,self.cvw[ce,1])
-        #             # active cells in current purview
-        #             # info from past st shouldn't be very good (due to the transient cfgs)?
-        #             pwu = pwx[~np.isnan(pwx)].astype(int)
-        #             cps = (self.sts[cfg,1]*np.sum([self.ces_pws[pw] for pw in pwu],axis=0))[1:-1,1:-1].flatten().nonzero()[0]
-        #             # all gl states where cells in purview are active
-        #             cps_gl = np.array([self.cvw[cpi,1] for cpi in cps])
-        #             cps_gl = np.pad(cps_gl,(0,5),'constant')[:5,:16]
-        #             # only valid glider pasts, leading to cell = 1
-        #             # possible gl past sts where pp cells were active
-        #             # => number of valid past gl sts where each pp cell past st = 1
-        #             # cps_pp = np.sum(cps_cfgs*gps,axis=1)
-        #             cps_pp = np.matmul(cps_gl,gps)
-        #             # for every gl cfg, the sum of the possibilities of all pp cells
-        #             self.cxs[cfg,pwi,c0,c1,c2,c3,c4] = np.matmul(cps_gl.T,cps_pp)
-        #         # higher order mechanisms
-        #         mxs = np.where(np.isnan(self.pws),0,1)
-        #         for mi in range(1,32):
-        #             if np.sum(mxs[mi])>0:
-        #                 # avoid conflicting with already gotten first order mxs
-        #                 cx = np.ones(16)
-        #                 c0,c1,c2,c3,c4 = mxs[mi].astype(int)
-        #                 if c0==1:
-        #                     cx *= self.cxs[cfg,pwi,c0,0,0,0,0]
-        #                 if c1==1:
-        #                     cx *= self.cxs[cfg,pwi,0,c1,0,0,0]
-        #                 if c2==1:
-        #                     cx *= self.cxs[cfg,pwi,0,0,c2,0,0]
-        #                 if c3==1:
-        #                     cx *= self.cxs[cfg,pwi,0,0,0,c3,0]
-        #                 if c4==1:
-        #                     cx *= self.cxs[cfg,pwi,0,0,0,0,c4]
-        #                 self.cxs[cfg,pwi,c0,c1,c2,c3,c4] = cx
-        #
+        # print some stuff
+        print('\nmax info, sxe?, subsys[minsize & common elements]:\n')
+        minsets = [set.intersection(*[set(list(mi)) for mi in self.maxinfo_ids[i]]) for i in range(16)]
+        info_sets = [[len(self.maxinfo_ids[i][0]),minsets[i]] for i in range(16)]
+        for i in [[a,b,c] for a,b,c in zip(self.maxinfo,self.maxinfo_sxe,info_sets)]:
+            print(' {:.2f}, {:.2f}, {}'.format(i[0],i[1],i[2]))
+        print('\nsystem synergy: past,present,future: sys|sys-sys|sum(ems)\n')
+        print(self.synsys[:,:,6,1])
+        print('\npast synergies: {}'.format(np.where(self.synsys[:,:,6,1][:,0]>0)[0]))
+        print('present synergies: {}'.format(np.where(self.synsys[:,:,6,1][:,1]>0)[0]))
+        print('future synergies: {}'.format(np.where(self.synsys[:,:,6,1][:,2]>0)[0]))
 
 
 
@@ -353,37 +312,6 @@ class Glider:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# pws (domain) for all 3x3 cells. sliding window
-# ces_pws = np.zeros((9,5,5))
-# for i in range(1,4):
-#     for j in range(1,4):
-#         w = np.zeros((5,5)).astype(int)
-#         w[i-1:i+2,j-1:j+2] = 1
-#         ces_pws[3*(i-1)+j-1] = w
-# # reduce to 3x3 (empty env, so no active cells outside)
-# ces_pws = ces_pws[:,1:-1,1:-1]
-# active cells for every glider cfg
-# cfgs = self.sts[:,1,1:-1,1:-1]
-# active cells in each active cell purview for every glider cfg
-# for cfg in range(16):
-    # pw : glider cfg * cells purview * only active cells in that cfg
-    # cfg_pws = cfgs.reshape(16,9)[cfg] * ces_pws.reshape(9,9) * np.array(self.sts[cfg,1,1:-1,1:-1].flatten()).reshape(9,1)
-    # self.pws[cfg][:5] = cfg_pws[~np.all(cfg_pws==0,axis=1)]
 
 
 

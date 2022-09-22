@@ -49,21 +49,14 @@ def int_reps(mreps):
         ireps[mi] = xi
     return ireps
 
-# distance matrix for abc
-def mk_abc_dm(dim=8,cost=1):
-    dm = np.zeros((dim,dim))
-    for i in range(dim):
-        bin_i = int2arr(i,3)
-        for j in range(dim):
-            bin_j = int2arr(j,3)
-            dij = np.sum([abs(bi-bj) for bi,bj in zip(bin_i,bin_j)])
-            dm[i][j] = cost * dij
-    return dm
-
-# distance matrix for glider EMD
-def mk_gl_dm(sts):
-    s = sts.reshape(16,25)
-    dm = np.array([np.nansum(abs(s-s[i]),axis=1) for i in range(16)])
+# distance matrix for n states
+def mk_dm(n_sts,cost=1,as_float=True):
+    ns = np.arange(n_sts)
+    mi,mj = np.meshgrid(ns,ns)
+    dm = np.abs(mi-mj)*cost
+    # if not float, returns dm as int
+    if as_float:
+        return dm.astype(float)
     return dm
 
 
