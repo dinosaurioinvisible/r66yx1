@@ -27,7 +27,7 @@ but still there is a loss of complete information (AB)
 '''
 
 class Glider:
-    def __init__(self):
+    def __init__(self,current_tf_only=False):
         # current st
         self.st = 0
         # glider past,current,future sts for all canonical cfgs
@@ -41,6 +41,7 @@ class Glider:
         self.mxs = np.zeros((16,31,16))
         self.mk_mxs()
         # cell 1/0 vals in past & fut (from current cfg pov)
+        self.ctf = current_tf_only
         self.ppws = np.zeros((16,5,16))
         self.fpws = np.zeros((16,5,16))
         self.mk_pws()
@@ -54,7 +55,7 @@ class Glider:
         # small phi: intrinsic information (cfg,mx,pw info)
         self.cxinfo = np.zeros((16,31,31))
         self.exinfo = np.zeros((16,31,31))
-        self.info = np.zeros((16,31))
+        self.info = np.zeros((16,31,31))
         self.get_info()
         # analysis
         self.analyze()
@@ -135,7 +136,7 @@ class Glider:
                 self.ppws[cfg] = self.ppws[cfg] * np.asarray(ppws).reshape(5,1)
                 self.fpws[cfg] = self.fpws[cfg] * np.asarray(fpws).reshape(5,1)
 
-    def mk_pws(self,current_tf=True):
+    def mk_pws(self):
         # for distance matrices
         self.pdm = np.zeros((16,16))
         self.fdm = np.zeros((16,16))
@@ -153,7 +154,7 @@ class Glider:
             self.ppws[cfg] = ppws[pws_ids]
             self.fpws[cfg] = fpws[pws_ids]
             # if we wish to include only cells 'connecting' time-frames
-            if current_tf:
+            if self.ctf:
                 # indices for connecting cells (alive in both timeframes)
                 pc_pws = [1 if pi in self.sts[cfg,0,1:-1,1:-1].flatten().nonzero()[0] else 0 for pi in pws_ids]
                 cf_pws = [1 if pi in self.sts[cfg,2,1:-1,1:-1].flatten().nonzero()[0] else 0 for pi in pws_ids]
@@ -164,6 +165,9 @@ class Glider:
             # 5 (max cost) - connecting cells between sts
             self.pdm[cfg] = 5 - np.sum(ppws.T*self.sts[cfg,1,1:-1,1:-1].flatten(),axis=1)
             self.fdm[cfg] = 5 - np.sum(fpws.T*self.sts[cfg,1,1:-1,1:-1].flatten(),axis=1)
+        # just checking (it seems that self elementary info = 0?)
+        # self.pdm *= np.abs(1-np.diag(np.ones(16)))
+        # self.fdm *= np.abs(1-np.diag(np.ones(16)))
 
     def mk_cxs(self):
         # for higher order combinations of purviews
@@ -217,6 +221,7 @@ class Glider:
         for cfg in range(16):
             # effect matrices, including virtual uc elements
             # likelihood of fut pws vals =0 or =1
+            # this is a kind of roundabout, but its easier to visualize
             tms = [np.sum(self.tm*np.abs(pwi-1),axis=1).reshape(16,1)*np.abs(pwi-1)+np.sum(self.tm*pwi,axis=1).reshape(16,1)*pwi for pwi in self.fpws[cfg]]
             # unconstrained future pws
             ufs = np.array([np.sum(tm,axis=0) for tm in tms])
@@ -228,12 +233,16 @@ class Glider:
                     ufx = ufs*1
                     # only non considered pws are unconstrained
                     ufx[pwe] = 1
-                    self.exs[cfg,me,pwe] = np.sum(tms[pwe]*mx.reshape(16,1),axis=0) * np.product(ufx,axis=0)
+                    ufx = np.product(ufx,axis=0)
+                    self.exs[cfg,me,pwe] = np.sum(tms[pwe]*mx.reshape(16,1),axis=0) * ufx
                 # higher order purviews
                 for pwi,pwx in enumerate(pwset):
                     ufx = ufs*1
                     ufx[np.asarray(pwx)] = 1
-                    self.exs[cfg,me,5+pwi] = np.product(self.exs[cfg,me][np.asarray(pwx)],axis=0) * np.product(ufx,axis=0)
+                    ufx = np.product(ufx,axis=0)
+                    # self.exs[cfg,me,5+pwi] = np.product(self.exs[cfg,me][np.asarray(pwx)],axis=0) * ufx
+                    px = np.array([np.sum(tms[pi]*mx.reshape(16,1),axis=0) for pi in pwx])
+                    self.exs[cfg,me,5+pwi] = np.product(px,axis=0) * ufx
                 # turn mx counts into distributions
                 self.exs[cfg,me] /= np.sum(self.exs[cfg,me],axis=1).reshape(31,1)
             # uncontrained future (different for every cfg)
@@ -252,7 +261,7 @@ class Glider:
                     self.cxinfo[cfg,me,pwi] = emd(self.cxs[cfg,me,pwi],ucp,self.pdm)
                     self.exinfo[cfg,me,pwi] = emd(self.exs[cfg,me,pwi],self.ucf[cfg],self.fdm)
                 # intrinsic info: minimum between causes and effects
-                self.info[cfg,me] = np.min((np.max(self.cxinfo[cfg,me]),np.max(self.exinfo[cfg,me])))
+                self.info[cfg,me] = np.minimum(self.cxinfo[cfg,me],self.exinfo[cfg,me])
 
     def analyze(self):
         # combinations (subsystems) of mechanisms
@@ -260,20 +269,21 @@ class Glider:
         # max intrinsic info (present from past & future)
         self.maxinfo = np.zeros(16)
         self.maxinfo_ids = []
-        self.maxinfo_sxe = np.zeros(16)
         # synergy: current sys info of past, present & fut
         # (16 cfgs, 3 timeframes: 0:p/c, 1:c/ii(p,f), 2:f/c)
         # (sys/em, sys/sys, sys/sys-sum(ems)/sys)
         self.synsys = np.zeros((16,3,7,2))
         # different for every cfg
         for cfg in range(16):
-            # IIT
-            # max informative mechanism
-            maxinfo = np.max(self.info[cfg])
-            self.maxinfo[cfg] = maxinfo
+            # max informative purview for each mechanism
+            max_pws = np.max(self.info[cfg],axis=1)
+            # max informatie mechanism for each cfg
+            max_mx = np.max(max_pws)
+            self.maxinfo[cfg] = max_mx
             # all mechanisms/subsystems providing max info
-            maxids = np.where(self.info[cfg]==maxinfo)[0]
-            self.maxinfo_ids.append([self.ids[cfg][np.asarray(pset[mid])] for mid in maxids])
+            max_ids = np.where(max_pws==max_mx)[0]
+            self.maxinfo_ids.append([self.ids[cfg][np.asarray(pset[mid])] for mid in max_ids])
+
         # synergies (1:present, 0:past, 2:future)
         # past
         self.synsys[:,0,:,0] = np.hstack((self.cxinfo[:,30,:5],self.cxinfo[:,30,30].reshape(16,1),np.sum(self.cxinfo[:,30,:5],axis=1).reshape(16,1)))
@@ -290,7 +300,7 @@ class Glider:
         print('\nmax info, sys info, elms info, subsys[minsize & common elms]:\n')
         minsets = [set.intersection(*[set(list(mi)) for mi in self.maxinfo_ids[i]]) for i in range(16)]
         info_sets = [[len(self.maxinfo_ids[i][0]),minsets[i]] for i in range(16)]
-        for i in [[a,b,c,d] for a,b,c,d in zip(self.maxinfo,self.synsys[:,1,5,0],self.synsys[:,1,6,0],info_sets)]:
+        for i in [[a,b,c,d] for a,b,c,d in zip(self.maxinfo,self.info[:,30,30],np.sum(self.info[:,:5,30],axis=1),info_sets)]:
             print(' {:.2f}, {:.2f}, {:.2f}, {}'.format(i[0],i[1],i[2],i[3]))
         print('\nsystem synergy: past,present,future: sys|sys-sys|sum(ems)\n')
         print(np.round(self.synsys[:,:,6,1],2))
@@ -298,8 +308,20 @@ class Glider:
         print('present synergies: {}'.format(np.where(self.synsys[:,:,6,1][:,1]>0)[0]))
         print('future synergies: {}'.format(np.where(self.synsys[:,:,6,1][:,2]>0)[0]))
 
+        # synergies2 (the other way around)
+        print("\nsynergy2:\n")
+        print('   psum, psys,psyn - csyn - fsyn,fsys, fsum')
+        psum = np.sum(self.cxinfo[:,:5,30],axis=1).reshape(16,1)
+        psys = self.cxinfo[:,30,30].reshape(16,1)
+        psyn = np.diff(np.hstack((np.sum(self.cxinfo[:,:5,30],axis=1).reshape(16,1),self.cxinfo[:,30,30].reshape(16,1))),axis=1)
+        csyn = self.info[:,30,30] - np.sum(self.info[:,:5,30],axis=1)
+        fsyn = np.diff(np.hstack((np.sum(self.exinfo[:,:5,30],axis=1).reshape(16,1),self.exinfo[:,30,30].reshape(16,1))),axis=1)
+        fsys = self.exinfo[:,30,30].reshape(16,1)
+        fsum = np.sum(self.exinfo[:,:5,30],axis=1).reshape(16,1)
+        print(np.round(np.hstack((psum,psys,psyn,csyn.reshape(16,1),fsyn,fsys,fsum)),2))
+        import pdb; pdb.set_trace()
 
-
+Glider()
 
 
 

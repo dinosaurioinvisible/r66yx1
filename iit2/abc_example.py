@@ -116,6 +116,7 @@ class ABCex:
         # uc past & future
         ucp = np.ones(8)/8
         ucfs = self.exs[:,2,2,2]/np.sum(self.exs[:,2,2,2],axis=1).reshape(7,1)
+        import pdb; pdb.set_trace()
         # for all mechanisms (A,B,C,AB,BC,AC,ABC) (rows)
         for u,[va,vb,vc] in enumerate(self.mx_sts):
             # for all purviews (columns)
