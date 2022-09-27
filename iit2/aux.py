@@ -50,7 +50,8 @@ def int_reps(mreps):
     return ireps
 
 # distance matrix for n states
-def mk_dm(n_sts,cost=1,as_float=True):
+# need to fix this
+def xmk_dm(n_sts,cost=1,as_float=True):
     ns = np.arange(n_sts)
     mi,mj = np.meshgrid(ns,ns)
     dm = np.abs(mi-mj)*cost
@@ -59,6 +60,19 @@ def mk_dm(n_sts,cost=1,as_float=True):
         return dm.astype(float)
     return dm
 
+# distance matrix
+def mk_dm(dim=8,cost=1,as_float=True):
+    dm = np.zeros((dim,dim))
+    for i in range(dim):
+        bin_i = int2arr(i,3)
+        for j in range(dim):
+            bin_j = int2arr(j,3)
+            dij = np.sum([abs(bi-bj) for bi,bj in zip(bin_i,bin_j)])
+            dm[i][j] = cost * dij
+    # if not float, returns dm as int
+    if as_float:
+        return dm.astype(float)
+    return dm
 
 
 
