@@ -2,6 +2,7 @@
 import numpy as np
 from aux import *
 from pyemd import emd
+import xlsxwriter
 
 '''
 There are 6 options for measuring phi, that i can think of:
@@ -27,7 +28,10 @@ but still there is a loss of complete information (AB)
 '''
 
 class Glider:
-    def __init__(self,current_tf_only=False):
+    def __init__(self,current_tf_only=False,write_to_xlsx=False):
+        # opt
+        self.ctf = current_tf_only
+        self.write = write_to_xlsx
         # current st
         self.st = 0
         # glider past,current,future sts for all canonical cfgs
@@ -41,7 +45,6 @@ class Glider:
         self.mxs = np.zeros((16,31,16))
         self.mk_mxs()
         # cell 1/0 vals in past & fut (from current cfg pov)
-        self.ctf = current_tf_only
         self.ppws = np.zeros((16,5,16))
         self.fpws = np.zeros((16,5,16))
         self.mk_pws()
@@ -166,8 +169,8 @@ class Glider:
             self.pdm[cfg] = 5 - np.sum(ppws.T*self.sts[cfg,1,1:-1,1:-1].flatten(),axis=1)
             self.fdm[cfg] = 5 - np.sum(fpws.T*self.sts[cfg,1,1:-1,1:-1].flatten(),axis=1)
         # just checking (it seems that self elementary info = 0?)
-        # self.pdm *= np.abs(1-np.diag(np.ones(16)))
-        # self.fdm *= np.abs(1-np.diag(np.ones(16)))
+        self.pdm *= np.abs(1-np.diag(np.ones(16)))
+        self.fdm *= np.abs(1-np.diag(np.ones(16)))
 
     def mk_cxs(self):
         # for higher order combinations of purviews
@@ -229,9 +232,8 @@ class Glider:
             for me,mx in enumerate(self.mxs[cfg]):
                 # elementary pws fut vals, given mx=1
                 for pwe in range(5):
-                    # to avoid ufs => ufx
-                    ufx = ufs*1
                     # only non considered pws are unconstrained
+                    ufx = ufs*1
                     ufx[pwe] = 1
                     ufx = np.product(ufx,axis=0)
                     self.exs[cfg,me,pwe] = np.sum(tms[pwe]*mx.reshape(16,1),axis=0) * ufx
@@ -309,7 +311,7 @@ class Glider:
         print('future synergies: {}'.format(np.where(self.synsys[:,:,6,1][:,2]>0)[0]))
 
         # synergies2 (the other way around)
-        print("\nsynergy2:\n")
+        print("\nsynergyes:\n")
         print('   psum, psys,psyn - csyn - fsyn,fsys, fsum')
         psum = np.sum(self.cxinfo[:,:5,30],axis=1).reshape(16,1)
         psys = self.cxinfo[:,30,30].reshape(16,1)
@@ -319,7 +321,58 @@ class Glider:
         fsys = self.exinfo[:,30,30].reshape(16,1)
         fsum = np.sum(self.exinfo[:,:5,30],axis=1).reshape(16,1)
         print(np.round(np.hstack((psum,psys,psyn,csyn.reshape(16,1),fsyn,fsys,fsum)),2))
+
+        print('\ncurrent timeframe synergy')
+        print(np.round(np.vstack((np.sum(self.info[:,:5,30],axis=1),self.info[:,30,30],csyn)).T,2))
+
+        if self.write:
+            # names od the elements
+            pset = powerset(5)[1:]
+            # initialize worksheet
+            workbook = xlsxwriter.Workbook('glxinfo.xlsx')
+            worksheet = workbook.add_worksheet()
+            row,col = 2,1
+            worksheet.write(row,col, 'phi')
+            # for every config
+            for cfgi,cfgx in enumerate(self.info):
+                wx = 'cfg = {}'.format(cfgi)
+                worksheet.write(row,col, wx)
+                # upper names
+                for pwi in range(30):
+                    worksheet.write(row,col+pwi+1, '{}'.format(pset[pwi]))
+                # left names and data
+                for mxi in range(30):
+                    row += 1
+                    worksheet.write(row,col, '{}'.format(pset[mxi]))
+                    for pwi in range(30):
+                        worksheet.write(row,col+pwi+1, cfgx[mxi,pwi])
+                # for next config
+                row += 2
+            workbook.close()
+
+        # 16 cfgs -> A and B
+        ab_info = False
+        if ab_info:
+            ab = self.info[:,:5,30]
+            absum = np.round(np.sum(self.info[:,:5,30],axis=1),2)
+            ems = ['A','B','C','D','E','SUM']
+            workbook = xlsxwriter.Workbook('glxAB.xlsx')
+            worksheet = workbook.add_worksheet()
+            row,col = 2,1
+            worksheet.write(row,col, 'phi')
+            for pwi in range(len(ems)):
+                worksheet.write(row,col+pwi+1, '{}'.format(ems[pwi]))
+            for cfg in range(16):
+                row += 1
+                worksheet.write(row,col, 'cfg={}'.format(cfg))
+                for pwi in range(5):
+                    worksheet.write(row,col+pwi+1, ab[cfg,pwi])
+                worksheet.write(row,col+6, absum[cfg])
+            workbook.close()
+
+
         import pdb; pdb.set_trace()
+
 
 Glider()
 
