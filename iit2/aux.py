@@ -74,7 +74,35 @@ def mk_dm(dim=8,cost=1,as_float=True):
         return dm.astype(float)
     return dm
 
+# gol timestep (bounded domains)
+def gol_timestep(domain):
+    # only int 0/1
+    dcopy = domain.astype(int)
+    # iterate through cells
+    for ei,di in enumerate(domain):
+        for ej,dij in enumerate(di):
+            # apply gol rule (max for borders)
+            nbsum = np.sum(domain[max(0,ei-1):ei+2,max(0,ej-1):ej+2]) - dij
+            dcopy[ei,ej] = 1 if nbsum==3 or (nbsum==2 & dij==1) else 0
+    return dcopy
 
+# tx matrix for a GoL individual cell
+def txs_gol_cell():
+    # 512 txs, 2 sts (sti,stx) & 9 cells domain
+    tx_tensor = np.zeros((512,2,9))
+    tx_matrix = np.zeros((512,512))
+    # for each sti 0:512 -> stx
+    for i in range(512):
+        # sti
+        sti = int2arr(i,arr_len=9)
+        tx_tensor[i,0] = sti
+        # stx
+        stx = gol_timestep(sti.reshape(3,3))
+        tx_tensor[i,1] = stx.flatten()
+        # sti -> stx
+        x = arr2int(stx)
+        tx_matrix[i,x] += 1
+    return tx_tensor,tx_matrix
 
 
 
