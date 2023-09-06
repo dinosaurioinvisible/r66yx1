@@ -31,7 +31,7 @@ def make_dm(tm):
 dm_x = make_dm(tm_x)
 dm_y = make_dm(tm_y)
 
-# distributions
+# distributions for x=0 -> y=1
 py_x0 = tm_x[0]
 py_x1 = tm_x[1]
 px_y0 = tm_y[0]
@@ -58,11 +58,10 @@ def info(x,y,cxy=count):
     ucy = ucy/np.sum(ucy)
     # distance matrices
     dmx = make_dm(tmx)
-    dmy = make_dm(tmy)
-    print(px_y)
-    print(ucx)
-    print(dmx)
+    dmy = make_dm(tmy)    
     # ci and ei
     ci = emd(px_y,ucx,dmx)
     ei = emd(py_x,ucy,dmy)
+    print('ci = EMD(p(sx|sy={})||ucx) : {}'.format(y,ci))
+    print('ei = EMD(p(sx|sy={})||ucx) : {}'.format(x,ei))
     return ci,ei
