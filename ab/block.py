@@ -138,11 +138,13 @@ def mk_block_analysis():
 
 
 
-
-
-
-
-
+# effect information (from proto-blocks into block)
+# given a protoblock x, how probable is its transition into a block
+# sx/sy = 'block', 'pblock1', etc
+def get_sx_info(sx,sy):
+    # sx_dom: (sx,ex)
+    # sy_dom: all past possible cfgs for current (sy,ey) domain
+    sx_dom,sy_dom = mk_tx_domain(sx,sy)
 
 
 
