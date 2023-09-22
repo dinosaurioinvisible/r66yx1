@@ -14,8 +14,31 @@ def array2int(arr):
     xi = np.sum([x<<e for e,x in enumerate(arr.flatten().astype(int))])
     return xi
 
+# fxs that return ids of the arrays of a matrix that:
+# sum = x; higher than x; lower than x; nonzero
+def sum_is(matrix,x,axis=1,arrays=False):
+    if arrays:
+        return matrix[np.where(np.sum(matrix,axis=axis)==x)[0]]
+    return np.where(np.sum(matrix,axis=axis)==x)[0]
+def sum_higher(matrix,x,axis=1,arrays=False):
+    if arrays:
+        return matrix[np.where(np.sum(matrix,axis=axis)>x)[0]]
+    return np.where(np.sum(matrix,axis=axis)>x)[0]
+def sum_lower(matrix,x,axis=1,arrays=False):
+    if arrays:
+        return matrix[np.where(np.sum(matrix,axis=axis)<x)[0]]
+    return np.where(np.sum(matrix,axis=axis)<x)[0]
+def sum_nonzero(matrix,axis=1,arrays=False):
+    if arrays:
+        return matrix[np.sum(matrix,axis=axis).nonzero()[0]]
+    return np.sum(matrix,axis=axis).nonzero()[0]
+# to check if some sx is surrended by zeros in some domx 
+def sum_borders(domx):
+    cx = np.sum(domx[1:-1,1:-1])
+    return np.sum(domx)-cx
+
 # make canonical gol patterns (sx,e=0) from word inputs
-def mk_gol_pattern(px):
+def mk_gol_pattern(px,):
     if px == 'block':
         dx = np.zeros((4,4))
         dx[1:-1,1:-1] = 1
@@ -40,7 +63,6 @@ def mk_gol_pattern(px):
                 dt = np.ascontiguousarray(dr.T)
                 dx.extend([dr,dt])
     return dx
-    
 
 # game of life transition
 def gol_step(world_st):
@@ -53,6 +75,80 @@ def gol_step(world_st):
             world[ei,ej] = vx
     return world
 
+# gol transition for multiple arrays
+# sx: matrix form to reshape arrays
+# sx_domains: gol lattice/domain arrays for each sx -> sy
+# make_zero: makes sums<3 = 0 (will die next)
+def multi_gol_step(sx,sx_domains,make_zero=True):
+    # shape
+    n,m = sx.shape    
+    # output array
+    sxy = np.zeros((sx_domains.shape[0],n*m))
+    # simulate transitions
+    for di,dx in enumerate(sx_domains):
+        dy = gol_step(dx.reshape(n,m)).flatten()
+        sxy[di] = dy
+    if make_zero:
+        sxy_zeros = np.where(np.sum(sxy,axis=1)<3)[0]
+        sxy[sxy_zeros] = 0
+    return sxy
+
+# to account for transition activity outside dx
+# dx: input in matrix form (n,m)
+# dy: output in matrix form (n+2,m+2)
+def gol_step_expanded(dx):
+    # expand domain
+    n,m = dx.shape
+    domx = np.zeros((n+2,m+2))
+    domx[1:-1,1:-1] = dx
+    dy = gol_step(domx)
+    return dy
+def multi_gol_step_expanded(sx,sx_domains,make_zero=True,expand_by=1):
+    n,m = sx.shape
+    ne = n + expand_by*2
+    me = m + expand_by*2
+    sxy = np.zeros((sx_domains.shape[0],(ne)*(me)))
+    for di,dx in enumerate(sx_domains):
+        dy = gol_step_expanded(dx.reshape(ne-2,me-2)).flatten()
+        sxy[di] = dy
+    if make_zero:
+        sxy_zeros = np.where(np.sum(sxy,axis=1)<3)[0]
+        sxy[sxy_zeros] = 0
+    return sxy
+
+# check for patterns 
+# domx: gol domain/lattice in matrix form
+# e0: empty environment
+def is_block(domx,e0=True):
+    if np.sum(domx) >= 4:
+        n,m = domx.shape
+        for i in range(n):
+            for j in range(m):
+                if np.sum(domx[i:i+2,j:j+2]) == 4:
+                    if e0:
+                        if np.sum(domx) == 4:
+                            return True
+                    else:
+                        if np.sum(domx[max(0,i-1):i+3,max(0,j-1):j+3]) == 4:
+                            return True
+    return False
+# same for next timestep
+def is_block_next(domx,e0=True):
+    n,m = domx.shape
+    # block may be outside of current domain
+    dom = np.zeros((n+2,m+2))
+    dom[1:-1,1:-1] = domx
+    domy = gol_step(dom)
+    return is_block(domy,e0)
+# blinker
+def is_blinker(domx):
+    if np.sum(domx) == 3:
+        vsum = np.sum(domx,axis=0)
+        hsum = np.sum(domx,axis=1)
+        if 3 in vsum or 3 in hsum:
+            return True
+    return False
+
 # a tensor for all binary combinations
 def mk_binary_domains(n_cells):
     doms = np.zeros((2**n_cells,n_cells)).astype(int)
@@ -63,12 +159,14 @@ def mk_binary_domains(n_cells):
         doms[:,-1-i] = np.tile(xi,n)
     return doms
 
+# more general fx, for gol patterns
 # domain environmental (sx + env) tensor
 # given a block, blinker or any other structure from the gol (sx)
 # make all the env arrays for sx
 # e_cells are all the cells in the environment
-def mk_sx_domain(sx):
+def mk_sx_domains(sx):
     # number of env cells
+    # pblock1: 3 active cells in the same region of the block
     if sx == 'block' or sx == 'pblock1':
         e_cells = 12
     # all possibilities of binary domain
@@ -83,136 +181,185 @@ def mk_sx_domain(sx):
     return doms
 
 # get all sx: sx -> sy
-# sy = 'block', 'blinker', etc
-def get_sxs(sy):
+# sy: any specific gol pattern domain (sx,ex)
+# requires matrix/lattice input
+def get_sxs_from_sy(sy,e0=True,ct=True):
     # array for expected sy
-    ey = mk_gol_pattern(sy)
-    n,m = ey.shape
-    ey = ey.flatten()
+    n,m = sy.shape
     # all possible domains fot (sx,ex)
     domx = mk_binary_domains(n*m)
     # analyze domains transitions
-    # firt array = ey for analysis later
-    sxs = ey*1
+    # first array = ey for analysis later
+    sxs = sy.flatten()
     for dx in domx:
-        dy = gol_step(dx.reshape(n,m)).flatten()
-        # perfect blocks
-        if np.sum(dy*ey) == 4:
+        # centered blocks + any env
+        # dy = gol_step(dx.reshape(n,m)).flatten()
+        # if np.sum(dy*ey) == 4:
+        if is_block_next(dx.reshape(n,m),e0):
             sxs = np.vstack((sxs,dx))
-    # translation and rotations (symmetries)
-    # 1) classify by number of active and shared sx-sy cells
-    symx = {}
-    # number of active cells in sx (skip sx->sy=0 cases)
-    for n_ac in range(3,n*m-3):
-        # to classify by n_ac
-        symx[n_ac] = {}
-        # to classify by common/shared cells (hints symmetry)
-        # possible range: 0 to n active cells in sy=ey
-        for cc in range(np.sum(ey).astype(int)+1):
-            symx[n_ac][cc] = []
-        # indexes for sxs with active cells = n_ac
-        # +1 because sxs[1:] (skip sy)
-        sxs_ac = np.where(np.sum(sxs[1:],axis=1)==n_ac)[0].astype(int)+1
-        # common active cells between sx and sy
-        for sxi in sxs_ac:
-            n_cc = np.sum(sxs[sxi]*ey).astype(int)
-            symx[n_ac][n_cc].append(sxi)
-    # 2) look for symmetries
-    # rotations
-    sxs_syms = {}
-    for aci in range(3,n*m-3):
-        sxs_syms[aci] = {}
-        for cci in range(np.sum(ey).astype(int)+1):
-            # skip 0 and 1 cases
-            if len(symx[aci][cci]) < 2:
-                sxs_syms[aci][cci] = [symx[aci][cci]]
-            else:
-                sxs_syms[aci][cci] = []
-                # already counted in previous cycles
-                all_syms = []
-                for ei,si in enumerate(symx[aci][cci][:-1]):
-                    if si in all_syms:
-                        break
-                    else:
-                        syms = [si]
-                    for sj in symx[aci][cci][ei+1:]:
-                        # rotation and transposition
-                        for ri in range(1,4):
-                            sjr = np.rot90(sxs[sj].reshape(4,4),ri)
-                            if np.array_equal(sxs[si],sjr.flatten()) == True:
-                                syms.append(sj)
-                                all_syms.append(sj)
+    # symmetries/equivalences
+    sxs_ct,sxs_symsets,symsets = get_symsets(sy,sxs,ct)
+    return sxs_ct,sxs_symsets,symsets
+
+# systematize the set of sxs -> sy
+# considering symmetries, shared cells & locations
+def get_symsets(sy,sxs,ct=True):
+    # counts from sxs before symmetries
+    n,m = sy.shape
+    print('\ntotal sxs: {}'.format(sxs.shape[0]))
+    for acs in range(n*m+1):
+        print(acs,sum_is(sxs,acs).shape[0])
+    # look for (dis)-continuity
+    # discard sx -> sy transitions if sx & sy don't share at least 1 active cell
+    # indices for shared cells > 0
+    if ct:
+        sxs_ct_ids = np.where(np.sum(sxs*sxs[0],axis=1)>0)[0]
+        sxs = sxs[sxs_ct_ids]
+    # sums of active cells to look for symmetries
+    sxs_sums = np.sum(sxs,axis=1)
+    # sy row = -1 to easily avoid counting it, retaining indexes
+    sxs_sums[0] = -1
+    # lists of indexes of arrays with the same number of active cells
+    sxs_ac_id_sets = [[] for _ in range(n*m+1)]
+    for sum_i in range(n*m+1):
+        sxs_ac_id_sets[sum_i] = np.where(sxs_sums==sum_i)[0]
+    # look for rotations and transps within sets
+    sxs_syms = [[] for _ in range(n*m+1)]
+    sxs_dups = [[] for _ in range(n*m+1)]
+    for aci,ac_id_set in enumerate(sxs_ac_id_sets):
+        # to avoid re-checking and duplications
+        checked_ids = []
+        # compare sx arrays
+        # ei: index in list, xi_id: index on sxs, xi: array on sxs
+        for ei,xi_id in enumerate(ac_id_set):
+            # get first array from indexes
+            xi = sxs[xi_id]
+            # skip previously checked/known eq cases
+            if xi_id not in checked_ids:
+                eq_ids = [xi_id]
+                dup_eq_ids = []
+                # look for rotationally eqs arrays
+                # ej: 2nd index in list, xj_id: 2nd index on sxs
+                for ej in range(ei+1,len(ac_id_set)):
+                    xj_id = ac_id_set[ej]
+                    if xj_id not in checked_ids:
+                        # xj: 2nd array from sxs, reshaped for rot/transp
+                        #xj = sxs[xj_id].reshape(n,m)
+                        xj = sxs[xj_id].reshape(n,m)
+                        # if rotated xj == xi, they are equivalent
+                        for rot_i in range(0,4):
+                            # 0 rotation for location and transp
+                            xj_rot = np.rot90(xj,rot_i).flatten()
+                            if np.array_equal(xi,xj_rot):
+                                eq_ids.append(xj_id)
                                 break
-                            sjt = np.ascontiguousarray(sjr.T).flatten()
-                            if np.array_equal(sxs[si],sjt) == True:
-                                syms.append(sj)
-                                all_syms.append(sj)
+                            # there's only one transp for every rot
+                            xj_transp = np.ascontiguousarray(xj_rot.reshape(4,4).T).flatten()
+                            if np.array_equal(xi,xj_transp):
+                                eq_ids.append(xj_id)
                                 break
-                        # non rotation case
-                        if sj not in all_syms:
-                            sjt0 = np.ascontiguousarray(sxs[sj].reshape(4,4).T).flatten()
-                            if np.array_equal(sxs[si],sjt0) == True:
-                                syms.append(sj)
-                                all_syms.append(sj)
+                            # check translation (location)
+                            loc = False
+                            for li in range(1,n*m):
+                                if np.array_equal(xi,np.roll(xj_rot,li)) or np.array_equal(xi,np.roll(xj_transp,li)):
 
-                    sxs_syms[aci][cci].append(syms)
-                    # all_syms.extend(syms)
-    # print data
-    for k_ac in sxs_syms.keys():
-        xac = []
-        for k_cc in sxs_syms[k_ac].keys():
-            xcc = [[k_cc,len(simset),simset] for simset in sxs_syms[k_ac][k_cc]]
-            xac.extend(xcc)
-        sumset = np.sum([i[1] for i in xac])
-        n_symsets = np.sum([1 for i in xac if i[1]>0]).astype(int)
-        print('\nactive cells: {}, sx->sy cases: {}, symsets: {}'.format(k_ac,sumset,n_symsets))
-        if sumset > 0:
-            for xai in xac:
-                if xai[1] > 0:
-                    print('common cells: {}, symset len: {}'.format(xai[0],xai[1]))
-                    print('symsets cases: {}'.format(xai[2]))
-    return sxs,sxs_syms
+                                    dup_eq_ids.append(xj_id)
+                                    loc=True
+                                    break
+                            if loc:
+                                break
+                checked_ids.extend(eq_ids)
+                checked_ids.extend(dup_eq_ids)
+                # save as array for indexing on sxs
+                sxs_syms[aci].append(np.array(eq_ids))
+                sxs_dups[aci].append(dup_eq_ids)
+    # organize and print
+    # check total instances
+    n_sxs_symsets = 0
+    n_sxs_dups = 0
+    n_sxs_acs = [0]*(n*m+1)
+    print('sxs')
+    for ac in range(n*m+1):
+        if len(sxs_syms[ac]) > 0:
+            n_sxs_symsets_ac = sum([len(ac_symset) for ac_symset in sxs_syms[ac]])
+            n_sxs_dups_ac = sum([len(ac_dups) for ac_dups in sxs_dups[ac]])
+            n_sxs_ac = n_sxs_symsets_ac + n_sxs_dups_ac
+            n_sxs_acs[ac] = n_sxs_ac
+            print('{}, sxs_ss:{}, sxs_dup:{}, sxs:{}'.format(ac,n_sxs_symsets_ac,n_sxs_dups_ac,n_sxs_ac))
+            n_sxs_symsets += n_sxs_symsets_ac
+            n_sxs_dups += n_sxs_dups_ac
+    n_sxs = n_sxs_symsets + n_sxs_dups
+    print('total',n_sxs_symsets,n_sxs_dups,n_sxs)
+    # symsets info
+    symsets = []
+    n_symsets = 0
+    print('symsets')
+    for ac,ac_symsets in enumerate(sxs_syms):
+        # join into one symset ids
+        print('ac: {}, sxs: {}, symsets: {}'.format(ac,n_sxs_acs[ac],len(ac_symsets)))
+        n_symsets += len(ac_symsets)
+        for ss,symset in enumerate(ac_symsets):
+            symsets.extend(symset)
+            symsets.extend(sxs_dups[ac][ss])
+    print('total symsets: ',n_symsets)
+    for ei,sxi in enumerate(sxs_syms):
+        ss_sxs = [len(i) for i in sxi]
+        cases = [0,0,0,0]
+        for ne,ni in enumerate([1,2,4,8]):
+            cases[ne] = np.where(np.asarray(ss_sxs)==ni)[0].shape[0]
+        if sum(cases)>0:
+            print('{} - c1:{}, c2:{}, c4:{}, c8:{}'.format(ei,cases[0],cases[1],cases[2],cases[3]))
+    return sxs,sxs_syms,symsets
 
+# get sys from sx
+# in this case we can't assume what sy is valid or not
+# so we should look for self-sustaining resulting patterns
+# sx: gol pattern in matrix form
+# sx_domains: tensor for all domains for sx
+# txs: number of sx->sy->sy2->...->sy_n transitions
+def get_sys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False):
+    # basically recursive calling of multi gol step:
+    sxs = sx_domains*1
+    for txi in range(txs):
+        if expanded:
+            sxy = multi_gol_step_expanded(sx,sx_domains,make_zero=make_zero,expand_by=txi+1)
+        else:
+            sxy = multi_gol_step(sx,sx_domains,make_zero=make_zero)
+        print('non zero sys in tx{}: {}'.format(txi+1,sum_nonzero(sxy).shape[0]))
+        sx_domains = sxy*1
+    # ids for non zero sys
+    sxy_ids = sum_nonzero(sxy)
+    # return only sx,sy nonzero (self-sustaining) arrays 
+    sxs = sxs[sxy_ids]
+    sxy = sxy[sxy_ids]
+    return sxs,sxy
 
-        
-
-
-    # # data
-    # if not data:
-    #     return sxs
-    # # ncells, ncases, shared_cells
-    # sx_cases = []
-    # # for rotation and translations
-    # cc_index = {}
-    # # 0 to all
-    # for i in range(n*m+1):
-    #     # sxs according to the number of active cells in dx
-    #     nsxs = np.sum(np.where(np.sum(sxs[1:],axis=1)==i,1,0))
-    #     # count of common/shared active cells between sx and sy
-    #     ccells = [0] * np.sum(ey).astype(int)
-    #     # indexes+1 because sxs[1:]
-    #     indexes = np.where(np.sum(sxs[1:],axis=1)==i)[0].astype(int)+1
-    #     # to classify sxs with same active ncells (i) and ccells (ci/cci)
-    #     cc_index[i] = {}
-    #     for ci in range(np.sum(ey).astype(int)+1):
-    #         cc_index[i][ci] = []
-    #     # indexes for sxs -> sy that may be the same after rot/transl
-    #     for xi in indexes:
-    #         # number of common cells
-    #         cci = np.sum(sxs[0]*sxs[xi]).astype(int)
-    #         # count
-    #         ccells[cci] += 1
-    #         # classification
-    #         cc_index[i][cci].append(xi)
-    #     sx_cases.append([i,nsxs,ccells])
-    #     print(i,nsxs,ccells)
-    # # rotation and tranlation
-    # return sxs, sx_cases, cc_index
-
-
-# cause repertoire
-# 
-# def mk_crep(sy):
+# distance matrices for intrinsic info
+# for every x and y value of a,b,...,n elements: sqrt( (ax-bx)**2 + (ay-by)**2 )
+# basically the euclidian distance for every comparison
+def make_dms(count):
+    # transition matrix for x
+    # given x, what are the probs for y
+    # every value divided by the sum of the rows (values for x)
+    tm_x = count/np.sum(count,axis=1)
+    # transition matrix for y
+    # given y, the probs of x
+    # knowing y, it is each value divided by the vertical sum (values of y)
+    # then transposed, so it is in function of y->x instead of x->y
+    tm_y = (count/np.sum(count,axis=0)).T
+    # distance matrices
+    dim = tm_x.shape[0]
+    # fill x
+    dmx = np.zeros((dim,dim))
+    for ei,i in enumerate(tm_x):
+        for ej,j in enumerate(tm_x):
+            dmx[ei,ej] = np.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
+    # fill y 
+    dmy = np.zeros((dim,dim))
+    for ei,i in enumerate(tm_y):
+        for ej,j in enumerate(tm_y):
+            dmy[ei,ej] = np.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
+    return dmx,dmy
 
 
 
