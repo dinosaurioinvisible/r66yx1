@@ -317,7 +317,7 @@ def get_symsets(sy,sxs,ct=True):
 # sx: gol pattern in matrix form
 # sx_domains: tensor for all domains for sx
 # txs: number of sx->sy->sy2->...->sy_n transitions
-def get_sys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False):
+def get_sxys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False):
     # basically recursive calling of multi gol step:
     sxs = sx_domains*1
     for txi in range(txs):

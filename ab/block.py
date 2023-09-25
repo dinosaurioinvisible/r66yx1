@@ -33,10 +33,36 @@ def get_block_sxs(e0=False,ct=True):
 def get_block_sys(txs=10,make_zero=True,expanded=False):
     block = mk_gol_pattern('block')
     block_domains = mk_sx_domains('block')
-    sxs,sxy = get_sys_from_sx(block,block_domains,txs,make_zero=make_zero,expanded=expanded)
+    sxs,sxy = get_sxys_from_sx(block,block_domains,txs,make_zero=make_zero,expanded=expanded)
     if not expanded:
         analize_block_sxy(sxy)
     return sxs,sxy
+
+def get_expanded_block_sxys(ct=True):
+    block = mk_gol_pattern('block')
+    # adjust block to 6x6
+    be = np.zeros((6,6))
+    be[1:-1,1:-1] = block
+    be = be.flatten()
+    bdoms = mk_sx_domains('block')
+    # expanded transition sx -> sy
+    sxs,sxys = get_sxys_from_sx(block,bdoms,txs=1,make_zero=True,expanded=True)
+    sxys_sums = [sum_is(sxys,i) for i in range(37)]
+    print()
+    for ei,es in enumerate(sxys_sums):
+        if es>0:
+            print('ac:{}, sxys:{}'.format(ei,es))
+    # continuity
+    if ct:
+        ct_ids = sum_nonzero(sxys*be)
+        sxs = sxs[ct_ids]
+        sxys = sxys[ct_ids]
+        sxys_sums = [sum_is(sxys,i) for i in range(37)]
+        print('\nsxs/sxys after ct:{}\n'.format(ct_ids.shape[0]))
+        print()
+        for ei,es in enumerate(sxys_sums):
+            if es>0:
+                print('ac:{}, sxys:{}'.format(ei,es))
 
 def analyze_expanded_block(txs=1,ct=True):
     print()
@@ -47,7 +73,7 @@ def analyze_expanded_block(txs=1,ct=True):
     be[1:-1,1:-1] = block
     be = be.flatten()
     bdoms = mk_sx_domains('block')
-    exs,exys = get_sys_from_sx(block,bdoms,txs,make_zero=True,expanded=True)
+    exs,exys = get_sxys_from_sx(block,bdoms,txs,make_zero=True,expanded=True)
     # preview
     exys_sums = [sum_is(exys,i).shape[0] for i in range(nme*nme+1)]
     print()
