@@ -180,6 +180,34 @@ def mk_sx_domains(sx):
         doms = np.insert(doms,(5,8,8),1,axis=1)
     return doms
 
+# check for decaying gol patterns
+# sxs: matrix of array-states
+# ncells: number of cells in domain
+def check_decaying_patterns(sxs,ncells,dims=[0,0]):
+    # number of sx->sy viable cases, indeces & array sts
+    sxys_ids, sxys = [], []
+    # if no dims, assume squared domain
+    if sum(dims)==0:
+        n = m = np.sqrt(sxs[0].shape[0]).astype(int)
+    # sum of cases with ac number of active cells in domain
+    sxs_ac_cases = [sum_is(sxs,ac).shape[0] for ac in range(ncells+1)]
+    # check number of active cells after sx->sy transition
+    for ac,n_cases in enumerate(sxs_ac_cases):
+        if n_cases > 0:
+            # for each sx with active cells = ac
+            for sx_id in sum_is(sxs,ac):
+                sx = sxs[sx_id]
+                sy = gol_step(sx.reshape(n,m)).flatten()
+                # if sy has at least 3 active cells
+                if np.sum(sy) > 2:
+                    sxys_ids.append(sx_id)
+                    sxys.append(sy)
+    # update sxs, sxs ac cases and get sxys ac cases
+    sxs = sxs[sxys_ids]
+    sxs_ac_cases = [sum_is(sxs,ac).shape[0] for ac in range(ncells+1)]
+    sxys_ac_cases = [sum_is(sxys,ac).shape[0] for ac in range(ncells+1)]
+    return np.array(sxys_ids), sxs, np.array(sxys), sxs_ac_cases, sxys_ac_cases
+
 # get all sx: sx -> sy
 # sy: any specific gol pattern domain (sx,ex)
 # requires matrix/lattice input
