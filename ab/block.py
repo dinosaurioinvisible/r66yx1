@@ -83,37 +83,44 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True):
 # series of recursive transitions from (block,ex) -> sy
 # block + every possible env -> sy1 -> sy2 -> ... -> sy10
 # for the block, there's no change after the 10th iteration
-def get_block_sxys(iter=5,txs=3):
-    by=[]
-    for xi in range(iter):
-        print('\niteration {}\n'.format(xi+1))
-        sxs,sxys,yzs = analyze_expanded_block_sxys(block_sxys=by,txs=txs)
-        by = sxys
-    return sxs,yzs
+def get_block_sxys(iter=2,txs=5):
+    # first run to get sxs,sxys
+    sxs,sxys,yzs = analyze_expanded_block_sxys(etxs=1,txs=txs)
+    # iterate 
+    by = sxys*1
+    for i in range(iter):
+        print('\niteration {}\n'.format(i+1))
+        i_sxs,i_sxys,i_yzs = analyze_expanded_block_sxys(block_sxys=by,txs=txs)
+        by = i_sxys
+    get_block_sxys_symsets(i_yzs)
+    return sxs,sxys,yzs
 
-def analize_block_sxy(sxy):
-    # analize sxy
-    # number of sy arrays according to number of active cells (0 to 16)
-    sxy_ac = [sum_is(sxy,i).shape[0] for i in range(17)]
-    for ac,ac_cases in enumerate(sxy_ac):
-        if ac_cases>0:
-            print(ac,ac_cases)
-    # 3 active cells: look for blinkers
-    sy_blinkers = 0
-    for sy3 in sxy[sum_is(sxy,3)]:
-        if is_blinker(sy3.reshape(4,4)):
-            sy_blinkers += 1
-    print('{} blinkers from {}'.format(sy_blinkers,sxy_ac[3]))
-    # 4 active cells: look for blocks (and rings)
-    sy_blocks,sy_rings = 0,0
-    for sy4 in sxy[sum_is(sxy,4)]:
-        if is_block(sy4.reshape(4,4)):
-            sy_blocks += 1
-        else:
-            sy_rings += 1
-    print('{} blocks from {}'.format(sy_blocks,sxy_ac[4]))
-    print('{} rings from {}'.format(sy_rings,sxy_ac[4]))
-    # 5 active cells: gliders? 
+def get_block_sxys_symsets(sxys):
+    ncells = sxys.shape[1]
+    nm = np.sqrt(ncells).astype(int)
+    sxys_acs = [sum_is(sxys,i).shape[0] for i in range(ncells)]
+    print()
+    blinkers = []
+    blocks=[]
+    for ac,n_ac in enumerate(sxys_acs):
+        if n_ac > 0:
+            sxys_ids = sum_is(sxys,ac)
+            for sxy_id in sxys_ids:
+                sxy = sxys[sxy_id].reshape(nm,nm)
+                # blinkers
+                if ac==3:
+                    sxys3 = sxys_ids.shape[0]
+                    if is_blinker(sxy):
+                        blinkers.append(sxy_id)
+                # blocks, rings ans others
+                if ac==4:
+                    if is_block(sxy):
+                        sxys4 = sxys_ids.shape[0]
+                        blocks.append(sxy_id)
+                
+                
+    print('{} blinkers of {}'.format(len(blinkers),sxys3))
+    print('{} blocks of {}'.format(len(blocks),sxys4))
 
 
 def get_block_cause_info():

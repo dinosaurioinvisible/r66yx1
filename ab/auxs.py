@@ -290,7 +290,6 @@ def get_symsets(sy,sxs,ct=True):
                             loc = False
                             for li in range(1,n*m):
                                 if np.array_equal(xi,np.roll(xj_rot,li)) or np.array_equal(xi,np.roll(xj_transp,li)):
-
                                     dup_eq_ids.append(xj_id)
                                     loc=True
                                     break
