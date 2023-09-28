@@ -27,9 +27,53 @@ def get_block_sxs(e0=False,ct=True):
     pb_sxs,pb_sxs_symsets,pb_symsets = get_sxs_from_sy(block,e0,ct)
     return pb_sxs,pb_sxs_symsets,pb_symsets
 
+# look for decaying transitions (after sx->sy and before sy->sz)
+# sxys: matrix of arrays of sy states with ac>2 (so = or -> zero)
+# sxs: sx sts (for updating and making indices)
+# the idea is too look for other states that -> zero
+def mk_block_decay(sxs,sxys,txs=1,print_all=True):
+    # number of cells in domain (for ac range)
+    ncells = sxys.shape[1]
+    # copy of sxys for processing & acs for storing
+    z_sts = sxys*1
+    sts_acs = np.zeros((ncells+1,1+2*txs))
+    sts_acs[:,0] = np.array([sum_is(sxys,i).shape[0] for i in range(ncells+1)])
+    # txs go: y -> z1 => z1 -> z2 => z2 -> z3, etc
+    print()
+    for txi in range(txs):
+        # valid indices, z sts, z number of cases for every ac
+        zn_ids,z0,z_sts,z0_acs,z_acs = check_decaying_patterns(z_sts,ncells)
+        # update sxs & sxys indices (to match z)
+        sxys = sxys[zn_ids]
+        sxs = sxs[zn_ids]
+        # update sxs & sxys counts
+        txid = (txi+1)*2
+        sts_acs[:,txid-1] = z_acs
+        sts_acs[:,txid] = np.array([sum_is(sxys,i).shape[0] for i in range(ncells+1)])
+        sxs_acs = [sum_is(sxs,i).shape[0] for i in range(ncells+1)]
+        if print_all:
+            # print update sxys and tx data
+            print('\ntx{}: sxys -> z{}: {}\n'.format(txi+2,txi+1,zn_ids.shape[0]))
+        for ac in range(ncells):
+            if np.sum(sts_acs[ac]):
+                # print sxys ac, acs, z_n & retro updated y_n counts 
+                pp = 'ac:{:2}, x:{:3}, y:{:3}'+''.join([', z'+str(i+1)+':{:3} >{:3}' for i in range(txi+1)])
+                print(pp.format(*[ac]+[sxs_acs[ac]]+list(sts_acs[ac,:txid+1].astype(int))))
+    print()
+    # make arrays
+    txs_ac_sts = [[] for _ in range(ncells+1)]
+    for ac in range(ncells):
+        if np.sum(sts_acs[ac]) > 1:
+            # arrays for each state stored by ac cases
+            for sts in [sxs,sxys,z_sts]:
+                txs_ac_sts[ac].append(sum_is(sts,ac,arrays=True))
+    # return only y ac sums
+    y_acs = np.delete(sts_acs,np.arange(1,sts_acs.shape[1],2),axis=1)
+    return sxs,sxys,z_sts,txs_ac_sts,y_acs
+
 # exts: expanded transitions (only 1 for now)
-# txs: non expenande txs to discard decaying patterns
-def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True):
+# txs: non expenanded txs to discard decaying patterns
+def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=True):
     print()
     block = mk_gol_pattern('block')
     # from scratch
@@ -64,26 +108,13 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True):
             if es>0:
                 print('ac:{}, sxys:{}'.format(ei,es))
     # transitions to discard decaying patterns (sy -> zx_n)
-    yzs = sxys*1
-    for txi in range(txs):
-        # valid indices, y0->y1 sts, y0->y1 number of ac cases
-        tx_ids,y0,y1,y0_acs,y1_acs = check_decaying_patterns(yzs,nme*nme)
-        # update sxs and sxys
-        sxs = sxs[tx_ids]
-        sxys = sxys[tx_ids]
-        sxys_acs = [sum_is(sxys,i).shape[0] for i in range(nme*nme+1)]
-        # print update sxys and tx data
-        print('\nchecking tx{}: y{} -> y{}: {}\n'.format(txi+1,txi,txi+1,tx_ids.shape[0]))
-        for ac in range(37):
-            if sxys_acs[ac]+y0_acs[ac]+y1_acs[ac] > 0:
-                print('ac:{}, sxys:{}, y{}:{}, y{}:{}'.format(ac,sxys_acs[ac],txi,y0_acs[ac],txi+1,y1_acs[ac]))
-        yzs = y1*1
-    return sxs,sxys,yzs
+    sxs,sxys,syzs,ac_sts,y_acs = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all)
+    return sxs,sxys,syzs,ac_sts,y_acs
 
 # series of recursive transitions from (block,ex) -> sy
 # block + every possible env -> sy1 -> sy2 -> ... -> sy10
 # for the block, there's no change after the 10th iteration
-def get_block_sxys(iter=2,txs=5):
+def get_block_sxys(auto=False,iter=2,txs=5):
     # first run to get sxs,sxys
     sxs,sxys,yzs = analyze_expanded_block_sxys(etxs=1,txs=txs)
     # iterate 

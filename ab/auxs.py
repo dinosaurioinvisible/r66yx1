@@ -1,6 +1,7 @@
 
 import numpy as np
 
+
 # int > binary array
 def int2array(ni,arr_len,mn=1):
     # reversed for cell order
@@ -183,9 +184,12 @@ def mk_sx_domains(sx):
 # check for decaying gol patterns
 # sxs: matrix of array-states
 # ncells: number of cells in domain
-def check_decaying_patterns(sxs,ncells,dims=[0,0]):
+def check_decaying_patterns(sxs,ncells=0,dims=[0,0]):
     # number of sx->sy viable cases, indeces & array sts
     sxys_ids, sxys = [], []
+    # if no number of cells, assume same as arrays
+    if ncells==0:
+        ncells = sxs.shape[1]
     # if no dims, assume squared domain
     if sum(dims)==0:
         n = m = np.sqrt(sxs[0].shape[0]).astype(int)
@@ -360,6 +364,71 @@ def get_sxys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False):
     sxs = sxs[sxy_ids]
     sxy = sxy[sxy_ids]
     return sxs,sxy
+
+# sxs: matrix of arrays representing gol domains (sx+ex)
+# i used sxs to mean anything, sxys, syzs, etc (too late to change it now)
+def mk_symsets(sxs,dims=[0,0]):
+    # if not dims assume squared domain
+    if np.sum(dims)==0:
+        n = m = np.sqrt(sxs.shape[1]).astype(int)
+    # ncells for checking acs
+    ncells = sxs.shape[1]
+    # to store (id,type) & to avoid going again over same ids
+    symsets = np.zeros((sxs.shape[0],2)).astype(int)
+    # for all doms with same ac number
+    for ac in range(ncells):
+        ac_ids = sum_is(sxs,ac)
+        # if at least 2 of them (to compare)
+        if ac_ids.shape[0] == 1:
+            symsets[ac_ids[0]] = [ac,ac_ids[0]]
+        elif ac_ids.shape[0] > 1:
+            # first available: sx
+            for ei,sx_id in enumerate(ac_ids):
+                # to avoid repetitions
+                if symsets[sx_id][0] == 0:
+                    symsets[sx_id] = [ac,sx_id]
+                    sx = sxs[sx_id].reshape(n,m)
+                    # go through the rest of the doms with same ac
+                    for ej in range(ei+1,ac_ids.shape[0]):
+                        sx2_id = ac_ids[ej]
+                        sx2 = sxs[sx2_id].reshape(n,m)
+                        # rotations, transpositions, translations
+                        for ri in range(4):
+                            sx2r = np.rot90(sx2,ri)
+                            if np.array_equal(sx,sx2r):
+                                symsets[sx2_id] = [ac,sx_id]
+                                break
+                            sx2rt = np.ascontiguousarray(np.rot90(sx2,ri).T)
+                            if np.array_equal(sx,sx2rt):
+                                symsets[sx2_id] = [ac,sx_id]
+                                break
+                            loc = False
+                            for li in range(1,ncells):
+                                if np.array_equal(sx,np.roll(sx2r,li)):
+                                    loc = True
+                                    break
+                                if np.array_equal(sx,np.roll(sx2rt,li)):
+                                    loc = True
+                                    break
+                            if loc:
+                                symsets[sx2_id] = [ac,sx_id]
+                                break
+    # organize symsets 
+    org_symsets = {}
+    print('\ntotal symsets: {}\n'.format(len(set(symsets[:,1]))))
+    for ac in list(set(symsets[:,0])):
+        org_symsets[ac] = []
+        sxs_ac = symsets[np.where(symsets[:,0]==ac)[0]]
+        for sxi in list(set(sxs_ac[:,1])):
+            ss_ids = np.where(symsets[:,1]==sxi)[0]
+            org_symsets[ac].append(ss_ids)
+            print(ac,len(ss_ids),ss_ids)
+    return symsets,org_symsets
+
+
+    # correct ac for psx case
+
+
 
 # distance matrices for intrinsic info
 # for every x and y value of a,b,...,n elements: sqrt( (ax-bx)**2 + (ay-by)**2 )
