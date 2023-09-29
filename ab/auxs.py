@@ -181,6 +181,24 @@ def mk_sx_domains(sx):
         doms = np.insert(doms,(5,8,8),1,axis=1)
     return doms
 
+# helper fx for continuity
+# sxs: matrix of gol domain sts arrays 
+# psx: primary pattern/structure determining ct
+def apply_ct(sxs,psx,dims=[0,0]):
+    # assume square if no explicit dims
+    if np.sum(dims)==0:
+        n = m = np.sqrt(sxs.shape[1]).astype(int)
+    # adjust sx 
+    dx = psx*1
+    if sxs[0].shape != psx.flatten().shape:
+        dx = np.zeros((n,m))
+        ij = int(n/2)
+        dx[ij-2:ij+2,ij-2:ij+2] = psx
+    # ct
+    ct_ids = sum_nonzero(sxs*dx.flatten())
+    sxs_ct = sxs[ct_ids]
+    return sxs_ct,ct_ids
+
 # check for decaying gol patterns
 # sxs: matrix of array-states
 # ncells: number of cells in domain
@@ -229,9 +247,11 @@ def get_sxs_from_sy(sy,e0=True,ct=True):
         # if np.sum(dy*ey) == 4:
         if is_block_next(dx.reshape(n,m),e0):
             sxs = np.vstack((sxs,dx))
-    # symmetries/equivalences
-    sxs_ct,sxs_symsets,symsets = get_symsets(sy,sxs,ct)
-    return sxs_ct,sxs_symsets,symsets
+    if ct:
+        sxs,ct_ids = apply_ct(sxs,sy)
+        return sxs,ct_ids
+    return sxs
+    
 
 # systematize the set of sxs -> sy
 # considering symmetries, shared cells & locations
@@ -348,9 +368,10 @@ def get_symsets(sy,sxs,ct=True):
 # sx: gol pattern in matrix form
 # sx_domains: tensor for all domains for sx
 # txs: number of sx->sy->sy2->...->sy_n transitions
-def get_sxys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False):
+def get_sxys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False,ct=True):
     # basically recursive calling of multi gol step:
     sxs = sx_domains*1
+    print()
     for txi in range(txs):
         if expanded:
             sxy = multi_gol_step_expanded(sx,sx_domains,make_zero=make_zero,expand_by=txi+1)
@@ -363,11 +384,15 @@ def get_sxys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False):
     # return only sx,sy nonzero (self-sustaining) arrays 
     sxs = sxs[sxy_ids]
     sxy = sxy[sxy_ids]
+    # continuity
+    if ct:
+        sxy,ct_ids = apply_ct(sxy,sx)
+        return sxs,sxy,ct_ids
     return sxs,sxy
 
 # sxs: matrix of arrays representing gol domains (sx+ex)
 # i used sxs to mean anything, sxys, syzs, etc (too late to change it now)
-def mk_symsets(sxs,dims=[0,0]):
+def mk_symsets(sxs,sxs2=[],dims=[0,0]):
     # if not dims assume squared domain
     if np.sum(dims)==0:
         n = m = np.sqrt(sxs.shape[1]).astype(int)
@@ -425,9 +450,8 @@ def mk_symsets(sxs,dims=[0,0]):
             print(ac,len(ss_ids),ss_ids)
     return symsets,org_symsets
 
-
-    # correct ac for psx case
-
+# compare 
+def iter_comparison(sxs,sxs_ids,sxys=[],sxys_ids=[]):
 
 
 # distance matrices for intrinsic info

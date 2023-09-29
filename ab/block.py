@@ -22,16 +22,20 @@ from auxs import *
 # pb_domains,pb_symsets = get_sxs_from_sy(block)
 # pb_symsets: list of indexes for all instances classified as symsets
 # cause info
-def get_block_sxs(e0=False,ct=True):
+def get_block_sxs(e0=False,ct=True,syms=True):
     block = mk_gol_pattern('block')
-    pb_sxs,pb_sxs_symsets,pb_symsets = get_sxs_from_sy(block,e0,ct)
-    return pb_sxs,pb_sxs_symsets,pb_symsets
+    block_sxs,ct_ids = get_sxs_from_sy(block,e0=e0,ct=ct)
+    if syms:
+        symsets_arr,symsets = mk_symsets(block_sxs)
+    return block_sxs,symsets
+    # pb_sxs,pb_sxs_symsets,pb_symsets = get_sxs_from_sy(block,e0,ct,mk_symsets=mk_symsets)
+    # return pb_sxs,pb_sxs_symsets,pb_symsets
 
 # look for decaying transitions (after sx->sy and before sy->sz)
 # sxys: matrix of arrays of sy states with ac>2 (so = or -> zero)
 # sxs: sx sts (for updating and making indices)
 # the idea is too look for other states that -> zero
-def mk_block_decay(sxs,sxys,txs=1,print_all=True):
+def mk_block_decay(sxs,sxys,txs=1,print_all=True,return_all=False):
     # number of cells in domain (for ac range)
     ncells = sxys.shape[1]
     # copy of sxys for processing & acs for storing
@@ -68,8 +72,22 @@ def mk_block_decay(sxs,sxys,txs=1,print_all=True):
             for sts in [sxs,sxys,z_sts]:
                 txs_ac_sts[ac].append(sum_is(sts,ac,arrays=True))
     # return only y ac sums
-    y_acs = np.delete(sts_acs,np.arange(1,sts_acs.shape[1],2),axis=1)
-    return sxs,sxys,z_sts,txs_ac_sts,y_acs
+    if return_all:
+        y_acs = np.delete(sts_acs,np.arange(1,sts_acs.shape[1],2),axis=1)
+        return sxs,sxys,z_sts,txs_ac_sts,y_acs
+    return sxs,sxys
+
+# series of recursive transitions from (block,ex) -> sy
+# block + every possible env -> sy1 -> sy2 -> ... -> sy_n
+def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all=True):
+    block = mk_gol_pattern('block')
+    sxs = mk_sx_domains('block')
+    for _ in range(iter):
+        sxs,sxys,ct_ids = get_sxys_from_sx(block,sxs,txs=etxs,expanded=expanded,ct=ct)
+        sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
+    if syms:
+        symsets_arr,symsets = mk_symsets(sxys)
+    return sxys,symsets
 
 # exts: expanded transitions (only 1 for now)
 # txs: non expenanded txs to discard decaying patterns
@@ -95,13 +113,15 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=Tru
             print('ac:{}, sxys:{}'.format(ei,es))
     # continuity
     if ct:
-        be = np.zeros((nme,nme))
-        bij = int(nme/2)
-        be[bij-2:bij+2,bij-2:bij+2] = block
-        # be[1:-1,1:-1] = block
-        ct_ids = sum_nonzero(sxys*be.flatten())
+        sxys,ct_ids = apply_ct(sxys,block)
         sxs = sxs[ct_ids]
-        sxys = sxys[ct_ids]
+        # be = np.zeros((nme,nme))
+        # bij = int(nme/2)
+        # be[bij-2:bij+2,bij-2:bij+2] = block
+        # # be[1:-1,1:-1] = block
+        # ct_ids = sum_nonzero(sxys*be.flatten())
+        # sxs = sxs[ct_ids]
+        # sxys = sxys[ct_ids]
         sxys_sums = [sum_is(sxys,i).shape[0] for i in range(nme*nme+1)]
         print('\nsxs/sxys after ct: {}\n'.format(ct_ids.shape[0]))
         for ei,es in enumerate(sxys_sums):
@@ -111,47 +131,17 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=Tru
     sxs,sxys,syzs,ac_sts,y_acs = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all)
     return sxs,sxys,syzs,ac_sts,y_acs
 
-# series of recursive transitions from (block,ex) -> sy
-# block + every possible env -> sy1 -> sy2 -> ... -> sy10
-# for the block, there's no change after the 10th iteration
-def get_block_sxys(auto=False,iter=2,txs=5):
-    # first run to get sxs,sxys
-    sxs,sxys,yzs = analyze_expanded_block_sxys(etxs=1,txs=txs)
-    # iterate 
-    by = sxys*1
-    for i in range(iter):
-        print('\niteration {}\n'.format(i+1))
-        i_sxs,i_sxys,i_yzs = analyze_expanded_block_sxys(block_sxys=by,txs=txs)
-        by = i_sxys
-    get_block_sxys_symsets(i_yzs)
-    return sxs,sxys,yzs
+# get Dxs for Bc ((bxs,ex) -> Bc)
+# get Dys for Bc (Bc -> (bys,ey))
+# make symsets: ss(Dxs), ss(Dys)
+# go recursevely matching them 
+def mk_recursive_block_domains(e0=False,ct=True,syms=True,txs=1):
+    sxs,sxs_symsets = get_block_sxs(e0=e0,ct=ct,syms=syms)
+    sxys,sxys_symsets = get_block_sxys(txs=txs,ct=ct,syms=syms)
+    import pdb; pdb.set_trace()
+    return sxs,sxys,sxs_symsets,sxys_symsets
 
-def get_block_sxys_symsets(sxys):
-    ncells = sxys.shape[1]
-    nm = np.sqrt(ncells).astype(int)
-    sxys_acs = [sum_is(sxys,i).shape[0] for i in range(ncells)]
-    print()
-    blinkers = []
-    blocks=[]
-    for ac,n_ac in enumerate(sxys_acs):
-        if n_ac > 0:
-            sxys_ids = sum_is(sxys,ac)
-            for sxy_id in sxys_ids:
-                sxy = sxys[sxy_id].reshape(nm,nm)
-                # blinkers
-                if ac==3:
-                    sxys3 = sxys_ids.shape[0]
-                    if is_blinker(sxy):
-                        blinkers.append(sxy_id)
-                # blocks, rings ans others
-                if ac==4:
-                    if is_block(sxy):
-                        sxys4 = sxys_ids.shape[0]
-                        blocks.append(sxy_id)
-                
-                
-    print('{} blinkers of {}'.format(len(blinkers),sxys3))
-    print('{} blocks of {}'.format(len(blocks),sxys4))
+
 
 
 def get_block_cause_info():
@@ -163,7 +153,6 @@ def get_block_cause_info():
     dm = 0
     ci = emd(crep,ucx,dm)
     return ci
-
 
 # clasiffy transitions
 def mk_block_txs(block_domains):
