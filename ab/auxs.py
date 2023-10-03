@@ -64,6 +64,26 @@ def mk_gol_pattern(px,):
                 dx.extend([dr,dt])
     return dx
 
+# increase the domain size
+def expand_domain(sx,dims=(0,0)):
+    # if not specified, increase a layer
+    if np.sum(dims)==0:
+        dims = np.array(sx.shape)+2
+    nx,mx = dims
+    # create new domain and place sx in the center
+    dx = np.zeros((nx,mx))
+    nc,mc = int(nx/2),int(mx/2)
+    dx[nc-2:nc+2,mc-2:mc+2] = sx
+    return dx
+
+# adjust domains to the bigger one
+def adjust_domains(x1,x2):
+    if x1.shape[0] >= x2.shape[0] and x1.shape[1] >= x2.shape[1]:
+        x2 = expand_domain(x2,dims=x1.shape)
+    elif x2.shape[0] >= x1.shape[0] and x2.shape[1] >= x1.shape[1]:
+        x1 = expand_domain(x1,dims=x2.shape)
+    return x1,x2
+
 # game of life transition
 def gol_step(world_st):
     world = world_st/1
@@ -307,7 +327,7 @@ def mk_symsets(sxs,sxs2=[],dims=[0,0]):
                         sx2_id = ac_ids[ej]
                         sx2 = sxs[sx2_id].reshape(n,m)
                         # rotations, transpositions, translations
-                        if check_syms(sx,sx2):
+                        if are_symmetrical(sx,sx2):
                             symsets[sx2_id] = [ac,sx_id]
     # organize symsets 
     org_symsets = {}
@@ -323,9 +343,12 @@ def mk_symsets(sxs,sxs2=[],dims=[0,0]):
 
 # check symmetries in 2 gol domains 
 # x1,x2: matrix form gol reps
-def check_syms(x1,x2,nrolls=0):
+def are_symmetrical(x1,x2,nrolls=0):
+    # if sizes don't match, adjust to the larger one
+    if x1.shape != x2.shape:
+        x1,x2 = adjust_domains(x1,x2)
     # if not specified, assume all
-    nrolls = x1.shape[0]*x1.shape[1] if not nrolls else nrolls
+    nrolls = x1.shape[0]*x1.shape[1] if nrolls==0 else nrolls
     # rotations
     for ri in range(4):
         # rotations
@@ -346,8 +369,30 @@ def check_syms(x1,x2,nrolls=0):
 
 # sxs1,sxs2: arrays for gol sts 
 # ss1,ss2: symsets from sxs1,sxs2
-def check_matching_symsets(sxs1,ss1,sxs2,ss2):
-    
+def check_matching_symsets(sxs,ssx,sxys,ssy,xdims=[0,0],ydims=[0,0]):
+    # if not dims, assume squared domains
+    if np.sum(xdims)==0:
+        xdims = [np.sqrt(sxs[0].shape[0]).astype(int)]*2
+    if np.sum(ydims)==0:
+        ydims = [np.sqrt(sxys[0].shape[0]).astype(int)]*2
+    nx,mx = xdims
+    ny,my = ydims
+    # output arrray
+    matching_ids = []
+    # compare according to active cells
+    ncells = max(sxs.shape[1],sxys.shape[1])
+    for ac in range(ncells):
+        if ac in ssx.keys() and ac in ssy.keys():
+            for symset_x in ssx[ac]:
+                sx = sxs[symset_x[0]].reshape(nx,mx)
+                for symset_y in ssy[ac]:
+                    sy = sxys[symset_y[0]].reshape(ny,my)
+                    if are_symmetrical(sx,sy):
+                        matching_ids.append([symset_x[0],symset_y[0]])
+    print('\nmatching_ids:')
+    for i,j in matching_ids:
+        print(i,j)
+    return matching_ids
 
 # distance matrices for intrinsic info
 # for every x and y value of a,b,...,n elements: sqrt( (ax-bx)**2 + (ay-by)**2 )
@@ -377,19 +422,28 @@ def make_dms(count):
     return dmx,dmy
 
 # indexing for saving files
-def save_as(file,fname):
+def save_as(file,name,ext=''):
     import pickle
     import os
+    fname = '{}.{}'.format(name,ext)
     while os.path.isfile(fname):
         i = 1
         name,ext = fname.split('.')
         try:
             fi = int(name[-1])+1
-            fname = '{}{}.{}'.format(name[:-1],fi,ext)
+            fname = '{}{}.{}'.format(fname[:-1],fi,ext)
         except:
-            fi = i
-            fname = '{}{}.{}'.format(name,i,ext)
+            fi = i+1
+            fname = '{}{}.{}'.format(fname,i,ext)
     with open(fname,'wb') as f:
         pickle.dump(file,f)
-    print('saved as: '.format(fname))
+    print('\nsaved as: {}\n'.format(fname))
 
+def load(ext=''):
+    import pickle
+    import os
+    files = [i for i in os.listdir() if '.{}'.format(ext) in i]
+    for ei,fi in files:
+        print(ei,fi)
+    x = input('\nfile: _ ')
+    with open()

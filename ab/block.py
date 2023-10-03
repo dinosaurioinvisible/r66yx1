@@ -82,12 +82,16 @@ def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all
 # get Dys for Bc (Bc -> (bys,ey))
 # make symsets: ss(Dxs), ss(Dys)
 # go recursevely matching them 
-def mk_recursive_block_domains(e0=False,ct=True,syms=True,txs=1):
-    sxs,sxs_symsets = get_block_sxs(e0=e0,ct=ct,syms=syms)
-    sxys,sxys_symsets = get_block_sxys(txs=txs,ct=ct,syms=syms)
-    import pdb; pdb.set_trace()
-    return sxs,sxys,sxs_symsets,sxys_symsets
-
+def mk_recursive_block_domains(load=False,e0=False,ct=True,syms=True,txs=1,save=False):
+    if load:
+        pass
+    else:
+        sxs,sxs_symsets = get_block_sxs(e0=e0,ct=ct,syms=syms)
+        sxys,sxys_symsets = get_block_sxys(txs=txs,ct=ct,syms=syms)
+    if save:
+        save_as([sxs,sxs_symsets,sxys,sxys_symsets],'block_data',ext='bk')
+    xy_ids = check_matching_symsets(sxs,sxs_symsets,sxys,sxys_symsets)
+    return sxs,sxys,sxs_symsets,sxys_symsets,xy_ids
 
 # exts: expanded transitions (only 1 for now)
 # txs: non expenanded txs to discard decaying patterns
@@ -124,15 +128,15 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=Tru
     sxs,sxys,syzs,ac_sts,y_acs = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all)
     return sxs,sxys,syzs,ac_sts,y_acs
 
-def get_block_cause_info():
-    # prob of sx given sy=block, ucx: uniform
-    crep = np.array([len(i) for i in pb_symsets])
-    crep = crep/(np.sum(crep))
-    ucx = np.ones(crep.shape[0])/crep.shape[0]
-    # distance matrix for EMD
-    dm = 0
-    ci = emd(crep,ucx,dm)
-    return ci
+# def get_block_cause_info():
+#     # prob of sx given sy=block, ucx: uniform
+#     # crep = np.array([len(i) for i in pb_symsets])
+#     # crep = crep/(np.sum(crep))
+#     # ucx = np.ones(crep.shape[0])/crep.shape[0]
+#     # distance matrix for EMD
+#     dm = 0
+#     ci = emd(crep,ucx,dm)
+#     return ci
 
 # clasiffy transitions
 def mk_block_txs(block_domains):
@@ -253,19 +257,19 @@ def mk_block_analysis():
 
 
 
-# effect information (from proto-blocks into block)
-# given a protoblock x, how probable is its transition into a block
-# sx/sy = 'block', 'pblock1', etc
-def get_sx_info(sx,sy):
-    # sx_dom: (sx,ex)
-    sx_dom = mk_sx_domain(sx)
-    # sy_dom: all past possible cfgs for current (sy,ey) domain
-    # all (sx,ex) from where we need to see those that could have led to sy
-    if sy == 'block':
-        sy_dom_cells = 16
-    sy_dom = mk_binary_domains(sy_dom_cells)
-    # cause repertoire: p(x| y=sy)
-    crep = mk_crep(sy)
+# # effect information (from proto-blocks into block)
+# # given a protoblock x, how probable is its transition into a block
+# # sx/sy = 'block', 'pblock1', etc
+# def get_sx_info(sx,sy):
+#     # sx_dom: (sx,ex)
+#     sx_dom = mk_sx_domain(sx)
+#     # sy_dom: all past possible cfgs for current (sy,ey) domain
+#     # all (sx,ex) from where we need to see those that could have led to sy
+#     if sy == 'block':
+#         sy_dom_cells = 16
+#     sy_dom = mk_binary_domains(sy_dom_cells)
+#     # cause repertoire: p(x| y=sy)
+#     crep = mk_crep(sy)
 
 
 
