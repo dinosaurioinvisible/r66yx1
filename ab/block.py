@@ -3,17 +3,6 @@ import numpy as np
 from pyemd import emd 
 from auxs import *
 
-# analysis of the block 
-
-# make block pattern 
-# block in a 4x4 empty lattice (Bx,e=0)
-# block = mk_gol_pattern('block')
-
-# make tensor of block domains (Bc,ex)
-# (all possible env combinations for canonical block)
-# out: (2^16,16) matrix of flattened arrays 
-# block_domains = mk_sx_domain('block')
-
 # get all proto-block domains (sx: sx -> sy=block)
 # pb_domains: all sxs that could have led to a block
 # out: (m,16) matrix of flattened sx arrays 
@@ -89,6 +78,17 @@ def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all
         symsets_arr,symsets = mk_symsets(sxys)
     return sxys,symsets
 
+# get Dxs for Bc ((bxs,ex) -> Bc)
+# get Dys for Bc (Bc -> (bys,ey))
+# make symsets: ss(Dxs), ss(Dys)
+# go recursevely matching them 
+def mk_recursive_block_domains(e0=False,ct=True,syms=True,txs=1):
+    sxs,sxs_symsets = get_block_sxs(e0=e0,ct=ct,syms=syms)
+    sxys,sxys_symsets = get_block_sxys(txs=txs,ct=ct,syms=syms)
+    import pdb; pdb.set_trace()
+    return sxs,sxys,sxs_symsets,sxys_symsets
+
+
 # exts: expanded transitions (only 1 for now)
 # txs: non expenanded txs to discard decaying patterns
 def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=True):
@@ -115,13 +115,6 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=Tru
     if ct:
         sxys,ct_ids = apply_ct(sxys,block)
         sxs = sxs[ct_ids]
-        # be = np.zeros((nme,nme))
-        # bij = int(nme/2)
-        # be[bij-2:bij+2,bij-2:bij+2] = block
-        # # be[1:-1,1:-1] = block
-        # ct_ids = sum_nonzero(sxys*be.flatten())
-        # sxs = sxs[ct_ids]
-        # sxys = sxys[ct_ids]
         sxys_sums = [sum_is(sxys,i).shape[0] for i in range(nme*nme+1)]
         print('\nsxs/sxys after ct: {}\n'.format(ct_ids.shape[0]))
         for ei,es in enumerate(sxys_sums):
@@ -130,19 +123,6 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=Tru
     # transitions to discard decaying patterns (sy -> zx_n)
     sxs,sxys,syzs,ac_sts,y_acs = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all)
     return sxs,sxys,syzs,ac_sts,y_acs
-
-# get Dxs for Bc ((bxs,ex) -> Bc)
-# get Dys for Bc (Bc -> (bys,ey))
-# make symsets: ss(Dxs), ss(Dys)
-# go recursevely matching them 
-def mk_recursive_block_domains(e0=False,ct=True,syms=True,txs=1):
-    sxs,sxs_symsets = get_block_sxs(e0=e0,ct=ct,syms=syms)
-    sxys,sxys_symsets = get_block_sxys(txs=txs,ct=ct,syms=syms)
-    import pdb; pdb.set_trace()
-    return sxs,sxys,sxs_symsets,sxys_symsets
-
-
-
 
 def get_block_cause_info():
     # prob of sx given sy=block, ucx: uniform
