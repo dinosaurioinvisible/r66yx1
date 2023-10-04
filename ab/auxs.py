@@ -20,6 +20,11 @@ def sum_is(matrix,x,axis=1,arrays=False):
     if arrays:
         return matrix[np.where(np.sum(matrix,axis=axis)==x)[0]]
     return np.where(np.sum(matrix,axis=axis)==x)[0]
+def sum_in_range(matrix,rl,rh,axis=1,arrays=False):
+    ids = np.where(np.logical_and(np.sum(matrix,axis=axis)>=rl,np.sum(matrix,axis=axis)<=rh))[0]
+    if arrays:
+        return matrix[ids]
+    return ids
 def sum_higher(matrix,x,axis=1,arrays=False):
     if arrays:
         return matrix[np.where(np.sum(matrix,axis=axis)>x)[0]]
@@ -252,11 +257,12 @@ def check_decaying_patterns(sxs,ncells=0,dims=[0,0]):
 # get all sx: sx -> sy
 # sy: any specific gol pattern domain (sx,ex)
 # requires matrix/lattice input
-def get_sxs_from_sy(sy,e0=True,ct=True):
+def get_sxs_from_sy(sy,domx=[],e0=True,ct=True):
     # array for expected sy
     n,m = sy.shape
-    # all possible domains fot (sx,ex)
-    domx = mk_binary_domains(n*m)
+    if len(domx)==0:
+        # all possible domains fot (sx,ex)
+        domx = mk_binary_domains(n*m)
     # analyze domains transitions
     # first array = ey for analysis later
     sxs = sy.flatten()
@@ -301,7 +307,7 @@ def get_sxys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False,ct=True):
 
 # sxs: matrix of arrays representing gol domains (sx+ex)
 # i used sxs to mean anything, sxys, syzs, etc (too late to change it now)
-def mk_symsets(sxs,sxs2=[],dims=[0,0]):
+def mk_symsets(sxs,dims=[0,0]):
     # if not dims assume squared domain
     if np.sum(dims)==0:
         n = m = np.sqrt(sxs.shape[1]).astype(int)
@@ -341,6 +347,32 @@ def mk_symsets(sxs,sxs2=[],dims=[0,0]):
             print(ac,len(ss_ids),ss_ids)
     return symsets,org_symsets
 
+# look for symmetries from less to more activ cells 
+# basically, patterns with more acs should be different to make a new symset
+# e.g., if sx_ac=4 and sx_ac=6 are the same plus 2, then: (sx,ei) and (sx,ej)
+# sxs: matrix of gol sts in array form; sx: sample 
+def mk_increasing_symsets(sxs,sx):
+    n,m = sx.shape
+    ncells = n*m
+    # symsets arr: for each sx array: ac,symset canon/type id, id (easier later)
+    symsets_arr = np.zeros((sxs.shape[0],3)).astype(int)
+    # list of (ac,ids), if 1 make directly, omit all cases for ac=0
+    for ac,id1 in [(ac,sum_is(sxs,ac)[0]) for ac in range(ncells) if sum_is(sxs,ac).shape[0]==1]:
+        symsets_arr[id1] = [ac,id1,id1]
+    ac_sxs = [(ac,sum_is(sxs,ac)) for ac in range(ncells) if sum_is(sxs,ac).shape[0]>1]
+    # compare sxs sts
+    for ac,ac_ids in ac_sxs:
+        for ei,idx in enumerate(ac_ids):
+            if symsets_arr[idx][0] == 0:
+                symsets_arr[idx] = [ac,idx,idx]
+                for idx2 in ac_ids[ei:]:
+                    if symsets_arr[idx2][0] == 0:
+                        if are_symmetrical(sxs[idx].reshape(n,m),sxs[idx2].reshape(n,m)):
+                            symsets_arr[idx2] = [ac,idx,idx2]
+    symsets_arr = np.array(sorted(list(symsets_arr),key=lambda x:(x[0],x[1]))).reshape(sxs.shape[0],3)
+    symsets_sxc = sxs[np.array(list(set(symsets_arr[:,1])))]
+    return symsets_arr,symsets_sxc
+
 # check symmetries in 2 gol domains 
 # x1,x2: matrix form gol reps
 def are_symmetrical(x1,x2,nrolls=0):
@@ -348,7 +380,7 @@ def are_symmetrical(x1,x2,nrolls=0):
     if x1.shape != x2.shape:
         x1,x2 = adjust_domains(x1,x2)
     # if not specified, assume all
-    nrolls = x1.shape[0]*x1.shape[1] if nrolls==0 else nrolls
+    nrolls = x1.flatten().shape[0] if nrolls==0 else nrolls
     # rotations
     for ri in range(4):
         # rotations
@@ -358,7 +390,7 @@ def are_symmetrical(x1,x2,nrolls=0):
         # transpositions
         x2rt = np.ascontiguousarray(x2r.T)
         if np.array_equal(x1,x2rt):
-           return True
+            return True
         # translations
         for rli in range(1,nrolls):
             if np.array_equal(x1,np.roll(x2r,rli)):
@@ -366,6 +398,25 @@ def are_symmetrical(x1,x2,nrolls=0):
             if np.array_equal(x1,np.roll(x2rt,rli)):
                 return True
     return False
+
+# check for cases where sx appears in a different env
+# for the basic cases: sx,e0 <-> sx,ex
+# x1: the basic/known instance, to compare against
+def are_sx_instances(x1,x2):
+    dx = x2*0
+    i = np.where(np.sum(x2,axis=1)==0)[0]
+    j = np.where(np.sum(x2,axis=0)==0)[0]
+    if np.sum(x2[:i,:j])==np.sum(x1):
+        dx[:i,:j] = x2[:i,:j]
+    elif np.sum(x2[i:,:j])==np.sum(x1):
+        dx[i:,:j] = x2[i:,:j]
+    elif np.sum(x2[:i,j:])==np.sum(x1):
+        dx[:i,j:] = x2[:i,j:]
+    elif np.sum(x2[i:,j:])==np.sum(x1):
+        dx[i:,j:] = x2[i:,j:]
+    else:
+        return False
+    return are_symmetrical(x1,dx)
 
 # sxs1,sxs2: arrays for gol sts 
 # ss1,ss2: symsets from sxs1,sxs2
@@ -421,7 +472,7 @@ def make_dms(count):
             dmy[ei,ej] = np.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
     return dmx,dmy
 
-# indexing for saving files
+# saving and loading with pickle
 def save_as(file,name,ext=''):
     import pickle
     import os
@@ -439,11 +490,20 @@ def save_as(file,name,ext=''):
         pickle.dump(file,f)
     print('\nsaved as: {}\n'.format(fname))
 
-def load(ext=''):
+def load_data(auto=True,ext=''):
     import pickle
     import os
-    files = [i for i in os.listdir() if '.{}'.format(ext) in i]
-    for ei,fi in files:
-        print(ei,fi)
-    x = input('\nfile: _ ')
-    with open()
+    fnames = [i for i in os.listdir() if '.{}'.format(ext) in i]
+    x = 1
+    while False==False:
+        print()
+        for ei,fi in enumerate(fnames):
+            print('{} - {}'.format(ei+1,fi))
+            if not auto:
+                x = int(input('\nfile: _ '))
+            try:
+                with open(fnames[x-1],'rb') as fname:
+                    fdata = pickle.load(fname)
+                    return fdata
+            except:
+                print('\ninvalid input?\n')
