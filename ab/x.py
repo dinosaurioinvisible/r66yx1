@@ -10,6 +10,20 @@
 # out: (2^16,16) matrix of flattened arrays 
 # block_domains = mk_sx_domain('block')
 
+# domain configurations (12 env cells for the block)
+# function to make a matrix with all cfgs 
+def mk_block_domains(n_cells=12):
+    doms = np.zeros((2**n_cells,n_cells)).astype(int)
+    # all env cfgs
+    for i in range(n_cells):
+        f = 2**i
+        xi = np.concatenate((np.zeros(f),np.ones(f)))
+        n = int(2**n_cells/(2**(i+1)))
+        doms[:,-1-i] = np.tile(xi,n)
+    # insert blocks 
+    doms = np.insert(doms,(5,5,7,7),1,axis=1) 
+    return doms
+
 # clasiffy transitions
 def mk_block_txs(block_domains):
     # classifications
@@ -49,6 +63,28 @@ def mk_block_txs(block_domains):
         txs[di] = [dx,dy.flatten()]
         txs_types[di] = dt
     return txs,txs_types
+
+# get all sx: sx -> sy
+# sy: any specific gol pattern domain (sx,ex)
+# requires matrix/lattice input
+# sy_px: sy expected pattern ('block','blinker',etc)
+def get_sxs_from_sy(sy,sy_px,domx=[],e0=True,ct=True):
+    # array for expected sy
+    n,m = sy.shape
+    if len(domx)==0:
+        # all possible domains fot (sx,ex)
+        domx = mk_binary_domains(n*m)
+    # analyze domains transitions
+    sxs = []
+    for dx in domx:
+        if sy_px == 'block':
+            if is_block_next(dx.reshape(n,m),e0):
+                sxs.append(dx)
+    sxs = np.array(sxs)
+    if ct:
+        sxs,ct_ids = apply_ct(sxs,sy)
+        return sxs,ct_ids
+    return sxs
 
 # main function for now
 # todo: delete summary[1] and clean in general
@@ -234,20 +270,47 @@ def get_symsets(sy,sxs,ct=True):
             print('{} - c1:{}, c2:{}, c4:{}, c8:{}'.format(ei,cases[0],cases[1],cases[2],cases[3]))
     return sxs,sxs_syms,symsets
 
-
-# domain configurations (12 env cells for the block)
-# function to make a matrix with all cfgs 
-def mk_block_domains(n_cells=12):
-    doms = np.zeros((2**n_cells,n_cells)).astype(int)
-    # all env cfgs
-    for i in range(n_cells):
-        f = 2**i
-        xi = np.concatenate((np.zeros(f),np.ones(f)))
-        n = int(2**n_cells/(2**(i+1)))
-        doms[:,-1-i] = np.tile(xi,n)
-    # insert blocks 
-    doms = np.insert(doms,(5,5,7,7),1,axis=1) 
-    return doms
+# sxs: matrix of arrays representing gol domains (sx+ex)
+# i used sxs to mean anything, sxys, syzs, etc (too late to change it now)
+def mk_symsets(sxs,dims=[0,0]):
+    # if not dims assume squared domain
+    if np.sum(dims)==0:
+        n = m = np.sqrt(sxs.shape[1]).astype(int)
+    # ncells for checking acs
+    ncells = sxs.shape[1]
+    # to store (id,type) & to avoid going again over same ids
+    symsets = np.zeros((sxs.shape[0],2)).astype(int)
+    # for all doms with same ac number
+    for ac in range(ncells):
+        ac_ids = sum_is(sxs,ac)
+        # if at least 2 of them (to compare)
+        if ac_ids.shape[0] == 1:
+            symsets[ac_ids[0]] = [ac,ac_ids[0]]
+        elif ac_ids.shape[0] > 1:
+            # first available: sx
+            for ei,sx_id in enumerate(ac_ids):
+                # to avoid repetitions
+                if symsets[sx_id][0] == 0:
+                    symsets[sx_id] = [ac,sx_id]
+                    sx = sxs[sx_id].reshape(n,m)
+                    # go through the rest of the doms with same ac
+                    for ej in range(ei+1,ac_ids.shape[0]):
+                        sx2_id = ac_ids[ej]
+                        sx2 = sxs[sx2_id].reshape(n,m)
+                        # rotations, transpositions, translations
+                        if are_symmetrical(sx,sx2):
+                            symsets[sx2_id] = [ac,sx_id]
+    # organize symsets 
+    org_symsets = {}
+    print('\ntotal symsets: {}\n'.format(len(set(symsets[:,1]))))
+    for ac in list(set(symsets[:,0])):
+        org_symsets[ac] = []
+        sxs_ac = symsets[np.where(symsets[:,0]==ac)[0]]
+        for sxi in list(set(sxs_ac[:,1])):
+            ss_ids = np.where(symsets[:,1]==sxi)[0]
+            org_symsets[ac].append(ss_ids)
+            print(ac,len(ss_ids),ss_ids)
+    return symsets,org_symsets
 
 
     # # translation and rotations (symmetries)

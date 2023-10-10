@@ -21,16 +21,6 @@ def get_block_sxs(e0=False,ct=True,syms=True):
     # pb_sxs,pb_sxs_symsets,pb_symsets = get_sxs_from_sy(block,e0,ct,mk_symsets=mk_symsets)
     # return pb_sxs,pb_sxs_symsets,pb_symsets
 
-# proto-blocks with 3 or 4 active cells 
-# the idea is that most of higher ac cases are variants of these
-def mk_basic_proto_blocks():
-    block = mk_gol_pattern('block')
-    dxs = mk_binary_domains(16)
-    dxs = sum_in_range(dxs,3,4,arrays=True)
-    sxs = get_sxs_from_sy(block,domx=dxs,ct=False)
-    symsets,pbs = mk_increasing_symsets(sxs,block)
-    return sxs,symsets,pbs
-
 # series of recursive transitions from (block,ex) -> sy
 # block + every possible env -> sy1 -> sy2 -> ... -> sy_n
 def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all=True):
@@ -42,6 +32,19 @@ def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all
     if syms:
         symsets_arr,symsets = mk_symsets(sxys)
     return sxys,symsets
+
+# the idea is that most of higher ac cases are variants of basic pbs
+# for basic proto-blocks: rl=3, rh=4
+def mk_proto_blocks(rl=0,rh=0,ct=False,increasing=True):
+    rl = rl if rl > 0 else 3
+    rh = rh if rh > rl else 16
+    block = mk_gol_pattern('block')
+    dxs = mk_binary_domains(16)
+    dxs_ids = sum_in_range(dxs,rl,rh)
+    sxs = get_sxs_from_sy(block,sy_px='block',dxs=dxs[dxs_ids],ct=ct)
+    sxs_copy = sxs*1
+    sms_ids,pbs_ids = mk_symsets(sxs,block,increasing=increasing)
+    return sxs_copy,sms_ids,pbs_ids
 
 # look for decaying transitions (after sx->sy and before sy->sz)
 # sxys: matrix of arrays of sy states with ac>2 (so = or -> zero)

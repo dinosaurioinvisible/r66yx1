@@ -69,6 +69,55 @@ def mk_gol_pattern(px,):
                 dx.extend([dr,dt])
     return dx
 
+# TODO: domains larger than 4x4
+# remove isolated cells that will become zero (<2)
+def rm_env(dx):
+    # try to split by rows and columns = 0
+    i0 = sum_is(dx,0)
+    j0 = sum_is(dx,0,axis=0)
+    # if region is < 2 mk 0
+    if len(i0) == 1:
+        if np.sum(dx[:i0[0]+1,:]) < 3:
+            dx[:i0[0]+1,:] = 0
+        if np.sum(dx[i0[0]+1:,:]) < 3:
+            dx[i0[0]+1:,:] = 0
+    if len(j0) == 1:
+        if np.sum(dx[:,:j0[0]+1]) < 3:
+            dx[:,:j0[0]+1] = 0
+        if np.sum(dx[:,j0[0]+1:]) < 3:
+            dx[:,j0[0]+1:] = 0
+    if len(i0)==1 or len(j0)==1:
+        return dx
+    # do something for this cases
+    if len(i0)==0 and len(j0)==0:
+        pass
+    # do something for larger domains
+    return dx
+    
+# expand domain for rolling correctly
+# basically they should mantain the dist among act cells
+def check_translation(x1,x2r,x2t):
+    n,m = x1.shape
+    b1 = np.zeros((n+2,m+2))
+    b1[1:-1,1:-1] = x1
+    bx1 = b1.flatten().nonzero()[0]
+    bx1 = np.abs(bx1-bx1[0])
+    b2r = np.zeros((n+2,m+2))
+    b2r[1:-1,1:-1] = x2r
+    bx2r = b2r.flatten().nonzero()[0]
+    if np.array_equal(bx1,np.abs(bx2r-bx2r[0])):
+        return True
+    if np.array_equal(bx1,np.abs(np.flip(bx2r-bx2r[0]))):
+        return True
+    b2t = np.zeros((n+2,m+2))
+    b2t[1:-1,1:-1] = x2t
+    bx2t = b2t.flatten().nonzero()[0]
+    if np.array_equal(bx1,np.abs(bx2t-bx2t[0])):
+        return True
+    if np.array_equal(bx1,np.abs(np.flip(bx2t-bx2t[0]))):
+        return True
+    return False
+
 # increase the domain size
 def expand_domain(sx,dims=(0,0)):
     # if not specified, increase a layer
@@ -257,24 +306,25 @@ def check_decaying_patterns(sxs,ncells=0,dims=[0,0]):
 # get all sx: sx -> sy
 # sy: any specific gol pattern domain (sx,ex)
 # requires matrix/lattice input
-def get_sxs_from_sy(sy,domx=[],e0=True,ct=True):
+# sy_px: sy expected pattern ('block','blinker',etc)
+# dxs: specific (smaller) domain
+def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True,return_ct_ids=False):
     # array for expected sy
     n,m = sy.shape
-    if len(domx)==0:
-        # all possible domains fot (sx,ex)
-        domx = mk_binary_domains(n*m)
+    if len(dxs)==0:
+        # all possible domains for (sx,ex)
+        dxs = mk_binary_domains(n*m)
     # analyze domains transitions
-    # first array = ey for analysis later
-    sxs = sy.flatten()
-    for dx in domx:
-        # centered blocks + any env
-        # dy = gol_step(dx.reshape(n,m)).flatten()
-        # if np.sum(dy*ey) == 4:
-        if is_block_next(dx.reshape(n,m),e0):
-            sxs = np.vstack((sxs,dx))
+    sxs = []
+    for dx in dxs:
+        if sy_px == 'block':
+            if is_block_next(dx.reshape(n,m),e0):
+                sxs.append(dx)
+    sxs = np.array(sxs)
     if ct:
         sxs,ct_ids = apply_ct(sxs,sy)
-        return sxs,ct_ids
+        if return_ct_ids:
+            return sxs,ct_ids
     return sxs
 
 # get sys from sx
@@ -305,54 +355,10 @@ def get_sxys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False,ct=True):
         return sxs,sxy,ct_ids
     return sxs,sxy
 
-# sxs: matrix of arrays representing gol domains (sx+ex)
-# i used sxs to mean anything, sxys, syzs, etc (too late to change it now)
-def mk_symsets(sxs,dims=[0,0]):
-    # if not dims assume squared domain
-    if np.sum(dims)==0:
-        n = m = np.sqrt(sxs.shape[1]).astype(int)
-    # ncells for checking acs
-    ncells = sxs.shape[1]
-    # to store (id,type) & to avoid going again over same ids
-    symsets = np.zeros((sxs.shape[0],2)).astype(int)
-    # for all doms with same ac number
-    for ac in range(ncells):
-        ac_ids = sum_is(sxs,ac)
-        # if at least 2 of them (to compare)
-        if ac_ids.shape[0] == 1:
-            symsets[ac_ids[0]] = [ac,ac_ids[0]]
-        elif ac_ids.shape[0] > 1:
-            # first available: sx
-            for ei,sx_id in enumerate(ac_ids):
-                # to avoid repetitions
-                if symsets[sx_id][0] == 0:
-                    symsets[sx_id] = [ac,sx_id]
-                    sx = sxs[sx_id].reshape(n,m)
-                    # go through the rest of the doms with same ac
-                    for ej in range(ei+1,ac_ids.shape[0]):
-                        sx2_id = ac_ids[ej]
-                        sx2 = sxs[sx2_id].reshape(n,m)
-                        # rotations, transpositions, translations
-                        if are_symmetrical(sx,sx2):
-                            symsets[sx2_id] = [ac,sx_id]
-    # organize symsets 
-    org_symsets = {}
-    print('\ntotal symsets: {}\n'.format(len(set(symsets[:,1]))))
-    for ac in list(set(symsets[:,0])):
-        org_symsets[ac] = []
-        sxs_ac = symsets[np.where(symsets[:,0]==ac)[0]]
-        for sxi in list(set(sxs_ac[:,1])):
-            ss_ids = np.where(symsets[:,1]==sxi)[0]
-            org_symsets[ac].append(ss_ids)
-            print(ac,len(ss_ids),ss_ids)
-    return symsets,org_symsets
-
 # look for symmetries from less to more activ cells 
-# basically, patterns with more acs should be different to make a new symset
-# e.g., if sx_ac=4 and sx_ac=6 are the same plus 2, then: (sx,ei) and (sx,ej)
-# sxs: matrix of gol sts in array form; sx: sample 
-def mk_increasing_symsets(sxs,sx):
-    n,m = sx.shape
+# sxs: matrix of gol sts in array form; sx: sample/canon 
+def mk_symsets(sxs,sxc,increasing=False):
+    n,m = sxc.shape
     ncells = n*m
     # symsets arr: for each sx array: ac,symset canon/type id, id (easier later)
     symsets_arr = np.zeros((sxs.shape[0],3)).astype(int)
@@ -365,13 +371,33 @@ def mk_increasing_symsets(sxs,sx):
         for ei,idx in enumerate(ac_ids):
             if symsets_arr[idx][0] == 0:
                 symsets_arr[idx] = [ac,idx,idx]
-                for idx2 in ac_ids[ei:]:
+                for idx2 in ac_ids[ei+1:]:
                     if symsets_arr[idx2][0] == 0:
                         if are_symmetrical(sxs[idx].reshape(n,m),sxs[idx2].reshape(n,m)):
                             symsets_arr[idx2] = [ac,idx,idx2]
+    # ids for all arrays in same symset, and indices for only first case (canon-like)
     symsets_arr = np.array(sorted(list(symsets_arr),key=lambda x:(x[0],x[1]))).reshape(sxs.shape[0],3)
-    symsets_sxc = sxs[np.array(list(set(symsets_arr[:,1])))]
-    return symsets_arr,symsets_sxc
+    symsets_pbs = np.array(sorted(list(set(symsets_arr[:,1]))))
+    if increasing:
+        return mk_increasing_symsets(sxs,sxc,symsets_arr,symsets_pbs)
+    return symsets_arr,symsets_pbs
+
+# check for equivalent instances within symsets
+# basically, patterns with more acs should be different to make a new symset
+# e.g., if sx_ac=4 and sx_ac=6 are the same plus 2, then: (sx,ei) and (sx,ej)
+def mk_increasing_symsets(sxs,sxc,sms_ids,pbs_ids):
+    n,m = sxc.shape
+    checked_pbs = []
+    for ei,pbi in enumerate(pbs_ids):
+        if pbi not in checked_pbs:
+            checked_pbs.append(pbi)
+            for pbj in pbs_ids[ei+1:]:
+                if are_sx_instances(sxs[pbi].reshape(n,m),sxs[pbj].reshape(n,m)):
+                    sms_ids[np.where(sms_ids[:,1]==pbj)[0],1] = pbi
+                    checked_pbs.append(pbj)
+    sms_ids = np.array(sorted(list(sms_ids),key=lambda x:(x[1],x[0]))).reshape(sxs.shape[0],3)
+    pbs_ids = np.array(sorted(list(set(sms_ids[:,1]))))
+    return sms_ids,pbs_ids
 
 # check symmetries in 2 gol domains 
 # x1,x2: matrix form gol reps
@@ -392,31 +418,25 @@ def are_symmetrical(x1,x2,nrolls=0):
         if np.array_equal(x1,x2rt):
             return True
         # translations
-        for rli in range(1,nrolls):
-            if np.array_equal(x1,np.roll(x2r,rli)):
-                return True
-            if np.array_equal(x1,np.roll(x2rt,rli)):
-                return True
+        if check_translation(x1,x2r,x2rt):
+            return True
+        # for rli in range(1,nrolls):
+        #     if np.array_equal(x1,np.roll(x2r,rli)):
+        #         return True
+        #     if np.array_equal(x1,np.roll(x2rt,rli)):
+        #         return True
     return False
 
+# TODO: only working for 4x4
 # check for cases where sx appears in a different env
 # for the basic cases: sx,e0 <-> sx,ex
 # x1: the basic/known instance, to compare against
 def are_sx_instances(x1,x2):
-    dx = x2*0
-    i = np.where(np.sum(x2,axis=1)==0)[0]
-    j = np.where(np.sum(x2,axis=0)==0)[0]
-    if np.sum(x2[:i,:j])==np.sum(x1):
-        dx[:i,:j] = x2[:i,:j]
-    elif np.sum(x2[i:,:j])==np.sum(x1):
-        dx[i:,:j] = x2[i:,:j]
-    elif np.sum(x2[:i,j:])==np.sum(x1):
-        dx[:i,j:] = x2[:i,j:]
-    elif np.sum(x2[i:,j:])==np.sum(x1):
-        dx[i:,j:] = x2[i:,j:]
-    else:
-        return False
-    return are_symmetrical(x1,dx)
+    if np.sum(x1) != np.sum(x2):
+        x2 = rm_env(x2)
+    if np.sum(x1) == np.sum(x2):
+        return are_symmetrical(x1,x2)
+    return False
 
 # sxs1,sxs2: arrays for gol sts 
 # ss1,ss2: symsets from sxs1,sxs2
