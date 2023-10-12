@@ -13,7 +13,7 @@ from auxs import *
 # cause info
 def get_block_sxs(e0=False,ct=True,syms=True):
     block = mk_gol_pattern('block')
-    block_sxs = get_sxs_from_sy(block,e0=e0,ct=ct)
+    block_sxs = get_sxs_from_sy(block,'block',e0=e0,ct=ct)
     if syms:
         sms_arrs,sms_sxc = mk_symsets(block_sxs,block)
         return block_sxs,sms_arrs,sms_sxc
@@ -21,12 +21,12 @@ def get_block_sxs(e0=False,ct=True,syms=True):
 
 # series of recursive transitions from (block,ex) -> sy
 # block + every possible env -> sy1 -> sy2 -> ... -> sy_n
-def get_block_sxys(txs=1,expanded=True,mk_zero=True,decay=True,ct=True,syms=True,print_all=False):
+def get_block_sxys(txs=1,expanded=True,mk_zero=True,decay_txs=3,expanded_decay=False,ct=True,syms=True,print_all=False):
     block = mk_gol_pattern('block')
     sxs = mk_sx_domains('block')
-    sxs,sxys = get_sxys_from_sx(block,sxs,txs=txs,expanded=expanded,mk_zero=mk_zero,ct=ct)
-    
-    sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
+    sxs,sxys = get_sxys_from_sx(sxs,block,txs=txs,expanded=expanded,mk_zero=mk_zero,decay_txs=decay_txs,ct=ct)
+    # sxys,szs,yz_ids,ac_evol = mk_dxs_decay(sxys,block)
+    # sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
     symsets_arr,symsets = mk_symsets(sxys)
     return 
 

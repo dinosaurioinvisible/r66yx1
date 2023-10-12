@@ -254,7 +254,7 @@ def apply_ct(sxs,psx,dims=[0,0],ids=False):
 # requires matrix/lattice input
 # sy_px: sy expected pattern ('block','blinker',etc)
 # dxs: specific (smaller) domain
-def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True,return_ct_ids=False):
+def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True):
     # array for expected sy
     n,m = sy.shape
     if len(dxs)==0:
@@ -275,33 +275,35 @@ def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True,return_ct_ids=False):
 # in this case we can't assume what sy is valid or not
 # so we should look for self-sustaining resulting patterns
 # sx: gol pattern in matrix form
-# sx_domains: tensor for all domains for sx
+# dxs: tensor for all domains for sx
 # txs: number of sx->sy->sy2->...->sy_n transitions
 # mk_zero: auto make zero domains < 3
-def get_sxys_from_sx(sx,sx_domains,txs=5,mk_zero=True,expanded=False,ct=True,return_ct_ids=False):
+def get_sxys_from_sx(sxs,sx,txs=5,mk_zero=True,expanded=False,decay_txs=0,expanded_decay=False,ct=True):
     # basically recursive calling of multi gol step:
-    sxs = sx_domains*1
+    sxys = sxs*1
     print()
     for txi in range(txs):
-        sxys = multi_gol_step(sx,sx_domains,mk_zero=mk_zero,expanded=expanded)
+        # gol step for every array
+        sxys = multi_gol_step(sx,sxys,mk_zero=mk_zero,expanded=expanded)
+        # decay txs for every array
+        if decay_txs>0:
+            # TODO: check sx? 
+            sxys,z_ids = mk_dxs_decay(sxys,sx,ct=ct,expanded=expanded_decay,dxs_only=True)
+            sxs = sxs[z_ids]
+        if ct:
+            sxys,ct_ids = apply_ct(sxys,sx,ids=True)
+            sxs = sxs[ct_ids]
+        # remove arrys=0 (in case it wasn't made before)
+        if decay_txs==0 and not ct:
+            sxs = sum_nonzero(sxs,arrays=True)
+            sxys= sum_nonzero(sxys,arrays=True)
         print('non zero sys in tx{}: {}'.format(txi+1,sum_nonzero(sxys).shape[0]))
-        sx_domains = sxys*1
-    # ids for non zero sys
-    sxys_ids = sum_nonzero(sxys)
-    # return only sx,sy nonzero (self-sustaining) arrays 
-    sxs = sxs[sxys_ids]
-    sxys = sxys[sxys_ids]
-    # continuity
-    if ct:
-        sxys,ct_ids = apply_ct(sxys,sx)
-        if return_ct_ids:
-            return sxs,sxys,ct_ids
     return sxs,sxys
 
 # check & discard domains transition into 0
 # dxs: matrix of arrays for gol domains
 # sy: objective pattern/structure 
-def mk_dxs_decay(dxs,sy,decay_txs=1,ct=False,expanded=False,arrs_only=False):
+def mk_dxs_decay(dxs,sy,decay_txs=1,ct=False,expanded=False,dxs_only=False):
     dzs = dxs*1
     ac_evol = get_ac_cases(dxs,rh=dxs.shape[1]) 
     # n transitions into future
@@ -311,9 +313,9 @@ def mk_dxs_decay(dxs,sy,decay_txs=1,ct=False,expanded=False,arrs_only=False):
             dzs = apply_ct(dzs,sy)
         ac_evol = np.vstack((ac_evol,get_ac_cases(dzs,rh=dxs.shape[1])))
     z_ids = sum_nonzero(dzs)
-    if arrs_only:
-        return dxs[z_ids]
-    return dxs[z_ids],dzs[z_ids],ac_evol
+    if dxs_only:
+        return dxs[z_ids],z_ids
+    return dxs[z_ids],dzs[z_ids],z_ids,ac_evol
 
 # gets number of cases of n active cells from domain
 def get_ac_cases(dxs,ac=0,rl=0,rh=0,arrays=False,ids=False,nonzero=False):
