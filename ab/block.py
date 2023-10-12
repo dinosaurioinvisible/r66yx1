@@ -13,19 +13,24 @@ from auxs import *
 # cause info
 def get_block_sxs(e0=False,ct=True,syms=True):
     block = mk_gol_pattern('block')
-    block_sxs,ct_ids = get_sxs_from_sy(block,e0=e0,ct=ct)
+    block_sxs = get_sxs_from_sy(block,e0=e0,ct=ct)
     if syms:
-        symsets = mk_increasing_symsets(block_sxs,block)
-        # symsets_arr,symsets = mk_symsets(block_sxs)
-    return block_sxs,symsets
-    # pb_sxs,pb_sxs_symsets,pb_symsets = get_sxs_from_sy(block,e0,ct,mk_symsets=mk_symsets)
-    # return pb_sxs,pb_sxs_symsets,pb_symsets
+        sms_arrs,sms_sxc = mk_symsets(block_sxs,block)
+        return block_sxs,sms_arrs,sms_sxc
+    return block_sxs
 
 # series of recursive transitions from (block,ex) -> sy
 # block + every possible env -> sy1 -> sy2 -> ... -> sy_n
-def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all=True):
+def get_block_sxys(txs=1,expanded=True,mk_zero=True,decay=True,ct=True,syms=True,print_all=False):
     block = mk_gol_pattern('block')
     sxs = mk_sx_domains('block')
+    sxs,sxys = get_sxys_from_sx(block,sxs,txs=txs,expanded=expanded,mk_zero=mk_zero,ct=ct)
+    
+    sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
+    symsets_arr,symsets = mk_symsets(sxys)
+    return 
+
+def mk_iter_block_sxys(iters=3,)
     for _ in range(iter):
         sxs,sxys,ct_ids = get_sxys_from_sx(block,sxs,txs=etxs,expanded=expanded,ct=ct)
         sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
@@ -35,7 +40,7 @@ def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all
 
 # the idea is that most of higher ac cases are variants of basic pbs
 # for basic proto-blocks: rl=3, rh=4
-def mk_proto_blocks(rl=0,rh=0,ct=False,increasing=True):
+def mk_proto_blocks(rl=0,rh=0,ct=True,incremental=True):
     rl = rl if rl > 0 else 3
     rh = rh if rh > rl else 16
     block = mk_gol_pattern('block')
@@ -43,8 +48,30 @@ def mk_proto_blocks(rl=0,rh=0,ct=False,increasing=True):
     dxs_ids = sum_in_range(dxs,rl,rh)
     sxs = get_sxs_from_sy(block,sy_px='block',dxs=dxs[dxs_ids],ct=ct)
     sxs_copy = sxs*1
-    sms_ids,pbs_ids = mk_symsets(sxs,block,increasing=increasing)
+    sms_ids,pbs_ids = mk_symsets(sxs,block,incremental=incremental)
     return sxs_copy,sms_ids,pbs_ids
+
+# apply something similar for future blocks
+def mk_per_gliders(rl=0,rh=0,ct=True,incremental=True,save=False):
+    rl = rl if rl > 0 else 3
+    rh = rh if rh > rl else 16
+    
+
+# get Dxs for Bc ((bxs,ex) -> Bc)
+# get Dys for Bc (Bc -> (bys,ey))
+# make symsets: ss(Dxs), ss(Dys)
+# go recursevely matching them 
+def mk_recursive_block_domains(load=False,auto_load=False,e0=False,ct=True,syms=True,txs=1,save=False):
+    if load:
+        print('sxs, sxs_symsets_ids, sxys, sxys_symsets_ids')
+        sxs,sxs_symsets,sxys,sxys_symsets = load_data(auto=auto_load,ext='bk')
+    else:
+        sxs,sxs_symsets = get_block_sxs(e0=e0,ct=ct,syms=syms)
+        sxys,sxys_symsets = get_block_sxys(txs=txs,ct=ct,syms=syms)
+    if save:
+        save_as([sxs,sxs_symsets,sxys,sxys_symsets],'block_ztxs={}'.format(txs),ext='bk')
+    xy_ids = check_matching_symsets(sxs,sxs_symsets,sxys,sxys_symsets)
+    return sxs,sxys,sxs_symsets,sxys_symsets,xy_ids
 
 # look for decaying transitions (after sx->sy and before sy->sz)
 # sxys: matrix of arrays of sy states with ac>2 (so = or -> zero)
@@ -92,22 +119,6 @@ def mk_block_decay(sxs,sxys,txs=1,print_all=True,return_all=False):
         return sxs,sxys,z_sts,txs_ac_sts,y_acs
     return sxs,sxys
 
-# get Dxs for Bc ((bxs,ex) -> Bc)
-# get Dys for Bc (Bc -> (bys,ey))
-# make symsets: ss(Dxs), ss(Dys)
-# go recursevely matching them 
-def mk_recursive_block_domains(load=False,auto_load=False,e0=False,ct=True,syms=True,txs=1,save=False):
-    if load:
-        print('sxs, sxs_symsets_ids, sxys, sxys_symsets_ids')
-        sxs,sxs_symsets,sxys,sxys_symsets = load_data(auto=auto_load,ext='bk')
-    else:
-        sxs,sxs_symsets = get_block_sxs(e0=e0,ct=ct,syms=syms)
-        sxys,sxys_symsets = get_block_sxys(txs=txs,ct=ct,syms=syms)
-    if save:
-        save_as([sxs,sxs_symsets,sxys,sxys_symsets],'block_ztxs={}'.format(txs),ext='bk')
-    xy_ids = check_matching_symsets(sxs,sxs_symsets,sxys,sxys_symsets)
-    return sxs,sxys,sxs_symsets,sxys_symsets,xy_ids
-
 # exts: expanded transitions (only 1 for now)
 # txs: non expenanded txs to discard decaying patterns
 def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=True):
@@ -117,12 +128,12 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=Tru
     if len(block_sxys)==0:
         bdoms = mk_sx_domains('block')
         # one or many expanded transitions
-        sxs,sxys = get_sxys_from_sx(block,bdoms,txs=etxs,make_zero=True,expanded=True)
+        sxs,sxys = get_sxys_from_sx(block,bdoms,txs=etxs,mk_zero=True,expanded=True)
     else:
         # for continuing cases
         nme = np.sqrt(block_sxys.shape[1]).astype(int)
         sx0 = block_sxys[0].reshape(nme,nme)
-        sxs,sxys = get_sxys_from_sx(sx0,block_sxys,txs=etxs,make_zero=True,expanded=True)
+        sxs,sxys = get_sxys_from_sx(sx0,block_sxys,txs=etxs,mk_zero=True,expanded=True)
     nme = np.sqrt(sxys.shape[1]).astype(int)
     sxys_sums = [sum_is(sxys,i).shape[0] for i in range(nme*nme+1)]
     # print initial data
@@ -169,7 +180,7 @@ def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=Tru
 
 # call 
 import sys
-if sys.argv[0] == 'block_fx.py':
+if sys.argv[0] == 'block.py':
     auto_load = True if '--auto_load' in sys.argv else False
     mk_recursive_block_domains(load=auto_load,auto=auto_load)
 

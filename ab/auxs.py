@@ -37,10 +37,34 @@ def sum_nonzero(matrix,axis=1,arrays=False):
     if arrays:
         return matrix[np.sum(matrix,axis=axis).nonzero()[0]]
     return np.sum(matrix,axis=axis).nonzero()[0]
+
 # to check if some sx is surrended by zeros in some domx 
 def sum_borders(domx):
     cx = np.sum(domx[1:-1,1:-1])
     return np.sum(domx)-cx
+# expand domain size: rows/cols=(bef 0,aft n), else layers
+def expand_domain(sx,layers=1,rows=(0,0),cols=(0,0)):
+    if np.sum([rows,cols])>0:
+        return np.pad(sx,(rows,cols),mode='constant')
+    return np.pad(sx,layers,mode='constant')
+# adjust domains to bigger, for each dimension
+def adjust_domains(x1,x2):
+    rx,cx = np.abs(np.array(x1.shape)-np.array(x2.shape))
+    r0,rn = [int(rx/2)]*2 if rx%2==0 else [int(rx/2),int(rx/2)+1]
+    c0,cn = [int(cx/2)]*2 if cx%2==0 else [int(cx/2),int(cx/2)+1]
+    if x1.shape[0] >= x2.shape[0] and x1.shape[1] >= x2.shape[1]:
+        return x1,expand_domain(x2,rows=(r0,rn),cols=(c0,cn))
+    if x2.shape[0] >= x1.shape[0] and x2.shape[1] >= x1.shape[1]:
+        return expand_domain(x1,rows=(r0,rn),cols=(c0,cn)),x2
+    if x1.shape[0] > x2.shape[0]:
+        x2 = expand_domain(x2,rows=(r0,rn))
+    elif x1.shape[0] < x2.shape[0]:
+        x1 = expand_domain(x1,rows=(r0,rn))
+    if x1.shape[1] > x2.shape[1]:
+        x2 = expand_domain(x2,cols=(c0,cn))
+    elif x1.shape[1] < x2.shape[1]:
+        x1 = expand_domain(x1,cols=(c0,cn))
+    return x1,x2
 
 # make canonical gol patterns (sx,e=0) from word inputs
 def mk_gol_pattern(px,):
@@ -118,77 +142,31 @@ def check_translation(x1,x2r,x2t):
         return True
     return False
 
-# increase the domain size
-def expand_domain(sx,dims=(0,0)):
-    # if not specified, increase a layer
-    if np.sum(dims)==0:
-        dims = np.array(sx.shape)+2
-    nx,mx = dims
-    # create new domain and place sx in the center
-    dx = np.zeros((nx,mx))
-    nc,mc = int(nx/2),int(mx/2)
-    dx[nc-2:nc+2,mc-2:mc+2] = sx
-    return dx
-
-# adjust domains to the bigger one
-def adjust_domains(x1,x2):
-    if x1.shape[0] >= x2.shape[0] and x1.shape[1] >= x2.shape[1]:
-        x2 = expand_domain(x2,dims=x1.shape)
-    elif x2.shape[0] >= x1.shape[0] and x2.shape[1] >= x1.shape[1]:
-        x1 = expand_domain(x1,dims=x2.shape)
-    return x1,x2
-
 # game of life transition
-def gol_step(world_st):
-    world = world_st/1
-    world_copy = world_st/1
+# expanded adds an external layer
+def gol_step(world_st,expanded=False):
+    world = world_st*1 if not expanded else expand_domain(world_st)
+    world_copy = world*1
     for ei,vi in enumerate(world_copy):
         for ej,vij in enumerate(vi):
             nb = np.sum(world_copy[max(0,ei-1):ei+2,max(ej-1,0):ej+2]) - vij
             vx = 1 if (vij==1 and 2<=nb<=3) or (vij==0 and nb==3) else 0
             world[ei,ej] = vx
     return world
-
 # gol transition for multiple arrays
-# sx: matrix form to reshape arrays
+# sx: matrix form to reshape arrays (if nor, assume squared)
 # sx_domains: gol lattice/domain arrays for each sx -> sy
-# make_zero: makes sums<3 = 0 (will die next)
-def multi_gol_step(sx,sx_domains,make_zero=True):
-    # shape
-    n,m = sx.shape    
-    # output array
-    sxy = np.zeros((sx_domains.shape[0],n*m))
+# mk_zero: makes sums<3 = 0 (will die next)
+def multi_gol_step(sx_domains,sx=[],mk_zero=True,expanded=False):
+    # shape & output array
+    n,m = sx.shape if len(sx>0) else [np.sqrt(sx_domains.shape[1])]*2
+    sxys = sx_domains*0
     # simulate transitions
     for di,dx in enumerate(sx_domains):
-        dy = gol_step(dx.reshape(n,m)).flatten()
-        sxy[di] = dy
-    if make_zero:
-        sxy_zeros = np.where(np.sum(sxy,axis=1)<3)[0]
-        sxy[sxy_zeros] = 0
-    return sxy
-
-# to account for transition activity outside dx
-# dx: input in matrix form (n,m)
-# dy: output in matrix form (n+2,m+2)
-def gol_step_expanded(dx):
-    # expand domain
-    n,m = dx.shape
-    domx = np.zeros((n+2,m+2))
-    domx[1:-1,1:-1] = dx
-    dy = gol_step(domx)
-    return dy
-def multi_gol_step_expanded(sx,sx_domains,make_zero=True,expand_by=1):
-    n,m = sx.shape
-    ne = n + expand_by*2
-    me = m + expand_by*2
-    sxy = np.zeros((sx_domains.shape[0],(ne)*(me)))
-    for di,dx in enumerate(sx_domains):
-        dy = gol_step_expanded(dx.reshape(ne-2,me-2)).flatten()
-        sxy[di] = dy
-    if make_zero:
-        sxy_zeros = np.where(np.sum(sxy,axis=1)<3)[0]
-        sxy[sxy_zeros] = 0
-    return sxy
+        sxys[di] = gol_step(dx.reshape(n,m),expanded=expanded).flatten()
+    if mk_zero:
+        sxys[sum_is(sxys,0)] = 0
+    return sxys
 
 # check for patterns 
 # domx: gol domain/lattice in matrix form
@@ -257,51 +235,19 @@ def mk_sx_domains(sx):
 # helper fx for continuity
 # sxs: matrix of gol domain sts arrays 
 # psx: primary pattern/structure determining ct
-def apply_ct(sxs,psx,dims=[0,0]):
+def apply_ct(sxs,psx,dims=[0,0],ids=False):
     # assume square if no explicit dims
-    if np.sum(dims)==0:
-        n = m = np.sqrt(sxs.shape[1]).astype(int)
+    n,m = dims if sum(dims)>0 else [np.sqrt(sxs.shape[1]).astype(int)]*2
     # adjust sx 
     dx = psx*1
     if sxs[0].shape != psx.flatten().shape:
         dx = np.zeros((n,m))
         ij = int(n/2)
         dx[ij-2:ij+2,ij-2:ij+2] = psx
-    # ct
     ct_ids = sum_nonzero(sxs*dx.flatten())
-    sxs_ct = sxs[ct_ids]
-    return sxs_ct,ct_ids
-
-# check for decaying gol patterns
-# sxs: matrix of array-states
-# ncells: number of cells in domain
-def check_decaying_patterns(sxs,ncells=0,dims=[0,0]):
-    # number of sx->sy viable cases, indeces & array sts
-    sxys_ids, sxys = [], []
-    # if no number of cells, assume same as arrays
-    if ncells==0:
-        ncells = sxs.shape[1]
-    # if no dims, assume squared domain
-    if sum(dims)==0:
-        n = m = np.sqrt(sxs[0].shape[0]).astype(int)
-    # sum of cases with ac number of active cells in domain
-    sxs_ac_cases = [sum_is(sxs,ac).shape[0] for ac in range(ncells+1)]
-    # check number of active cells after sx->sy transition
-    for ac,n_cases in enumerate(sxs_ac_cases):
-        if n_cases > 0:
-            # for each sx with active cells = ac
-            for sx_id in sum_is(sxs,ac):
-                sx = sxs[sx_id]
-                sy = gol_step(sx.reshape(n,m)).flatten()
-                # if sy has at least 3 active cells
-                if np.sum(sy) > 2:
-                    sxys_ids.append(sx_id)
-                    sxys.append(sy)
-    # update sxs, sxs ac cases and get sxys ac cases
-    sxs = sxs[sxys_ids]
-    sxs_ac_cases = [sum_is(sxs,ac).shape[0] for ac in range(ncells+1)]
-    sxys_ac_cases = [sum_is(sxys,ac).shape[0] for ac in range(ncells+1)]
-    return np.array(sxys_ids), sxs, np.array(sxys), sxs_ac_cases, sxys_ac_cases
+    if ids:
+        return sxs[ct_ids],ct_ids
+    return sxs[ct_ids]
 
 # get all sx: sx -> sy
 # sy: any specific gol pattern domain (sx,ex)
@@ -322,9 +268,7 @@ def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True,return_ct_ids=False):
                 sxs.append(dx)
     sxs = np.array(sxs)
     if ct:
-        sxs,ct_ids = apply_ct(sxs,sy)
-        if return_ct_ids:
-            return sxs,ct_ids
+        sxs = apply_ct(sxs,sy)
     return sxs
 
 # get sys from sx
@@ -333,31 +277,64 @@ def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True,return_ct_ids=False):
 # sx: gol pattern in matrix form
 # sx_domains: tensor for all domains for sx
 # txs: number of sx->sy->sy2->...->sy_n transitions
-def get_sxys_from_sx(sx,sx_domains,txs=5,make_zero=True,expanded=False,ct=True):
+# mk_zero: auto make zero domains < 3
+def get_sxys_from_sx(sx,sx_domains,txs=5,mk_zero=True,expanded=False,ct=True,return_ct_ids=False):
     # basically recursive calling of multi gol step:
     sxs = sx_domains*1
     print()
     for txi in range(txs):
-        if expanded:
-            sxy = multi_gol_step_expanded(sx,sx_domains,make_zero=make_zero,expand_by=txi+1)
-        else:
-            sxy = multi_gol_step(sx,sx_domains,make_zero=make_zero)
-        print('non zero sys in tx{}: {}'.format(txi+1,sum_nonzero(sxy).shape[0]))
-        sx_domains = sxy*1
+        sxys = multi_gol_step(sx,sx_domains,mk_zero=mk_zero,expanded=expanded)
+        print('non zero sys in tx{}: {}'.format(txi+1,sum_nonzero(sxys).shape[0]))
+        sx_domains = sxys*1
     # ids for non zero sys
-    sxy_ids = sum_nonzero(sxy)
+    sxys_ids = sum_nonzero(sxys)
     # return only sx,sy nonzero (self-sustaining) arrays 
-    sxs = sxs[sxy_ids]
-    sxy = sxy[sxy_ids]
+    sxs = sxs[sxys_ids]
+    sxys = sxys[sxys_ids]
     # continuity
     if ct:
-        sxy,ct_ids = apply_ct(sxy,sx)
-        return sxs,sxy,ct_ids
-    return sxs,sxy
+        sxys,ct_ids = apply_ct(sxys,sx)
+        if return_ct_ids:
+            return sxs,sxys,ct_ids
+    return sxs,sxys
+
+# check & discard domains transition into 0
+# dxs: matrix of arrays for gol domains
+# sy: objective pattern/structure 
+def mk_dxs_decay(dxs,sy,decay_txs=1,ct=False,expanded=False,arrs_only=False):
+    dzs = dxs*1
+    ac_evol = get_ac_cases(dxs,rh=dxs.shape[1]) 
+    # n transitions into future
+    for _ in range(decay_txs):
+        dzs = multi_gol_step(sy,dzs,mk_zero=True,expanded=expanded)
+        if ct: # continuity criterium
+            dzs = apply_ct(dzs,sy)
+        ac_evol = np.vstack((ac_evol,get_ac_cases(dzs,rh=dxs.shape[1])))
+    z_ids = sum_nonzero(dzs)
+    if arrs_only:
+        return dxs[z_ids]
+    return dxs[z_ids],dzs[z_ids],ac_evol
+
+# gets number of cases of n active cells from domain
+def get_ac_cases(dxs,ac=0,rl=0,rh=0,arrays=False,ids=False,nonzero=False):
+    if ac>0:
+        if arrays:
+            return sum_is(dxs,ac,arrays=True)
+        if ids:
+            return sum_is(dxs,ac)
+        return sum_is(dxs,ac).shape[0]
+    rl,rh = (rl,rh) if rl<rh else (0,dxs.shape[1])
+    nz = 0 if nonzero==True else -1
+    ids = [sum_is(dxs,ac) for ac in range(rl,rh+1) if sum_is(dxs,ac).shape[0]>nz]
+    if arrays:
+        return dxs[ids]
+    if ids:
+        ids
+    return np.array([i.shape[0] for i in ids])
 
 # look for symmetries from less to more activ cells 
 # sxs: matrix of gol sts in array form; sx: sample/canon 
-def mk_symsets(sxs,sxc,increasing=False):
+def mk_symsets(sxs,sxc,incremental=False):
     n,m = sxc.shape
     ncells = n*m
     # symsets arr: for each sx array: ac,symset canon/type id, id (easier later)
@@ -377,15 +354,15 @@ def mk_symsets(sxs,sxc,increasing=False):
                             symsets_arr[idx2] = [ac,idx,idx2]
     # ids for all arrays in same symset, and indices for only first case (canon-like)
     symsets_arr = np.array(sorted(list(symsets_arr),key=lambda x:(x[0],x[1]))).reshape(sxs.shape[0],3)
-    symsets_pbs = np.array(sorted(list(set(symsets_arr[:,1]))))
-    if increasing:
-        return mk_increasing_symsets(sxs,sxc,symsets_arr,symsets_pbs)
-    return symsets_arr,symsets_pbs
+    symsets_sxc = np.array(sorted(list(set(symsets_arr[:,1]))))
+    if incremental:
+        return mk_incremental_symsets(sxs,sxc,symsets_arr,symsets_sxc)
+    return symsets_arr,symsets_sxc
 
 # check for equivalent instances within symsets
 # basically, patterns with more acs should be different to make a new symset
 # e.g., if sx_ac=4 and sx_ac=6 are the same plus 2, then: (sx,ei) and (sx,ej)
-def mk_increasing_symsets(sxs,sxc,sms_ids,pbs_ids):
+def mk_incremental_symsets(sxs,sxc,sms_ids,pbs_ids):
     n,m = sxc.shape
     checked_pbs = []
     for ei,pbi in enumerate(pbs_ids):

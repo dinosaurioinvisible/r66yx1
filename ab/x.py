@@ -24,6 +24,57 @@ def mk_block_domains(n_cells=12):
     doms = np.insert(doms,(5,5,7,7),1,axis=1) 
     return doms
 
+# game of life transition
+def gol_step(world_st):
+    world = world_st/1
+    world_copy = world_st/1
+    for ei,vi in enumerate(world_copy):
+        for ej,vij in enumerate(vi):
+            nb = np.sum(world_copy[max(0,ei-1):ei+2,max(ej-1,0):ej+2]) - vij
+            vx = 1 if (vij==1 and 2<=nb<=3) or (vij==0 and nb==3) else 0
+            world[ei,ej] = vx
+    return world
+# gol transition for multiple arrays
+# sx: matrix form to reshape arrays
+# sx_domains: gol lattice/domain arrays for each sx -> sy
+# mk_zero: makes sums<3 = 0 (will die next)
+def multi_gol_step(sx,sx_domains,mk_zero=True):
+    # shape
+    n,m = sx.shape    
+    # output array
+    sxy = np.zeros((sx_domains.shape[0],n*m))
+    # simulate transitions
+    for di,dx in enumerate(sx_domains):
+        dy = gol_step(dx.reshape(n,m)).flatten()
+        sxy[di] = dy
+    if mk_zero:
+        sxy_zeros = np.where(np.sum(sxy,axis=1)<3)[0]
+        sxy[sxy_zeros] = 0
+    return sxy
+
+# to account for transition activity outside dx
+# dx: input in matrix form (n,m)
+# dy: output in matrix form (n+2,m+2)
+def gol_step_expanded(dx):
+    # expand domain
+    n,m = dx.shape
+    domx = np.zeros((n+2,m+2))
+    domx[1:-1,1:-1] = dx
+    dy = gol_step(domx)
+    return dy
+def multi_gol_step_expanded(sx,sx_domains,mk_zero=True,expand_by=1):
+    n,m = sx.shape
+    ne = n + expand_by*2
+    me = m + expand_by*2
+    sxy = np.zeros((sx_domains.shape[0],(ne)*(me)))
+    for di,dx in enumerate(sx_domains):
+        dy = gol_step_expanded(dx.reshape(ne-2,me-2)).flatten()
+        sxy[di] = dy
+    if mk_zero:
+        sxy_zeros = np.where(np.sum(sxy,axis=1)<3)[0]
+        sxy[sxy_zeros] = 0
+    return sxy
+
 # clasiffy transitions
 def mk_block_txs(block_domains):
     # classifications
@@ -85,6 +136,51 @@ def get_sxs_from_sy(sy,sy_px,domx=[],e0=True,ct=True):
         sxs,ct_ids = apply_ct(sxs,sy)
         return sxs,ct_ids
     return sxs
+
+# series of recursive transitions from (block,ex) -> sy
+# block + every possible env -> sy1 -> sy2 -> ... -> sy_n
+def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all=True):
+    block = mk_gol_pattern('block')
+    sxs = mk_sx_domains('block')
+    for _ in range(iter):
+        sxs,sxys,ct_ids = get_sxys_from_sx(block,sxs,txs=etxs,expanded=expanded,ct=ct)
+        sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
+    if syms:
+        symsets_arr,symsets = mk_symsets(sxys)
+    return sxys,symsets
+
+# check for decaying gol patterns
+# sxs: matrix of array-states
+# ncells: number of cells in domain
+def check_decaying_patterns(sxs,ncells=0,dims=[0,0]):
+    # number of sx->sy viable cases, indeces & array sts
+    sxys_ids, sxys = [], []
+    # if no number of cells, assume same as arrays
+    if ncells==0:
+        ncells = sxs.shape[1]
+    # if no dims, assume squared domain
+    if sum(dims)==0:
+        n = m = np.sqrt(sxs[0].shape[0]).astype(int)
+    # sum of cases with ac number of active cells in domain
+    sxs_ac_cases = [sum_is(sxs,ac).shape[0] for ac in range(ncells+1)]
+    # check number of active cells after sx->sy transition
+    for ac,n_cases in enumerate(sxs_ac_cases):
+        if n_cases > 0:
+            # for each sx with active cells = ac
+            for sx_id in sum_is(sxs,ac):
+                sx = sxs[sx_id]
+                sy = gol_step(sx.reshape(n,m)).flatten()
+                # if sy has at least 3 active cells
+                if np.sum(sy) > 2:
+                    sxys_ids.append(sx_id)
+                    sxys.append(sy)
+    # update sxs, sxs ac cases and get sxys ac cases
+    sxs = sxs[sxys_ids]
+    sxs_ac_cases = [sum_is(sxs,ac).shape[0] for ac in range(ncells+1)]
+    sxys_ac_cases = [sum_is(sxys,ac).shape[0] for ac in range(ncells+1)]
+    return np.array(sxys_ids), sxs, np.array(sxys), sxs_ac_cases, sxys_ac_cases
+
+
 
 # main function for now
 # todo: delete summary[1] and clean in general
