@@ -23,39 +23,44 @@ def get_block_sxs(e0=False,ct=True,syms=True):
 # block + every possible env -> sy1 -> sy2 -> ... -> sy_n
 def get_block_sxys(txs=1,expanded=True,mk_zero=True,decay_txs=3,expanded_decay=False,ct=True,syms=True,print_all=False):
     block = mk_gol_pattern('block')
-    sxs = mk_sx_domains('block')
-    sxs,sxys = get_sxys_from_sx(sxs,block,txs=txs,expanded=expanded,mk_zero=mk_zero,decay_txs=decay_txs,ct=ct)
-    # sxys,szs,yz_ids,ac_evol = mk_dxs_decay(sxys,block)
-    # sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
-    symsets_arr,symsets = mk_symsets(sxys)
-    return 
-
-def mk_iter_block_sxys(iters=3,)
-    for _ in range(iter):
-        sxs,sxys,ct_ids = get_sxys_from_sx(block,sxs,txs=etxs,expanded=expanded,ct=ct)
-        sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
+    block_sxs = mk_sx_domains('block')
+    block_sxs,block_sxys = get_sxys_from_sx(block_sxs,block,txs=txs,expanded=expanded,mk_zero=mk_zero,ct=ct,decay_txs=decay_txs,expanded_decay=expanded_decay)
     if syms:
-        symsets_arr,symsets = mk_symsets(sxys)
-    return sxys,symsets
+        sms_arrs,sms_sxc = mk_symsets(block_sxys)
+        return block_sxys,sms_arrs,sms_sxc
+    return block_sxys
 
 # the idea is that most of higher ac cases are variants of basic pbs
 # for basic proto-blocks: rl=3, rh=4
 def mk_proto_blocks(rl=0,rh=0,ct=True,incremental=True):
-    rl = rl if rl > 0 else 3
-    rh = rh if rh > rl else 16
+    rl,rh = (rl,rh) if rh>rl else (3,16)
     block = mk_gol_pattern('block')
     dxs = mk_binary_domains(16)
     dxs_ids = sum_in_range(dxs,rl,rh)
     sxs = get_sxs_from_sy(block,sy_px='block',dxs=dxs[dxs_ids],ct=ct)
-    sxs_copy = sxs*1
+    #sxs_copy = sxs*1
     sms_ids,pbs_ids = mk_symsets(sxs,block,incremental=incremental)
-    return sxs_copy,sms_ids,pbs_ids
+    return sxs,sms_ids,pbs_ids
+    #return sxs_copy,sms_ids,pbs_ids
 
 # apply something similar for future blocks
-def mk_per_gliders(rl=0,rh=0,ct=True,incremental=True,save=False):
-    rl = rl if rl > 0 else 3
-    rh = rh if rh > rl else 16
+def mk_per_gliders(rl=0,rh=0,txs=1,dtxs=3,ct=True,incremental=True):
+    rl,rh = (rl,rh) if rh > rl else (3,36)
+    block = mk_gol_pattern('block')
+    dxs = mk_sx_domains('block')
+    dxs = sum_in_range(dxs,rl,rh,arrays=True)
+    sxs,sxys = get_sxys_from_sx(dxs,block,txs=txs,decay_txs=dtxs,ct=ct)
+    sms_ids,per_ids = mk_symsets(sxys,block,incremental=incremental)
+    return sxs,sxys,sms_ids,per_ids
     
+
+# def mk_iter_block_sxys(iters=3,)
+#     for _ in range(iter):
+#         sxs,sxys,ct_ids = get_sxys_from_sx(block,sxs,txs=etxs,expanded=expanded,ct=ct)
+#         sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
+#     if syms:
+#         symsets_arr,symsets = mk_symsets(sxys)
+#     return sxys,symsets
 
 # get Dxs for Bc ((bxs,ex) -> Bc)
 # get Dys for Bc (Bc -> (bys,ey))
