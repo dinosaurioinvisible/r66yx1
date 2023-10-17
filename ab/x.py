@@ -137,6 +137,28 @@ def get_sxs_from_sy(sy,sy_px,domx=[],e0=True,ct=True):
         return sxs,ct_ids
     return sxs
 
+def get_sxys_from_sx(dxs,sx,txs=1,mk_zero=True,expanded=True,decay_txs=0,expanded_decay=False,ct=True):
+    # basically recursive calling of multi gol step:
+    sxys = dxs*1
+    # x->y transitions (only in rare cases > 1)
+    for txi in range(txs):
+        # gol step for every array
+        sxys = multi_gol_step(sxys,sx,mk_zero=mk_zero,expanded=expanded)
+        # decay txs for every array
+        if decay_txs>0:
+            # y -> z1 -> z2 ->...-> zn decay txs (often 2 or 3) (includes ct)
+            # sx_dims = sx_dims if not expanded else expand_domain(sx_dims,layers=txi+1).shape
+            sxys,z_ids = mk_dxs_decay(sxys,sx,ct=ct,expanded=expanded_decay,dxs_only=True)
+            dxs = dxs[z_ids]
+        elif ct: # ct only (no decaying)
+            sxys,ct_ids = apply_ct(sxys,ct_sx=sx,ids=True)
+            dxs = dxs[ct_ids]
+        else: # remove arrys=0 (in case it wasn't made before)
+            dxs = sum_nonzero(dxs,arrays=True)
+            sxys= sum_nonzero(sxys,arrays=True)
+        print('\nnon zero sys in tx{}: {}'.format(txi+1,sum_nonzero(sxys).shape[0]))
+    return dxs,sxys
+
 # series of recursive transitions from (block,ex) -> sy
 # block + every possible env -> sy1 -> sy2 -> ... -> sy_n
 def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all=True):
@@ -146,7 +168,7 @@ def get_block_sxys(iter=1,etxs=1,txs=1,expanded=True,ct=True,syms=True,print_all
         sxs,sxys,ct_ids = get_sxys_from_sx(block,sxs,txs=etxs,expanded=expanded,ct=ct)
         sxs,sxys = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all,return_all=False)
     if syms:
-        symsets_arr,symsets = mk_symsets(sxys)
+        symset_cases,symsets = mk_symsets(sxys)
     return sxys,symsets
 
 # check for decaying gol patterns
@@ -180,6 +202,17 @@ def check_decaying_patterns(sxs,ncells=0,dims=[0,0]):
     sxys_ac_cases = [sum_is(sxys,ac).shape[0] for ac in range(ncells+1)]
     return np.array(sxys_ids), sxs, np.array(sxys), sxs_ac_cases, sxys_ac_cases
 
+def mk_recursive_block_domains(load=False,auto_load=False,e0=False,ct=True,syms=True,txs=1,save=False):
+    if load:
+        print('sxs, sxs_symsets_ids, sxys, sxys_symsets_ids')
+        sxs,sxs_symsets,sxys,sxys_symsets = load_data(auto=auto_load,ext='bk')
+    else:
+        sxs,sxs_symsets = get_block_sxs(e0=e0,ct=ct,syms=syms)
+        sxys,sxys_symsets = get_block_sxys(txs=txs,ct=ct,syms=syms)
+    if save:
+        save_as([sxs,sxs_symsets,sxys,sxys_symsets],'block_ztxs={}'.format(txs),ext='bk')
+    xy_ids = check_matching_symsets(sxs,sxs_symsets,sxys,sxys_symsets)
+    return sxs,sxys,sxs_symsets,sxys_symsets,xy_ids
 
 
 # main function for now
@@ -408,6 +441,86 @@ def mk_symsets(sxs,dims=[0,0]):
             print(ac,len(ss_ids),ss_ids)
     return symsets,org_symsets
 
+# look for decaying transitions (after sx->sy and before sy->sz)
+# sxys: matrix of arrays of sy states with ac>2 (so = or -> zero)
+# sxs: sx sts (for updating and making indices)
+# the idea is too look for other states that -> zero
+def mk_block_decay(sxs,sxys,txs=1,print_all=True,return_all=False):
+    # number of cells in domain (for ac range)
+    ncells = sxys.shape[1]
+    # copy of sxys for processing & acs for storing
+    z_sts = sxys*1
+    sts_acs = np.zeros((ncells+1,1+2*txs))
+    sts_acs[:,0] = np.array([sum_is(sxys,i).shape[0] for i in range(ncells+1)])
+    # txs go: y -> z1 => z1 -> z2 => z2 -> z3, etc
+    print()
+    for txi in range(txs):
+        # valid indices, z sts, z number of cases for every ac
+        zn_ids,z0,z_sts,z0_acs,z_acs = check_decaying_patterns(z_sts,ncells)
+        # update sxs & sxys indices (to match z)
+        sxys = sxys[zn_ids]
+        sxs = sxs[zn_ids]
+        # update sxs & sxys counts
+        txid = (txi+1)*2
+        sts_acs[:,txid-1] = z_acs
+        sts_acs[:,txid] = np.array([sum_is(sxys,i).shape[0] for i in range(ncells+1)])
+        sxs_acs = [sum_is(sxs,i).shape[0] for i in range(ncells+1)]
+        if print_all:
+            # print update sxys and tx data
+            print('\ntx{}: sxys -> z{}: {}\n'.format(txi+2,txi+1,zn_ids.shape[0]))
+        for ac in range(ncells):
+            if np.sum(sts_acs[ac]):
+                # print sxys ac, acs, z_n & retro updated y_n counts 
+                pp = 'ac:{:2}, x:{:3}, y:{:3}'+''.join([', z'+str(i+1)+':{:3} >{:3}' for i in range(txi+1)])
+                print(pp.format(*[ac]+[sxs_acs[ac]]+list(sts_acs[ac,:txid+1].astype(int))))
+    print()
+    # make arrays
+    txs_ac_sts = [[] for _ in range(ncells+1)]
+    for ac in range(ncells):
+        if np.sum(sts_acs[ac]) > 1:
+            # arrays for each state stored by ac cases
+            for sts in [sxs,sxys,z_sts]:
+                txs_ac_sts[ac].append(sum_is(sts,ac,arrays=True))
+    # return only y ac sums
+    if return_all:
+        y_acs = np.delete(sts_acs,np.arange(1,sts_acs.shape[1],2),axis=1)
+        return sxs,sxys,z_sts,txs_ac_sts,y_acs
+    return sxs,sxys
+
+# exts: expanded transitions (only 1 for now)
+# txs: non expenanded txs to discard decaying patterns
+def analyze_expanded_block_sxys(block_sxys=[],etxs=1,txs=5,ct=True,print_all=True):
+    print()
+    block = mk_gol_pattern('block')
+    # from scratch
+    if len(block_sxys)==0:
+        bdoms = mk_sx_domains('block')
+        # one or many expanded transitions
+        sxs,sxys = get_sxys_from_sx(block,bdoms,txs=etxs,mk_zero=True,expanded=True)
+    else:
+        # for continuing cases
+        nme = np.sqrt(block_sxys.shape[1]).astype(int)
+        sx0 = block_sxys[0].reshape(nme,nme)
+        sxs,sxys = get_sxys_from_sx(sx0,block_sxys,txs=etxs,mk_zero=True,expanded=True)
+    nme = np.sqrt(sxys.shape[1]).astype(int)
+    sxys_sums = [sum_is(sxys,i).shape[0] for i in range(nme*nme+1)]
+    # print initial data
+    print()
+    for ei,es in enumerate(sxys_sums):
+        if es>0:
+            print('ac:{}, sxys:{}'.format(ei,es))
+    # continuity
+    if ct:
+        sxys,ct_ids = apply_ct(sxys,block)
+        sxs = sxs[ct_ids]
+        sxys_sums = [sum_is(sxys,i).shape[0] for i in range(nme*nme+1)]
+        print('\nsxs/sxys after ct: {}\n'.format(ct_ids.shape[0]))
+        for ei,es in enumerate(sxys_sums):
+            if es>0:
+                print('ac:{}, sxys:{}'.format(ei,es))
+    # transitions to discard decaying patterns (sy -> zx_n)
+    sxs,sxys,syzs,ac_sts,y_acs = mk_block_decay(sxs,sxys,txs=txs,print_all=print_all)
+    return sxs,sxys,syzs,ac_sts,y_acs
 
     # # translation and rotations (symmetries)
     # # 1) classify by number of active and shared sx-sy cells
