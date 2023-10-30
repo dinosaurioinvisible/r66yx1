@@ -1,5 +1,6 @@
 
 import numpy as np
+from tqdm import tqdm
 
 # int > binary array
 def int2array(ni,arr_len,mn=1):
@@ -47,6 +48,14 @@ def expand_domain(sx,layers=1,rows=(0,0),cols=(0,0)):
     if np.sum([rows,cols])>0:
         return np.pad(sx,(rows,cols),mode='constant')
     return np.pad(sx,layers,mode='constant')
+# expand one layer for multiple domains
+def expand_multiple_domains(dxs,sx=()):
+    ms,ns = sx.shape if len(sx)>0 else [np.sqrt(dxs.shape[1]).astype(int)]*2
+    e_dxs = np.zeros((dxs.shape[0],(ms+2)*(ns+2)))
+    sx_ids = expand_domain(np.ones((ms,ns))).flatten().nonzero()[0]
+    e_dxs[:,sx_ids] = dxs
+    return e_dxs
+
 # adjust domains to bigger, for each dimension
 def adjust_domains(x1,x2):
     # n rows/cols to fill     
@@ -70,7 +79,7 @@ def adjust_domains(x1,x2):
     return x1,x2
 
 # make canonical gol patterns (sx,e=0) from word inputs
-def mk_gol_pattern(px,):
+def mk_gol_pattern(px):
     if px == 'block':
         dx = np.zeros((4,4))
         dx[1:-1,1:-1] = 1
@@ -100,38 +109,48 @@ def mk_gol_pattern(px,):
 # dxs: matrix with arrays of gol sts
 # sx form for reshaping
 def mk_dxs_tensor(dxs,sx):
+    if dxs.shape[1] != sx.flatten().shape[0]:
+        sx = expand_domain(sx)
     sxi,sxj = sx.shape
     tgol = np.zeros((dxs.shape[0],sxi,sxj))
     for di,dx in enumerate(dxs):
         tgol[di] = dx.reshape(sxi,sxj)
     return tgol
 
-# TODO: domains larger than 4x4
-# TODO: domains crossed by zeros (ex: proto-bloxk 14, id=218)
-# remove isolated cells that will become zero (<2)
-def rm_env(dx):
-    # try to split by rows and columns = 0
-    i0 = sum_is(dx,0)
-    j0 = sum_is(dx,0,axis=0)
-    # if region is < 2 mk 0
-    if len(i0) == 1:
-        if np.sum(dx[:i0[0]+1,:]) < 3:
-            dx[:i0[0]+1,:] = 0
-        if np.sum(dx[i0[0]+1:,:]) < 3:
-            dx[i0[0]+1:,:] = 0
-    if len(j0) == 1:
-        if np.sum(dx[:,:j0[0]+1]) < 3:
-            dx[:,:j0[0]+1] = 0
-        if np.sum(dx[:,j0[0]+1:]) < 3:
-            dx[:,j0[0]+1:] = 0
-    if len(i0)==1 or len(j0)==1:
-        return dx
-    # do something for this cases
-    if len(i0)==0 and len(j0)==0:
-        pass
-    # do something for larger domains
-    return dx
-    
+# split using rows/cols=0
+def rm_env(dx,nc=2):
+    dom = dx*1
+    # first/last row/col dont change results
+    r0 = sum_is(dom[1:-1],0)+1
+    c0 = sum_is(dom[:,1:-1],0,axis=0)+1
+    i0,j0 = 0,0
+    # basically split by rows/cols=0
+    if np.sum(r0)>0:
+        for i in list(r0)+[dom.shape[0]]:
+            if np.sum(dom[i0:i]) <= nc:
+                dom[i0:i] = 0
+                i0 = i
+            else:
+                c0 = sum_is(dom[i0:i],0,axis=0)
+                for j in list(c0)+[dom.shape[0]]:
+                    if np.sum(dom[i0:i,j0:j]) <= nc:
+                        dom[i0:i,j0:j] = 0
+                    j0 = j
+            i0,j0 = i,0
+        return dom
+    for j in list(c0)+[dom.shape[1]]:
+        if np.sum(dom[:,j0:j]) <= nc:
+            dom[:,j0:j] = 0
+            j0 = j
+        else:
+            r0 = sum_is(dom[:,j0:j],0)
+            for i in list(r0)+[dom.shape[1]]:
+                if np.sum(dom[i0:i,j0:j]) <= nc:
+                    dom[i0:i,j0:j] = 0
+                    i0 = i
+        j0,i0 = j,0
+    return dom
+
 # expand domain for rolling correctly
 # basically they should mantain the dist among act cells
 def check_translation(x1,x2r,x2t):
@@ -185,26 +204,24 @@ def multi_gol_step(sx_domains,sx,mk_zero=True,expanded=False):
 # check for patterns 
 # domx: gol domain/lattice in matrix form
 # e0: empty environment
-def is_block(domx,e0=True):
-    if np.sum(domx) >= 4:
-        n,m = domx.shape
+def is_block(domx,e0=False):
+    # no more than block + m0 + full env
+    # min m0 = 2 sides = 5 cells
+    n,m = domx.shape
+    if 4 <= np.sum(domx) <= n*m-5:
         for i in range(n):
             for j in range(m):
                 if np.sum(domx[i:i+2,j:j+2]) == 4:
-                    if e0:
-                        if np.sum(domx) == 4:
-                            return True
-                    else:
+                    if np.sum(domx) == 4:
+                        return True
+                    if not e0:
                         if np.sum(domx[max(0,i-1):i+3,max(0,j-1):j+3]) == 4:
                             return True
     return False
 # same for next timestep
-def is_block_next(domx,e0=True):
-    n,m = domx.shape
+def is_block_next(domx,e0=True,expanded=True):
     # block may be outside of current domain
-    dom = np.zeros((n+2,m+2))
-    dom[1:-1,1:-1] = domx
-    domy = gol_step(dom)
+    domy = gol_step(domx,expanded=expanded)
     return is_block(domy,e0)
 # blinker
 def is_blinker(domx):
@@ -249,18 +266,23 @@ def mk_sx_domains(sx):
 # helper fx for continuity
 # dxs: matrix of gol domain sts arrays 
 # psx: primary pattern/structure determining ct
-def apply_ct(dxs,psx,ids=False):
-    ct_ids = sum_nonzero(dxs*psx.flatten())
-    if ids:
-        return dxs[ct_ids],ct_ids
-    return dxs[ct_ids]
+def apply_ct(dxs,psx,ct_ids=False,non_ct_ids=False):
+    if dxs.shape != psx.shape:
+        psx = psx.flatten()
+    ids = sum_nonzero(dxs*psx)
+    if ct_ids:
+        return dxs[ids],ids
+    if non_ct_ids:
+        zero_ids = sum_is(dxs*psx,0)
+        return dxs[ids],zero_ids
+    return dxs[ids]
 
 # get all sx: sx -> sy
 # sy: any specific gol pattern domain (sx,ex)
 # requires matrix/lattice input
 # sy_px: sy expected pattern ('block','blinker',etc)
 # dxs: specific (smaller) domain
-def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True,print_data=True):
+def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,expanded=True,ct=True,print_data=True):
     # array for expected sy
     n,m = sy.shape
     if len(dxs)==0:
@@ -268,13 +290,15 @@ def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True,print_data=True):
         dxs = mk_binary_domains(n*m)
     # analyze domains transitions
     sxs = []
-    for dx in dxs:
+    for dx in tqdm(dxs):
         if sy_px == 'block':
-            if is_block_next(dx.reshape(n,m),e0):
+            if is_block_next(dx.reshape(n,m),e0=e0,expanded=expanded):
                 sxs.append(dx)
     sxs = np.array(sxs)
+    print('\nproto domains: {}/{}'.format(sxs.shape[0],dxs.shape[0]))
     if ct:
         sxs = apply_ct(sxs,sy)
+        print('\nafter CT: {}'.format(sxs.shape[0]))
     if print_data:
         print_ac_cases(sxs,title='proto domains:')
     return sxs
@@ -286,7 +310,7 @@ def get_sxs_from_sy(sy,sy_px,dxs=[],e0=True,ct=True,print_data=True):
 # dxs: tensor for all domains for sx
 # decay txs: number of sy->z1->z2->...->zn transitions
 # mk_zero: auto make zero domains < 3
-def get_sxys_from_sx(dxs,sx,mk_zero=True,expanded=True,decay_txs=3,expanded_decay=False,ct=True,print_data=True):
+def get_sxys_from_sx(dxs,sx,mk_zero=True,expanded=True,ct=True,decay_txs=3,expanded_decay=False,decay_ct=True,print_data=True):
     # gol step for every array
     sxys = multi_gol_step(dxs,sx,mk_zero=mk_zero,expanded=expanded)
     nz_ids = sum_nonzero(sxys)
@@ -296,42 +320,38 @@ def get_sxys_from_sx(dxs,sx,mk_zero=True,expanded=True,decay_txs=3,expanded_deca
     dxs = dxs[nz_ids]
     sx = expand_domain(sx) if expanded else sx
     if ct:
-        sxys,ct_ids = apply_ct(sxys,sx,ids=True)
+        sxys,ct_ids = apply_ct(sxys,sx,ct_ids=True)
         dxs = dxs[ct_ids]
         if print_data:
-            print('\nnon zero after CT: {}/{}'.format(sum_nonzero(sxys).shape[0],sum_nonzero(dxs).shape[0]))
+            print('\nnon zero after CT: {}'.format(sum_nonzero(sxys).shape[0]))
     # decay txs for every array
     if decay_txs>0:
         # y -> z1 -> z2 ->...-> zn decay txs (often 2 or 3) (includes ct)
-        sxys,z_ids = mk_dxs_decay(sxys,sx,decay_txs=decay_txs,ct=ct,expanded=expanded_decay,dxs_only=True,print_data=print_data)
+        sxys,z_ids = mk_dxs_decay(sxys,sx,decay_txs=decay_txs,expanded=expanded_decay,ct=decay_ct,print_data=print_data)
         dxs = dxs[z_ids]
     return dxs,sxys
 
 # check & discard domains transition into 0
 # dxs: matrix of arrays for gol domains
-# sx: for reshaping gol arrays for sx -> sy txs (assume squared if none)
-# expanded: if True, check decay in successive expanded domains (a bit less likely)
-# ct requires ct_sx: original sx in e0 defining possible shared acs
-def mk_dxs_decay(dxs,sx,decay_txs=1,ct=False,expanded=False,dxs_only=False,print_data=True):
-    dzs = dxs*1
-    # ac_evol = get_ac_cases(dxs,rh=dxs.shape[1])
-    # n transitions into future
+# sx: for reshaping gol arrays for sx -> sy txs
+def mk_dxs_decay(dxs,sx,decay_txs=2,expanded=False,ct=True,z_arrays=False,print_data=False):
+    dzs,psx = dxs*1,dxs*1
+    # y -> z transition into future 
     for txi in range(decay_txs):
         dzs = multi_gol_step(dzs,sx,mk_zero=True,expanded=expanded)
-        sx = expand_domain(sx) if expanded else sx
-        if ct: # continuity criterium
-            dzs = apply_ct(dzs,psx=sx)
-        # ac_evol = np.vstack((ac_evol,get_ac_cases(dzs,rh=dxs.shape[1])))
+        if ct:
+            psx = psx if not expanded else expand_multiple_domains(psx,sx)
+            nz,non_ct_ids = apply_ct(dzs,psx,non_ct_ids=True)
+            dzs[non_ct_ids] = 0
+            psx = dzs*1
         if print_data:
             title = 'non zero dzs in tx{}: {}'.format(txi+1,sum_nonzero(dzs).shape[0])
-            print_ac_cases(dzs,title=title)
-    z_ids = sum_nonzero(dzs)
-    #if print_data:
-        #print_ac_cases(dxs[z_ids],title='fwd domains:')
-        # print evol
-    if dxs_only:
-        return dxs[z_ids],z_ids
-    return dxs[z_ids],dzs[z_ids],z_ids#,ac_evol
+            print_ac_cases(sum_nonzero(dzs,arrays=True),title=title)
+    # apply ids only at the end to avoid mismatches
+    yz_ids = sum_nonzero(dzs)
+    if z_arrays:
+        return dxs[yz_ids],dzs[yz_ids],yz_ids
+    return dxs[yz_ids],yz_ids
 
 # gets number of cases of n active cells from domain
 def get_ac_cases(dxs,ac=0,rl=0,rh=0,arrays=False,ids=False,nonzero=False):
@@ -408,7 +428,7 @@ def mk_incremental_symsets(sxs,sx,sms_cases,pbs_ids,print_data=False):
                     pbij = np.where(sms_cases[:,1]==pbj)[0]
                     checked_pbs.append(pbj)
                     sms_cases[pbij,1] = pbi
-    sms_cases = np.array(sorted(list(sms_cases),key=lambda x:(x[1],x[0]))).reshape(sxs.shape[0],3)
+    sms_cases = np.array(sorted(list(sms_cases),key=lambda x:(x[0],x[1]))).reshape(sxs.shape[0],3)
     pbs_ids = np.array(sorted(list(set(sms_cases[:,1]))))
     if print_data:
         print_ac_cases(sxs[pbs_ids],title='incremental symsets:')
@@ -435,23 +455,16 @@ def are_symmetrical(x1,x2,nrolls=0):
         # translations
         if check_translation(x1,x2r,x2rt):
             return True
-        # for rli in range(1,nrolls):
-        #     if np.array_equal(x1,np.roll(x2r,rli)):
-        #         return True
-        #     if np.array_equal(x1,np.roll(x2rt,rli)):
-        #         return True
     return False
 
-# TODO: only working for 4x4
 # check for cases where sx appears in a different env
 # for the basic cases: sx,e0 <-> sx,ex
 # x1: the basic/known instance, to compare against
 def are_sx_instances(dx1,dx2):
-    x1 = dx1*1
-    x2 = dx2*1
-    for _ in range(3):
-        if np.sum(x2) > np.sum(x1):
-            x2 = rm_env(x2)
+    x1,x2 = dx1*1,dx2*1
+    x2 = rm_env(x2)
+    if np.sum(x2) > np.sum(x1):
+        x2 = rm_env(x2)
     if np.sum(x1) == np.sum(x2):
         return are_symmetrical(x1,x2)
     return False
