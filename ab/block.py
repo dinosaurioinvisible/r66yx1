@@ -11,9 +11,9 @@ from auxs import *
 # pb_domains,pb_symsets = get_sxs_from_sy(block)
 # pb_symsets: list of indexes for all instances classified as symsets
 # cause info
-def mk_pb_domains(block=[],e0=False,ct=True,print_data=True):
+def mk_pb_domains(block=[],e0=False,ct=True,xpn=True,print_data=True):
     block = block if len(block)>0 else mk_gol_pattern('block')
-    pb_domains = get_sxs_from_sy(block,'block',e0=e0,ct=ct,print_data=print_data)
+    pb_domains = get_sxs_from_sy(block,'block',e0=e0,ct=ct,xpn=xpn,print_data=print_data)
     return pb_domains 
 
 # series of recursive transitions from (block,ex) -> sy
@@ -27,13 +27,12 @@ def mk_fb_domains(block=[],expanded=True,mk_zero=True,decay_txs=3,expanded_decay
 # generalizes symmetries among domains
 # 1) rotation, translation & transposition
 # 2) incremental analysis
-def mk_block_symsets(dxs,print_data=True,return_all=False):
+def mk_block_symsets(dxs,print_data=True,tensor=False):
     block = mk_gol_pattern('block')
-    sms1,sms_ids1 = mk_symsets(dxs,block,incremental=False,print_data=print_data)
-    sms2,sms_ids2 = mk_incremental_symsets(dxs,block,sms1,sms_ids1,print_data=print_data)
-    if return_all: # for analysis
-        return sms1,sms_ids1,dxs[sms_ids1],sms2,sms_ids2,dxs[sms_ids2]
-    return sms2,dxs[sms_ids2]
+    sms,sms_ids = mk_symsets(dxs,block,incremental=True,print_data=print_data)
+    if tensor:
+        return mk_dxs_tensor(dxs[sms_ids],block)
+    return sms,dxs[sms_ids]
 
 # the idea is that most of higher ac cases are variants of basic pbs
 # for basic proto-blocks: rl=3, rh=4
