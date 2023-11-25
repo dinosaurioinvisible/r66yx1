@@ -20,15 +20,30 @@ def array2int(arr):
 # fxs that return ids of the arrays of a matrix that:
 # sum = x; higher than x; lower than x; nonzero
 def sum_is(matrix,x,axis=1,arrays=False):
+    if len(matrix.shape) == 3:
+        if arrays:
+            return matrix[np.where(np.sum(matrix,axis=(1,2))==x)[0]]
+        return np.where(np.sum(matrix,axis=(1,2))==x)[0]
     if arrays:
         return matrix[np.where(np.sum(matrix,axis=axis)==x)[0]]
     return np.where(np.sum(matrix,axis=axis)==x)[0]
 def sum_in_range(matrix,rl,rh,axis=1,arrays=False):
-    ids = np.where(np.logical_and(np.sum(matrix,axis=axis)>=rl,np.sum(matrix,axis=axis)<=rh))[0]
+    if len(matrix.shape)==3:
+        ids = np.array([])
+        for i in range(rl,rh):
+            ids = np.concatenate((ids,sum_is(matrix,i)))
+        if arrays:
+            return matrix[ids.astype(int)]
+        return ids
+    ids = np.where(np.logical_and(np.sum(matrix,axis=axis)>=rl,np.sum(matrix,axis=axis)<rh))[0]
     if arrays:
         return matrix[ids]
     return ids
 def sum_higher(matrix,x,axis=1,arrays=False):
+    if len(matrix.shape)==3:
+        if arrays:
+            return matrix[np.where(np.sum(matrix,axis=(1,2))>x)[0]]
+        return np.where(np.sum(matrix,axis=(1,2))>x)[0]
     if arrays:
         return matrix[np.where(np.sum(matrix,axis=axis)>x)[0]]
     return np.where(np.sum(matrix,axis=axis)>x)[0]
@@ -37,6 +52,10 @@ def sum_lower(matrix,x,axis=1,arrays=False):
         return matrix[np.where(np.sum(matrix,axis=axis)<x)[0]]
     return np.where(np.sum(matrix,axis=axis)<x)[0]
 def sum_nonzero(matrix,axis=1,arrays=False):
+    if len(matrix.shape) == 3:
+        if arrays:
+            return matrix[np.sum(matrix,axis=(1,2)).nonzero()[0]]
+        return np.sum(matrix,axis=(1,2)).nonzero()[0]
     if arrays:
         return matrix[np.sum(matrix,axis=axis).nonzero()[0]]
     return np.sum(matrix,axis=axis).nonzero()[0]
@@ -57,6 +76,52 @@ def expand_multiple_domains(dxs,sx=()):
     sx_ids = expand_domain(np.ones((ms,ns))).flatten().nonzero()[0]
     e_dxs[:,sx_ids] = dxs
     return e_dxs
+
+def get_diagonals(dx,min_len=1,sums=False,seps=False):
+    if seps:
+        diagonals_lr = []
+        diagonals_rl = []
+    diagonals = []
+    for di in range(-dx.shape[0]+1,dx.shape[1]):
+        diag_lr = dx.diagonal(di)
+        diag_rl = np.fliplr(dx).diagonal(di)
+        if len(diag_lr) >= min_len:
+            if sums:
+                if seps:
+                    diagonals_lr.append(np.sum(diag_lr))
+                    diagonals_rl.append(np.sum(diag_rl))
+                else:
+                    diagonals.extend([np.sum(diag_lr),np.sum(diag_rl)])
+            else:
+                if seps:
+                    diagonals_lr.append(diag_lr)
+                    diagonals_rl.append(diag_rl)
+                else:
+                    diagonals.extend([diag_lr,diag_rl])
+    if seps:
+        return diagonals_lr,diagonals_rl
+    return diagonals
+
+def reduce_to_min_sqr(xa,xb):
+    x1,x2 = xa*1,xb*1
+    x1 = expand_domain(rm_zero_layers(x1))
+    x2 = expand_domain(rm_zero_layers(x2))
+    if x1.shape == x2.shape and x1.shape[0] == x1.shape[1]:
+        return xa,xb
+    rx,cx = np.array(x2.shape) - np.array(x1.shape)
+    if rx > 0:
+        x1 = np.pad(x1,((0,rx),(0,0)))
+    elif rx < 0:
+        x2 = np.pad(x2,((0,abs(rx)),(0,0)))
+    if cx > 0:
+        x1 = np.pad(x1,((0,0),(0,cx)))
+    elif cx < 0:
+        x2 = np.pad(x2,((0,0),(0,abs(cx))))
+    if x1.shape[0] == x1.shape[1]:
+        return x1,x2
+    if x1.shape[0]-x1.shape[1] > 0:
+        return np.pad(x1,((0,0),(0,x1.shape[0]-x1.shape[1]))), np.pad(x2,((0,0),(0,x1.shape[0]-x1.shape[1])))
+    return np.pad(x1,((0,x1.shape[1]-x1.shape[0]),(0,0))), np.pad(x2,((0,x1.shape[1]-x1.shape[0]),(0,0)))
 
 # adjust domains to bigger, for each dimension
 def adjust_domains(x1,x2):
@@ -134,6 +199,9 @@ def mk_dxs_tensor(dxs,sx):
     for di,dx in enumerate(dxs):
         tgol[di] = dx.reshape(sxi,sxj)
     return tgol
+
+def sort_by_sum(dxs):
+    return np.array(sorted(list(dxs),key=lambda x:np.sum(x)))
 
 # split using rows/cols=0
 def rm_env(dx,nc=2):
@@ -234,8 +302,20 @@ def multi_gol_step(sx_domains,sx,mk_zero=True,expanded=False):
         if np.sum(dx)>2:
             sxys[di] = gol_step(dx.reshape(sx.shape),expanded=expanded).flatten()
     if mk_zero:
+        # remove decaying domains (<3)
         sxys[sum_lower(sxys,3)] = 0
     return sxys
+
+# remove decaying activations within domain (not environment of sx)
+def rm_non_env(dxs,sx):
+    # if extended dx
+    if sx.flatten().shape[0] < dxs.shape[1]:
+        sx = expand_domain(sx)
+    dxs_ne = dxs*1
+    for di,dx in enumerate(dxs):
+        gx = gol_step(dx.reshape(sx.shape))
+        dxs_ne[di] = ((mk_moore_nb(gx)+gx)*dx.reshape(sx.shape)).flatten()
+    return dxs_ne
 
 # make moore neighborhood
 # sxr: reduced sx (the min rectangle containing all act. cells)
@@ -322,6 +402,17 @@ def mk_sx_domains(sx,membrane=False):
     # just not to call it apart
     if membrane:
         return mk_sx_membrane_domains(sx)
+    # for unnamed patterns/domains
+    if type(sx) == np.ndarray:
+        sx = expand_domain(rm_zero_layers(sx)) # centering
+        sx_env = mk_moore_nb(sx)
+        binary_dxs = mk_binary_domains(np.sum(sx_env).astype(int))
+        non_env_ids = np.where(sx_env.flatten()==0)[0]
+        non_env_ids -= np.arange(non_env_ids.shape[0])
+        binary_dxs = np.insert(binary_dxs,non_env_ids,1,axis=1)
+        non_ids = np.where((sx+sx_env).flatten()==0)
+        binary_dxs[:,non_ids] = 0
+        return binary_dxs
     # number of env cells
     # pblock1: 3 active cells in the same region of the block
     if sx == 'block' or sx == 'pb0':
@@ -507,6 +598,7 @@ def mk_symsets(sxs,sx,incremental=False,print_data=True,return_data=False):
     n,m = sx.shape
     ncells = n*m
     # symsets cases: for each sx array: ac,symset canon/type id, id (easier later)
+    sxs = sort_by_sum(sxs)
     symset_cases = np.zeros((sxs.shape[0],3)).astype(int)
     # list of (ac,ids), if 1 make directly, omit all cases for ac=0
     for ac,id1 in [(ac,sum_is(sxs,ac)[0]) for ac in range(ncells) if sum_is(sxs,ac).shape[0]==1]:
@@ -605,17 +697,32 @@ def are_sx_instances(dx1,dx2):
     return False
 
 # check if some instance (sx) can be found in a domain (dx)
-def is_in_domain(sx,dx):
+def is_in_domain(sx,dx,zeros=False):
+    # reduced to the smallest squared shape possible (sqr for T)
+    sx,dx = reduce_to_min_sqr(sx,dx)
     m,n = dx.shape
+    # check in domain
     for ri in range(4):
         sxr = np.rot90(sx,ri)
         for t in range(m*n):
-            if np.sum(dx*np.roll(sxr,t))>0:
+            if zeros==True:
+                sxr = mk_moore_nb(sxr)+sxr
+                if dx.shape != sxr.shape:
+                    import pdb; pdb.set_trace()
+                if np.sum(dx*np.roll(sxr,t))==np.sum(sx):
+                    if are_symmetrical(sxr,dx*np.roll(sxr,t)):
+                        return True
+            elif not zeros and np.sum(dx*np.roll(sxr,t))>0:
                 if are_symmetrical(sxr,dx*np.roll(sxr,t)):
                     return True
         sxrt = np.ascontiguousarray(sxr.T)
         for t in range(m*n):
-            if np.sum(dx*np.roll(sxrt,t))>0:
+            if zeros==True:
+                sxrt = mk_moore_nb(sxrt)+sxrt
+                if np.sum(dx*np.roll(sxrt,t))==np.sum(sx):
+                    if are_symmetrical(sxrt,dx*np.roll(sxrt,t)):
+                        return True
+            elif not zeros and np.sum(dx*np.roll(sxrt,t))>0:
                 if are_symmetrical(sxrt,dx*np.roll(sxrt,t)):
                     return True
     return False
@@ -625,33 +732,122 @@ def rm_zero_layers(xdx):
     vs = np.sum(dx,axis=1).nonzero()[0]
     dx = dx[min(vs):max(vs)+1]
     hs = np.sum(dx,axis=0).nonzero()[0]
-    dx = dx[min(hs):max(hs)+1]
+    dx = dx[:,min(hs):max(hs)+1]
     return dx
 
 # set of symset domains not contained in any other
 # 'prime' proto structures
 # symset: tensor of gol domains
 def mk_minset(symset,print_data=True,return_data=False):
+    # sort increasingly by ac sum
+    symset = np.array(sorted(list(symset),key=lambda x:np.sum(x)))
     min_sxs_ids = []
     rep_sxs_ids = []
     min_rep_cases = []
-    for ei,sx in enumerate(symset):
+    # for ei,sx in enumerate(symset):
+    for ei in tqdm(range(symset.shape[0])):
+        sx = symset[ei]
         if ei not in rep_sxs_ids:
             min_sxs_ids.append(ei)
             for ey,sy in enumerate(symset[ei+1:]):
                 ej = ei+1+ey
-                # if ej not in rep_sxs_ids:
-                if True == True:
+                if return_data:
                     if is_in_domain(sx,sy):
                         rep_sxs_ids.append(ej)
                         min_rep_cases.append([np.sum(sx),ei,ej])
+                else:
+                    # in this case it doesn't matter if sx appears in many sy
+                    if ej not in rep_sxs_ids:
+                        if is_in_domain(sx,sy):
+                            rep_sxs_ids.append(ej)
     min_sxs_ids = np.array(min_sxs_ids)
     if print_data:
         print_ac_cases(symset[min_sxs_ids],title='minsets:')
     if return_data:
-        min_rep_cases = np.array(min_rep_cases)
-        return symset[min_sxs_ids],min_rep_cases,min_sxs_ids
+        return symset[min_sxs_ids],np.array(min_rep_cases),min_sxs_ids
     return symset[min_sxs_ids]
+
+# discard composed patterns
+# dxs = tensor of matrix domains
+def check_adjacency(dxs,print_data=True,arrays=True):
+    ids = []
+    for di,dx in enumerate(dxs):
+        adj_ct = True
+        dx = rm_zero_layers(dx)
+        ml = max(max(dx.shape)-min(dx.shape)+1,2)
+        dlr,drl = get_diagonals(dx,min_len=ml,sums=True,seps=True)
+        if np.sum(dx) != np.sum(rm_isol(dx)):
+            adj_ct = False
+        elif 0 in np.sum(dx,axis=1) or 0 in np.sum(dx,axis=0):
+            adj_ct = False
+        elif 0 in [dlr[i]+dlr[i+1] for i in range(len(dlr)-1)]:
+            adj_ct = False
+        elif 0 in [drl[i]+drl[i+1] for i in range(len(drl)-1)]:
+            adj_ct = False
+        if adj_ct:
+            ids.append(di)
+    if print_data:
+        print_ac_cases(dxs[np.array(ids)],title='after adjacency:')
+    if arrays:
+        return dxs[np.array(ids)]
+    return ids
+
+# remove basic patterns present in domains and check symmetries again
+# dxs: e=tensor of matrix shaped domains
+def check_basic_patterns(dxs):
+    # this is easier by hand
+    bp1 = expand_domain(np.ones((1,2)))
+    bp2 = expand_domain(np.array([1,0,0,1]).reshape(2,2))
+    ids = []
+    for bpi in [bp1,bp1.T,bp2,np.rot90(bp2,1)]:
+        for di in sum_higher(dxs,5):
+            dx = dxs[di]
+            for wi in range(dx.shape[0]-bpi.shape[0]+1):
+                for wj in range(dx.shape[1]-bpi.shape[1]+1):
+                    dw = dx[wi:wi+bpi.shape[0],wj:wj+bpi.shape[1]]
+                    #dwt = dx[wi:wi+bpi.shape[1],wj:wj+bpi.shape[0]]
+                    if np.array_equal(dw,bpi): #or np.array_equal(dwt,bpi.T):
+                        ids.append(di)
+    dxs[np.array(ids)] = 0
+    dxs = sum_nonzero(dxs,arrays=True)
+    ids = []
+    bxs = []
+    for bi in tqdm(sum_in_range(dxs,3,5).astype(int)):
+        bx = expand_domain(rm_zero_layers(dxs[bi]))
+        for ri in range(4):
+            br_in_bxs,brt_in_bxs,br_moore_in_bxs = False,False,False
+            br = np.rot90(bx,ri)
+            # hay 0,0 y 1,1, falta 0,1 y 1,0
+            bm = abs((mk_moore_nb(bx)+bx)-1)+bx
+            for bxi in bxs:
+                if np.array_equal(br,bxi):
+                    br_in_bxs = True
+                if np.array_equal(br.T,bxi):
+                    brt_in_bxs = True
+                if np.array_equal(bm,bxi):
+                    br_moore_in_bxs = True
+            if not br_in_bxs:
+                bxs.append(br)
+            if not brt_in_bxs:
+                bxs.append(br.T)
+            if not br_moore_in_bxs:
+                bxs.append(bm)
+    # import pdb; pdb.set_trace()
+    for bx in bxs:
+        print(bx)
+        for di in sum_higher(dxs,5):
+            dx = dxs[di]
+            for wi in range(dx.shape[0]-bx.shape[0]+1):
+                for wj in range(dx.shape[1]-bx.shape[1]+1):
+                    dw = dx[wi:wi+bx.shape[0],wj:wj+bx.shape[1]]
+                    if np.array_equal(dw,bx):
+                        ids.append(di)
+        print(len(ids))
+    import pdb; pdb.set_trace()
+    dxs[np.array(ids)] = 0
+    dxs = sum_nonzero(dxs,arrays=True)
+    return dxs
+
 
 # sxs1,sxs2: arrays for gol sts 
 # ss1,ss2: symsets from sxs1,sxs2
@@ -711,7 +907,10 @@ def make_dms(count):
 def save_as(file,name,ext=''):
     import pickle
     import os
-    fname = '{}.{}'.format(name,ext)
+    if not ext:
+        fname = name if '.' in name else '{}.{}'.format(name,'unk')
+    else:
+        fname = '{}.{}'.format(name,ext)
     while os.path.isfile(fname):
         i = 1
         name,ext = fname.split('.')

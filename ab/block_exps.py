@@ -199,39 +199,69 @@ def mk_proto_px(px_name,xpn=True,e0=False,ct=True,print_data=True):
 
 # Summary (expanded=True, e0=False):
 # protoblocks
-print('\n\nblock\n')
+# print('\n\nblock\n')
 block = mk_gol_pattern('block')
 # block = GolPx('block')
 # 1331/65536 -> ct: 1195 -> gensms: 145 -> sms: 110 -> min: 13
 # proto-pb0 (pacman)
-print('\n\npb0\n')
-pb0 = mk_gol_pattern('pb0')
+# print('\n\npb0\n')
+# pb0 = mk_gol_pattern('pb0')
 # pb0 = GolPx('pb0')
 # 2864/65536 -> ct: 2712 -> gensms: 358 -> sms: 316 -> min: 19
 # proto-pb1 (snake)
 # proto-pb2 (helix)
 
 # 10) check sx -> sy, sx = active cells + membrane
-pb0 = expand_domain(pb0)
-pb0_dxs = mk_sx_domains('pb0',membrane=True)
-pb0_dxs,sxys = get_sxys_from_sx(pb0_dxs,pb0)
-# mk basic symsets
-ids35 = sum_in_range(sxys,3,5)
-sms35,sms35_cases,sms35_ids = mk_symsets(sxys[ids35],pb0,incremental=True,return_data=True)
-# save symsets only (23)
-sxys[ids35] = 0
-sxys[ids35[sms35_ids]] = sms35.reshape(sms35.shape[0],sms35.shape[1]*sms35.shape[2])
-# do 6 (212)
-ids6 = sum_is(sxys,6)
-sms6,sms6_cases,sms6_ids = mk_symsets(sxys[ids6],pb0,incremental=False,return_data=True)
-sxys[ids6] = 0
-sxys[ids6[sms6_ids]] = sms6.reshape(sms6.shape[0],sms6.shape[1]*sms6.shape[2])
-# apply minsets
+if False==True:
+    pb0 = expand_domain(pb0)
+    pb0_dxs = mk_sx_domains('pb0',membrane=True)
+    pb0_dxs,sxys = get_sxys_from_sx(pb0_dxs,pb0)
+    # mk basic symsets
+    ids35 = sum_in_range(sxys,3,5)
+    sms35,sms35_cases,sms35_ids = mk_symsets(sxys[ids35],pb0,incremental=True,return_data=True)
+    # save symsets only (23)
+    sxys[ids35] = 0
+    sxys[ids35[sms35_ids]] = sms35.reshape(sms35.shape[0],sms35.shape[1]*sms35.shape[2])
+    # do 6 (212)
+    ids6 = sum_is(sxys,6)
+    sms6,sms6_cases,sms6_ids = mk_symsets(sxys[ids6],pb0,incremental=False,return_data=True)
+    sxys[ids6] = 0
+    sxys[ids6[sms6_ids]] = sms6.reshape(sms6.shape[0],sms6.shape[1]*sms6.shape[2])
+    # apply minsets
 
+# minimal proto blocks
+# e0 = False, ct = True, symsets, minsets + adjacencies
+if run_exps:
+    minset_pbs = load_data(filename='proto-block_minset.gol')
+    pbs = check_adjacency(minset_pbs,arrays=True)
+    save_as(pbs,'proto-block_pbs',ext='gol')
 
+# forward proto blocks
+if run_exps:
+    pbs = load_data(filename='proto-block_pbs.gol')
+    pb0 = pbs[0]
+    pb0_dxs = mk_sx_domains(pbs[0])
+    pb0_dxs,pb0_sxys = get_sxys_from_sx(pb0_dxs,pb0,decay_txs=1)
+    # nonzero: 4088/4096, after CT: 3519, after decay=1: 2974 
+    pb0_sxys = rm_non_env(pb0_sxys,pb0)
+    # this filter doesn't change the total amount, but changes the ca distribution
+    # pb0_sms,pb0_sms_cases,pb0_sms_ids = mk_symsets(pb0_sxys,pb0,incremental=True,return_data=True)
+    pb0_sms = mk_symsets(pb0_sxys,pb0,incremental=True)
+    # general symsets: 499, incremental symsets: 413
+    pb0_adj = check_adjacency(pb0_sms)
+    # after adjacency (discard discontinuous compositions): 264
+    pb0_ftb = check_basic_patterns(pb0_adj)
+    # after filtering out basic patterns, present in higher order domains: 
+    # pb0_mms = mk_minset(pb0_sms)
+    # basic/minimal symsets (not contained by others): 33
+    # save_as(pb0_mms,'fwd_pb0.gol')
 
-
-
-
+pb0_adj = load_data(filename='pb0_fwd_adj.gol')
+pb0_ftb = check_basic_patterns(pb0_adj)
+# pb0_sms = load_data(filename='pb0_fwd_sms.gol')
+# pb0_adj = check_adjacency(pb0_sms)
+# pb0_mms = mk_minset(pb0_adj)
+# pb0_mms = mk_minset(pb0_sms)
+# pb0_fwd = check_adjacency(pb0_mms)
 
 
