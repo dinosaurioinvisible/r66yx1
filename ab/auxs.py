@@ -385,6 +385,7 @@ def is_blinker(domx):
 
 # a tensor for all binary combinations
 def mk_binary_domains(n_cells):
+    n_cells = n_cells if type(n_cells)==int else int(n_cells)
     doms = np.zeros((2**n_cells,n_cells)).astype(int)
     for i in range(n_cells):
         f = 2**i
@@ -794,58 +795,57 @@ def check_adjacency(dxs,print_data=True,arrays=True):
 
 # remove basic patterns present in domains and check symmetries again
 # dxs: e=tensor of matrix shaped domains
-def check_basic_patterns(dxs):
+# dx_div: to delimit basic patterns (inclusive) range and dx of search (higher than)
+def check_basic_patterns(dxs,dx_div=4,print_data=True):
     # this is easier by hand
     bp1 = expand_domain(np.ones((1,2)))
     bp2 = expand_domain(np.array([1,0,0,1]).reshape(2,2))
     ids = []
     for bpi in [bp1,bp1.T,bp2,np.rot90(bp2,1)]:
-        for di in sum_higher(dxs,5):
-            dx = dxs[di]
+        for di in sum_higher(dxs,dx_div):
+            dx = expand_domain(dxs[di])
             for wi in range(dx.shape[0]-bpi.shape[0]+1):
                 for wj in range(dx.shape[1]-bpi.shape[1]+1):
                     dw = dx[wi:wi+bpi.shape[0],wj:wj+bpi.shape[1]]
-                    #dwt = dx[wi:wi+bpi.shape[1],wj:wj+bpi.shape[0]]
-                    if np.array_equal(dw,bpi): #or np.array_equal(dwt,bpi.T):
+                    if np.array_equal(dw,bpi):
                         ids.append(di)
     dxs[np.array(ids)] = 0
     dxs = sum_nonzero(dxs,arrays=True)
-    ids = []
-    bxs = []
-    for bi in tqdm(sum_in_range(dxs,3,5).astype(int)):
+    ids,bxs = [],[]
+    # translation, transopsition, rotation, different non moore envs
+    for bi in tqdm(sum_in_range(dxs,3,dx_div+1).astype(int)):
         bx = expand_domain(rm_zero_layers(dxs[bi]))
         for ri in range(4):
-            br_in_bxs,brt_in_bxs,br_moore_in_bxs = False,False,False
             br = np.rot90(bx,ri)
-            # hay 0,0 y 1,1, falta 0,1 y 1,0
-            bm = abs((mk_moore_nb(bx)+bx)-1)+bx
-            for bxi in bxs:
-                if np.array_equal(br,bxi):
-                    br_in_bxs = True
-                if np.array_equal(br.T,bxi):
-                    brt_in_bxs = True
-                if np.array_equal(bm,bxi):
-                    br_moore_in_bxs = True
-            if not br_in_bxs:
-                bxs.append(br)
-            if not brt_in_bxs:
-                bxs.append(br.T)
-            if not br_moore_in_bxs:
-                bxs.append(bm)
-    # import pdb; pdb.set_trace()
-    for bx in bxs:
-        print(bx)
-        for di in sum_higher(dxs,5):
-            dx = dxs[di]
+            bms = []
+            bmx = abs((mk_moore_nb(br)+br)-1)
+            non_moore_dxs = mk_binary_domains(np.sum(bmx).astype(int))
+            for mi in non_moore_dxs:
+                bm = bmx+br
+                bm[bmx.nonzero()] = mi
+                bms.append(bm)
+            for bh in [br,br.T]+bms:
+                bh_in = False
+                for bxi in bxs:
+                    if np.array_equal(bh,bxi):
+                        bh_in = True
+                        break
+                if not bh_in:
+                    bxs.append(bh)
+    # search in domains
+    for bi in tqdm(range(len(bxs))):
+        bx = bxs[bi]
+        for di in sum_higher(dxs,dx_div):
+            dx = expand_domain(dxs[di])
             for wi in range(dx.shape[0]-bx.shape[0]+1):
                 for wj in range(dx.shape[1]-bx.shape[1]+1):
                     dw = dx[wi:wi+bx.shape[0],wj:wj+bx.shape[1]]
                     if np.array_equal(dw,bx):
                         ids.append(di)
-        print(len(ids))
-    import pdb; pdb.set_trace()
     dxs[np.array(ids)] = 0
     dxs = sum_nonzero(dxs,arrays=True)
+    if print_data:
+        print_ac_cases(dxs)
     return dxs
 
 

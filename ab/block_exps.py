@@ -237,7 +237,7 @@ if run_exps:
     save_as(pbs,'proto-block_pbs',ext='gol')
 
 # forward proto blocks
-if run_exps:
+if not run_exps:
     pbs = load_data(filename='proto-block_pbs.gol')
     pb0 = pbs[0]
     pb0_dxs = mk_sx_domains(pbs[0])
@@ -245,13 +245,13 @@ if run_exps:
     # nonzero: 4088/4096, after CT: 3519, after decay=1: 2974 
     pb0_sxys = rm_non_env(pb0_sxys,pb0)
     # this filter doesn't change the total amount, but changes the ca distribution
-    # pb0_sms,pb0_sms_cases,pb0_sms_ids = mk_symsets(pb0_sxys,pb0,incremental=True,return_data=True)
     pb0_sms = mk_symsets(pb0_sxys,pb0,incremental=True)
     # general symsets: 499, incremental symsets: 413
     pb0_adj = check_adjacency(pb0_sms)
     # after adjacency (discard discontinuous compositions): 264
     pb0_ftb = check_basic_patterns(pb0_adj)
-    # after filtering out basic patterns, present in higher order domains: 
+    # after filtering out basic patterns: 205
+    
     # pb0_mms = mk_minset(pb0_sms)
     # basic/minimal symsets (not contained by others): 33
     # save_as(pb0_mms,'fwd_pb0.gol')
