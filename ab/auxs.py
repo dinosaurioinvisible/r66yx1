@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import os
+import pdb
 
 # int > binary array
 def int2array(ni,arr_len,mn=1):
@@ -203,6 +204,25 @@ def mk_dxs_tensor(dxs,sx):
 def sort_by_sum(dxs):
     return np.array(sorted(list(dxs),key=lambda x:np.sum(x)))
 
+def center_tensor_sxs(tensor_sxs):
+    for sxi,sx in enumerate(tensor_sxs):
+        tensor_sxs[sxi] = center_sx_in_dx(sx)
+    return tensor_sxs
+def center_sx_in_dx(sx):
+    if np.array_equal(sx,rm_zero_layers(sx)):
+        return sx
+    csx = expand_domain(rm_zero_layers(sx))
+    if csx.shape == sx.shape:
+        return csx
+    if sx.shape[0] < csx.shape[0]:
+        csx = csx[1:sx.shape[0]+1]
+    if sx.shape[1] < csx.shape[1]:
+        csx = csx[:,1:sx.shape[1]+1]
+    if csx.shape == sx.shape:
+        return csx
+    csx,sx = adjust_domains(csx,sx)
+    return csx
+
 # split using rows/cols=0
 def rm_env(dx,nc=2):
     dom = dx*1
@@ -250,7 +270,8 @@ def rm_isol(dx):
 
 # expand domain for rolling correctly
 # basically they should mantain the dist among act cells
-def check_translation(x1,x2r,x2t):
+def check_translation(x1,x2r,x2t):        
+    pb = reduce_to_min_sqr(pb)
     n,m = x1.shape
     b1 = np.zeros((n+2,m+2))
     b1[1:-1,1:-1] = x1
@@ -307,7 +328,9 @@ def multi_gol_step(sx_domains,sx,mk_zero=True,expanded=False):
     return sxys
 
 # remove decaying activations within domain (not environment of sx)
-def rm_non_env(dxs,sx):
+# dxs: domains in matrix form
+# sx: pattern being analyzed, but only for reshaping
+def rm_non_env(dxs,sx,print_data=True):
     # if extended dx
     if sx.flatten().shape[0] < dxs.shape[1]:
         sx = expand_domain(sx)
@@ -315,6 +338,8 @@ def rm_non_env(dxs,sx):
     for di,dx in enumerate(dxs):
         gx = gol_step(dx.reshape(sx.shape))
         dxs_ne[di] = ((mk_moore_nb(gx)+gx)*dx.reshape(sx.shape)).flatten()
+    if print_data:
+        print_ac_cases(dxs_ne,title='after removing decaying non-env cells:')
     return dxs_ne
 
 # make moore neighborhood
@@ -382,7 +407,66 @@ def is_blinker(domx):
         if 3 in vsum or 3 in hsum:
             return True
     return False
+# general function 
+def is_sx_in_next(sx,dx,mk_variants=False):
+    dy = gol_step(dx,expanded=True)
+    return is_sx_in_dx(sx,dy,mk_variants=mk_variants)
+def is_sx_in_dx(sx,dx,mk_variants=False):
+    # trivial check (sx[0] of variants has env=0)
+    if type(sx)==np.ndarray and np.sum(sx) > np.sum(dx):
+        return False
+    if type(sx)==list and np.sum(sx[0]) > np.sum(dx):
+        return False
+    # make variants if needed
+    vxs = mk_sx_variants(sx) if mk_variants==True else sx
+    # match using sliding window
+    for vx in vxs:
+        for wi in range(dx.shape[0]-vx.shape[0]+1):
+            for wj in range(dx.shape[1]-vx.shape[1]+1):
+                dw = dx[wi:wi+vx.shape[0],wj:wj+vx.shape[1]]
+                if np.array_equal(dw,vx):
+                    return True
+    return False
 
+# make all variants (rotation,transposition,non-env/moore nb)
+def mk_sx_variants(sx,mk_non_env=True):
+    vxs,sxs = [],[]
+    # rotations
+    for ri in range(4):
+        sxr = np.rot90(sx,ri)
+        # transpositions
+        sxrt = np.ascontiguousarray(sxr.T)
+        vxs.extend([sxr,sxrt])
+        # non env/moore different variants
+        if mk_non_env:
+            sxr_ne_base = abs((mk_moore_nb(sxr)+sxr)-1)
+            non_env_dxs = mk_binary_domains(np.sum(sxr_ne_base).astype(int))
+            for nei in non_env_dxs:
+                sxr_ne = sxr_ne_base+sxr
+                sxr_ne[sxr_ne_base.nonzero()] = nei
+                vxs.append(sxr_ne)
+            # same for transposed config
+            sxrt_ne_base = abs((mk_moore_nb(sxrt)+sxrt)-1)
+            non_env_dxs_sxrt = mk_binary_domains(np.sum(sxrt_ne_base).astype(int))
+            for nei in non_env_dxs_sxrt:
+                sxrt_ne = sxrt_ne_base+sxrt
+                sxrt_ne[sxrt_ne_base.nonzero()] = nei
+                vxs.append(sxrt_ne)
+    # reduce list        
+    for vxi in vxs:
+        vx_in = False
+        for sxi in sxs:
+            if np.array_equal(vxi,sxi):
+                vx_in = True
+                break
+        if not vx_in:
+            sxs.append(vxi)
+    return sxs
+        
+# same, but on top of the next, specific for proto-domains of sx
+def mk_proto_domains(sx):
+    n_cells = sx.flatten().shape[0]
+    return mk_binary_domains(n_cells)
 # a tensor for all binary combinations
 def mk_binary_domains(n_cells):
     n_cells = n_cells if type(n_cells)==int else int(n_cells)
@@ -406,6 +490,8 @@ def mk_sx_domains(sx,membrane=False):
     # for unnamed patterns/domains
     if type(sx) == np.ndarray:
         sx = expand_domain(rm_zero_layers(sx)) # centering
+        if sx.shape[0] + 2 == sx.shape[1]:
+            sx = np.pad(sx,((1,1),(0,0)))
         sx_env = mk_moore_nb(sx)
         binary_dxs = mk_binary_domains(np.sum(sx_env).astype(int))
         non_env_ids = np.where(sx_env.flatten()==0)[0]
@@ -444,11 +530,14 @@ def mk_sx_membrane_domains(sx):
 
 # helper fx for continuity
 # dxs: matrix of gol domain sts arrays 
-# psx: primary pattern/structure determining ct
-def apply_ct(dxs,psx,rm_zeros=True,ct_ids=False,non_ct_ids=False):
-    if dxs.shape != psx.shape:
-        psx = psx.flatten()
+# psx: primary pattern/structure determining ct with env=0
+def apply_ct(dxs,psx,rm_zeros=True,ct_ids=False,non_ct_ids=False,print_data=False):
+    if dxs.shape[1] > psx.flatten().shape[0]:
+        psx = expand_domain(psx)
+    psx = psx.flatten()
     ids = sum_nonzero(dxs*psx)
+    if print_data:
+        print_ac_cases(dxs[ids],title='after CT:')
     if ct_ids:
         if rm_zeros:
             return dxs[ids],ids
@@ -500,7 +589,37 @@ def get_sxs_from_sy(sy,sy_px,dxs=[],xpn=True,e0=False,ct=True,print_data=True,re
         dxs_ct_ids = dxs_ids[ct_ids]
         return dxs,dxs_ids,dxs_ct_ids
     return dxs
+# simpler version, to apply methods separatedly
+def mk_sxs_from_sy(sy,proto_dxs=[],ids=True,print_data=True):
+    if len(proto_dxs)==0:
+        proto_dxs = mk_proto_domains(sy)
+    sy_vxs = mk_sx_variants(sy)
+    for di in tqdm(range(proto_dxs.shape[0])):
+        dx = proto_dxs[di].reshape(sy.shape)
+        if not is_sx_in_next(sy_vxs,dx):
+            proto_dxs[di] = 0
+    sxs_ids = sum_nonzero(proto_dxs)
+    sxs = proto_dxs[sxs_ids]
+    if print_data:
+        print_ac_cases(sxs,title='valid proto domains (sxs->sy):')
+    if ids:
+        return sxs,sxs_ids
+    return sxs
 
+# same, but simpler, to apply things separatedly
+def mk_sxys_from_sx(sx,sx_dxs=[],ids=True,print_data=True):
+    if len(sx_dxs)==0:
+        sx_dxs = mk_sx_domains(sx)
+    sxys = multi_gol_step(sx_dxs,sx,expanded=True)
+    nz_ids = sum_higher(sxys,2)
+    # nz_ids = sum_nonzero(sxys)
+    sxys = sxys[nz_ids]
+    sx_dxs = sx_dxs[nz_ids]
+    if print_data:
+        print_ac_cases(sxys,title='non zero sxys fwd domains:')
+    if ids:
+        return sx_dxs,sxys,nz_ids
+    return sx_dxs,sxys
 # get sys from sx
 # in this case we can't assume what sy is valid or not
 # so we should look for self-sustaining resulting patterns
@@ -535,6 +654,16 @@ def get_sxys_from_sx(dxs,sx,mk_zero=True,expanded=True,ct=True,decay_txs=3,expan
         return sxys_all,sxys,nz_ids,ct_ids
     return dxs,sxys
 
+# same, but super simple
+def mk_yz_decay(sxys,sx,ids=False,print_data=True):
+    yz = multi_gol_step(sxys,sx,expanded=True)
+    yz_ids = sum_nonzero(yz)
+    sxys = sxys[yz_ids]
+    if print_data:
+        print_ac_cases(sxys,title='after yz decay:')
+    if ids:
+        return sxys,yz_ids
+    return sxys
 # check & discard domains transition into 0
 # dxs: matrix of arrays for gol domains
 # sx: for reshaping gol arrays for sx -> sy txs
@@ -590,6 +719,60 @@ def print_ac_cases(doms,rl=0,rh=0,nonzero=True,title=''):
     total = sum([nc for ac,nc in ids])
     print('total: {}'.format(total))
 
+# to make ids from a reduced domain, match ids from a previous larger domain
+# dx_ids: large (original) domain ids (array)
+# subset_ids: reduced domain ids (array)
+def mk_matching_ids(dx_ids,subset_ids):
+    if len(subset_ids.shape)==1:
+        return dx_ids[subset_ids]
+    if len(subset_ids.shape)==2:
+        if subset_ids.shape[0]>subset_ids.shape[1]:
+            for ci in range(subset_ids.shape[1]):
+                subset_ids[:,ci] = dx_ids[subset_ids[:,ci]]
+            return subset_ids
+        for ri in range(subset_ids.shape[0]):
+            subset_ids[ri] = dx_ids[subset_ids[ri]]
+        return subset_ids
+
+# same as below, but more exhaustive, with new algorithms
+def mk_dxs_symsets(dxs,sxc,ids=False,print_data=True):
+    if len(dxs.shape)==2:
+        dxs = mk_dxs_tensor(dxs,sxc)
+    sxc = expand_domain(sxc) if dxs[0].flatten().shape[0] > sxc.flatten().shape[0] else sxc
+    dxs = sort_by_sum(dxs)
+    # symset_cases: symset canon id, dx id 
+    symset_cases = np.ones((dxs.shape[0],2)).astype(int)*-1
+    print()
+    for di in tqdm(range(dxs.shape[0])):
+        # if already found as an instance of other sx
+        if di in symset_cases[:,1]:
+            pass
+        # take as sx canon
+        elif di not in symset_cases[:,0]:
+            symset_cases[di] = [di,di]
+            # reduce to min size and make variants
+            sx = dxs[di]
+            if rm_zero_layers(sx).shape != sx.shape:
+                sx = expand_domain(rm_zero_layers(sx))
+            non_env = False if np.sum(abs((mk_moore_nb(sx)+sx-1))) > 5 else True
+            sx_vxs = mk_sx_variants(sx,mk_non_env=non_env)
+            # look for repeated instances
+            for dj in range(dxs[di+1:].shape[0]):
+                dij = di+1+dj
+                dxj = expand_domain(dxs[dij])
+                # if not already checked before
+                if dij in symset_cases:
+                    pass
+                elif is_sx_in_dx(sx_vxs,dxj):
+                    symset_cases[dij] = [di,dij]
+    sms_ids = np.array(sorted(list(set(symset_cases[:,0]))))
+    sms_dxs = center_tensor_sxs(sort_by_sum(dxs[sms_ids]))
+    if print_data:
+        print_ac_cases(sms_dxs,title='symsets:')
+    if ids:
+        symset_cases = np.array(sorted(list(symset_cases),key=lambda x:(x[0],x[1])))
+        return sms_dxs,symset_cases
+    return sms_dxs
 # look for symmetries from less to more activ cells 
 # sxs: matrix of gol sts in array form
 # sx: sample/canon for reshaping
@@ -628,7 +811,6 @@ def mk_symsets(sxs,sx,incremental=False,print_data=True,return_data=False):
     if return_data: 
         return symset_tensor,symset_cases,symset_ids
     return symset_tensor
-
 # check for equivalent instances within symsets
 # basically, patterns with more acs should be different to make a new symset
 # e.g., if sx_ac=4 and sx_ac=6 are the same plus 2, then: (sx,ei) and (sx,ej)
@@ -736,6 +918,33 @@ def rm_zero_layers(xdx):
     dx = dx[:,min(hs):max(hs)+1]
     return dx
 
+# same but quicker
+def mk_minimal_sets(symsets,ids=False,print_data=True):
+    symsets = sort_by_sum(symsets)
+    minsets_cases = np.ones((symsets.shape[0],2)).astype(int)*-1
+    min_cases = []
+    print()
+    for si in tqdm(range(symsets.shape[0])):
+        if si in minsets_cases:
+            pass
+        else:
+            minsets_cases[si] = [si,si]
+            sym_sx = symsets[si]
+            for sj in range(symsets[si+1:].shape[0]):
+                sij = si+1+sj
+                sym_sy = symsets[sij]
+                if is_in_domain(sym_sx,sym_sy):
+                    minsets_cases[sij] = [si,sij]
+                    min_cases.append([si,sij])
+    min_ids = np.array(sorted(list(set(minsets_cases[:,0]))))
+    min_dxs = center_tensor_sxs(sort_by_sum(symsets[min_ids]))
+    if print_data:
+        print_ac_cases(min_dxs,title='minimal/source cases:')
+    if ids:
+        min_cases = np.array(sorted(min_cases,key=lambda x:(x[0],x[1])))
+        # minsets_cases = np.array(sorted(list(minsets_cases),key=lambda x:(x[0],x[1])))
+        return min_dxs,min_cases
+    return min_dxs
 # set of symset domains not contained in any other
 # 'prime' proto structures
 # symset: tensor of gol domains
@@ -769,9 +978,14 @@ def mk_minset(symset,print_data=True,return_data=False):
     return symset[min_sxs_ids]
 
 # discard composed patterns
-# dxs = tensor of matrix domains
-def check_adjacency(dxs,print_data=True,arrays=True):
-    ids = []
+# dxs = tensor of matrix domains (if not, requires sx for reshaping)
+# returns tensor if input is tensor, otherwise matrix
+def check_adjacency(dxs,sx=[],print_data=True,ids=False):
+    dxs_ids = []
+    tensor = True
+    if len(dxs.shape) == 2:
+        dxs = mk_dxs_tensor(dxs,sx)
+        tensor = False
     for di,dx in enumerate(dxs):
         adj_ct = True
         dx = rm_zero_layers(dx)
@@ -786,21 +1000,32 @@ def check_adjacency(dxs,print_data=True,arrays=True):
         elif 0 in [drl[i]+drl[i+1] for i in range(len(drl)-1)]:
             adj_ct = False
         if adj_ct:
-            ids.append(di)
+            dxs_ids.append(di)
+    dxs_ids = np.array(dxs_ids)
+    dxs = dxs[dxs_ids]
+    if not tensor:
+        if dxs.shape[1]*dxs.shape[2] > sx.flatten().shape[0]:
+            sx = expand_domain(sx)
+        dxs = dxs.reshape(dxs.shape[0],sx.flatten().shape[0])
     if print_data:
-        print_ac_cases(dxs[np.array(ids)],title='after adjacency:')
-    if arrays:
-        return dxs[np.array(ids)]
-    return ids
+        print_ac_cases(dxs,title='after adjacency:')
+    if ids:
+        return dxs,dxs_ids
+    return dxs
 
 # remove basic patterns present in domains and check symmetries again
 # dxs: e=tensor of matrix shaped domains
 # dx_div: to delimit basic patterns (inclusive) range and dx of search (higher than)
-def check_basic_patterns(dxs,dx_div=4,print_data=True):
+def check_basic_patterns(dxs,sx=[],dx_div=4,ids=False,print_data=True):
+    # in case dxs is not a tensor
+    tensor = True
+    if len(dxs.shape) == 2:
+        dxs = mk_dxs_tensor(dxs,sx)
+        tensor = False
     # this is easier by hand
     bp1 = expand_domain(np.ones((1,2)))
     bp2 = expand_domain(np.array([1,0,0,1]).reshape(2,2))
-    ids = []
+    ids_bp = []
     for bpi in [bp1,bp1.T,bp2,np.rot90(bp2,1)]:
         for di in sum_higher(dxs,dx_div):
             dx = expand_domain(dxs[di])
@@ -808,11 +1033,20 @@ def check_basic_patterns(dxs,dx_div=4,print_data=True):
                 for wj in range(dx.shape[1]-bpi.shape[1]+1):
                     dw = dx[wi:wi+bpi.shape[0],wj:wj+bpi.shape[1]]
                     if np.array_equal(dw,bpi):
-                        ids.append(di)
-    dxs[np.array(ids)] = 0
-    dxs = sum_nonzero(dxs,arrays=True)
-    ids,bxs = [],[]
+                        ids_bp.append(di)
+    if len(ids_bp)>0:
+        dxs[np.array(ids_bp)] = 0
+    non_bp_ids = sum_nonzero(dxs)
+    dxs = dxs[non_bp_ids]
+    if dx_div < 3:
+        if print_data:
+            print_ac_cases(dxs,title='after filtering basic comps <= {}:'.format(dx_div))
+        if ids:
+            return dxs,non_bp_ids
+        return dxs
     # translation, transopsition, rotation, different non moore envs
+    ids_bpxs,bxs = [],[]
+    print()
     for bi in tqdm(sum_in_range(dxs,3,dx_div+1).astype(int)):
         bx = expand_domain(rm_zero_layers(dxs[bi]))
         for ri in range(4):
@@ -841,12 +1075,35 @@ def check_basic_patterns(dxs,dx_div=4,print_data=True):
                 for wj in range(dx.shape[1]-bx.shape[1]+1):
                     dw = dx[wi:wi+bx.shape[0],wj:wj+bx.shape[1]]
                     if np.array_equal(dw,bx):
-                        ids.append(di)
-    dxs[np.array(ids)] = 0
+                        ids_bpxs.append(di)
+    # all_ids = ids_bp + ids_bpxs
+    dxs[np.array(ids_bpxs)] = 0
     dxs = sum_nonzero(dxs,arrays=True)
+    if not tensor:
+        dxs = dxs.reshape(dxs.shape[0],sx.flatten().shape[0])
     if print_data:
-        print_ac_cases(dxs)
+        print_ac_cases(dxs,title='after filtering basic comps instances <= {}:'.format(dx_div))
+    if ids:
+        dxs_ids = sum_nonzero(dxs)
+        return dxs,dxs_ids
     return dxs
+
+# to match symsets and minsets ids
+def get_minsyms_counts(sms_ids,sms_cases,min_cases):
+    # get ids and counts
+    min_ids = np.array(sorted(set(list(min_cases[:,0]))))
+    min_counts = np.array([[i,np.where(min_cases[:,0]==i)[0].shape[0]] for i in min_ids])
+    sms_counts = np.array([[i,np.where(sms_cases[:,0]==i)[0].shape[0]] for i in sms_ids])
+    # replace ids in sms counts for min ids and add to txs
+    txs_counts = min_counts*1
+    for smi,count in sms_counts:
+        if smi not in min_ids:
+            smi_min_ids = min_cases[np.where(min_cases[:,1]==smi)][:,0]
+            for xi in smi_min_ids:
+                txs_counts[np.where(txs_counts[:,0]==xi),1] += count
+        else:
+            txs_counts[np.where(txs_counts[:,0]==smi),1] += count
+    return txs_counts
 
 
 # sxs1,sxs2: arrays for gol sts 

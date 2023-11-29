@@ -3,7 +3,9 @@ from auxs import *
 from block import *
 import os
 import networkx as nx
-
+import pdb
+import seaborn as sns
+import pandas as pd
 
 # block
 block = mk_gol_pattern('block')
@@ -237,7 +239,7 @@ if run_exps:
     save_as(pbs,'proto-block_pbs',ext='gol')
 
 # forward proto blocks
-if not run_exps:
+if run_exps:
     pbs = load_data(filename='proto-block_pbs.gol')
     pb0 = pbs[0]
     pb0_dxs = mk_sx_domains(pbs[0])
@@ -256,12 +258,136 @@ if not run_exps:
     # basic/minimal symsets (not contained by others): 33
     # save_as(pb0_mms,'fwd_pb0.gol')
 
-pb0_adj = load_data(filename='pb0_fwd_adj.gol')
-pb0_ftb = check_basic_patterns(pb0_adj)
+# pb0_adj = load_data(filename='pb0_fwd_adj.gol')
+# pb0_ftb = check_basic_patterns(pb0_adj)
 # pb0_sms = load_data(filename='pb0_fwd_sms.gol')
 # pb0_adj = check_adjacency(pb0_sms)
 # pb0_mms = mk_minset(pb0_adj)
 # pb0_mms = mk_minset(pb0_sms)
 # pb0_fwd = check_adjacency(pb0_mms)
+
+#################################################################
+
+#
+# 1: final sequence of methods, for protoblocks
+# not the optimal (fastest), but the most ordered way
+#
+def proto_blocks_fx():
+    # 0) define block and all proto-domains
+    block = mk_gol_pattern('block')
+    block_proto_domains = mk_proto_domains(block)
+    # 1) get all proto-domains
+    if 'block_pb_domains_ids.gol' in os.listdir():
+        pb_domains,pb_ids = load_data('block_pb_domains_ids.gol')
+        print_ac_cases(pb_domains,title='valid proto domains (sxs->sy):')
+    else:
+        pb_domains,pb_ids = mk_sxs_from_sy(block,block_proto_domains)
+        save_as([pb_domains,pb_ids],'block_pb_domains_ids.gol')
+    # 2) filtering:
+    if 'block_ft_pb_domains_ids.gol' in os.listdir():
+        ft_pb_domains,ft_ids = load_data('block_ft_pb_domains_ids.gol')
+        print_ac_cases(ft_pb_domains,title='filtered proto domains:')
+    else:
+        # 2.1) Transitional continuity (CT)
+        pb_domains_ct,ct_ids = apply_ct(pb_domains,block,ct_ids=True,print_data=True)
+        ct_ids = mk_matching_ids(pb_ids,ct_ids)
+        # 2.2) Structural continuity (CT)
+        pb_domains_st,st_ids = check_adjacency(pb_domains_ct,block,ids=True)
+        st_ids = mk_matching_ids(ct_ids,st_ids)
+        # 2.3) Continuous, but compositional cases (<2)
+        ft_pb_domains,ft_ids = check_basic_patterns(pb_domains_st,block,dx_div=2,ids=True)
+        ft_ids = mk_matching_ids(st_ids,ft_ids)
+        # save_as([ft_pb_domains,ft_ids],'block_ft_pb_domains_ids.gol')
+    # 3) Categorization
+    fname = 'block_pbs_txs.gol'
+    if fname in os.listdir():
+        pbs,pb_txs = load_data(fname)
+        print_ac_cases(pbs,title='proto-blocks:')
+    else:
+        # 3.1) symsets
+        pb_sms,sms_cases = mk_dxs_symsets(ft_pb_domains,block,ids=True)
+        sms_cases = mk_matching_ids(ft_ids,sms_cases)
+        sms_ids = np.array(sorted(list(set(sms_cases[:,0]))))
+        # 3.2) minimal sets
+        min_pbs,min_cases = mk_minimal_sets(pb_sms,ids=True)
+        min_cases = mk_matching_ids(sms_ids,min_cases)
+        # 3.3) pb transitions
+        pb_txs = get_minsyms_counts(sms_ids,sms_cases,min_cases)
+        save_as([min_pbs,pb_txs],fname)
+        # 4) Cause repertoire
+        pb_crep = pb_txs[:,1]/np.sum(pb_txs[:,1])
+        pb_names = ['pb{}'.format(i) for i in range(pb_txs.shape[0])]
+        # fig,ax = plt.subplots()
+        sns.set(style='darkgrid')
+        plt.bar(pb_names,pb_crep,alpha=0.5)
+        plt.plot(pb_crep)
+        plt.show()
+    return min_pbs,pb_txs
+# 
+# 2: final sequence of methods for fwd-protoblocks
+# 
+if True:
+    proto_blocks,pb_txs = load_data('block_pbs_txs.gol')
+    for pi,pb in enumerate(proto_blocks):
+        # 0) define proto-blocks and env pb domains
+        pb_dxs = mk_sx_domains(pb)
+        if pb_dxs.shape[1] > pb.flatten().shape[0]:
+            pb = expand_domain(pb)
+        print('\nsx domains: {}'.format(pb_dxs.shape[0]))
+        # 1) get all nonzero fwd domains (pb is always expanded)
+        pb_dxs,pb_sxys,sxys_ids = mk_sxys_from_sx(pb,pb_dxs)
+        exp_pb = expand_domain(pb)
+        # 2) Filtering
+        pb_sxys_ct,ct_ids = apply_ct(pb_sxys,exp_pb,ct_ids=True,print_data=True)
+        # 2.1) remove decaying y->z patterns
+        # pb_sxys_yz,yz_ids = mk_yz_decay(pb_sxys,exp_pb,ids=True)
+        pb_sxys_yz,yz_ids = mk_yz_decay(pb_sxys_ct,exp_pb,ids=True)
+        # 2.2) transitional CT
+        # pb_sxys_ct,ct_ids = apply_ct(pb_sxys_yz,exp_pb,ct_ids=True,print_data=True)
+        # pb_dxs = pb_dxs[ct_ids]
+        # 2.3) structural CT
+        pb_sxys_st,st_ids = check_adjacency(pb_sxys_ct,exp_pb,ids=True)
+        # pb_dxs = pb_dxs[st_ids]
+        # 2.4) remove decaying non-env cells (ids don't change)
+        pb_sxys_ne = rm_non_env(pb_sxys_st,exp_pb)
+        # 2.5) remove compositional patterns
+        pb_sxys_ft,ft_ids = check_basic_patterns(pb_sxys_ne,exp_pb,dx_div=2,ids=True)
+        # pb_dxs = pb_dxs[ft_ids]
+        # incremental
+        for i in range(3,10):
+            smi,smi_cases = mk_dxs_symsets(sum_is(pb_sxys_ft,i,arrays=True),pb,ids=True)
+            smi_ids_zeros = []
+            pb_sxys_ft[smi_ids_zeros] = 0
+            pb_sxys_ft = sum_nonzero(pb_sxys_ft,arrays=True)
+            pdb.set_trace()
+        # 3) Categorization
+        # 3.1) symsets
+        fname = 'pb{}_fwd_symsets_cases.gol'.format(pi)
+        if fname in os.listdir():
+            pb_fwd_sms,sms_cases = load_data(fname)
+            print_ac_cases(pb_fwd_sms,title='pb{} forward symsets:'.format(pi))
+        else:
+            pb_fwd_sms,sms_cases = mk_dxs_symsets(pb_sxys_ft,pb,ids=True)
+            sms_cases = mk_matching_ids(ft_ids,sms_cases)
+            save_as([pb_fwd_sms,sms_cases],fname)
+        sms_ids = np.array(sorted(list(set(sms_cases[:,0]))))
+        # 3.2) minimal sets
+        fname = 'pb{}_fwd_txs.gol'.format(pi)
+        if fname in os.listdir():
+            pb_fwd,pb_fwd_txs = load_data(fname)
+            print_ac_cases(pb_fwd,title='pb{} forward mins:'.format(pi))
+        else:
+            pb_fwd,min_cases = mk_minimal_sets(pb_fwd_sms,ids=True)
+            min_cases = mk_matching_ids(sms_ids,min_cases)
+            # 3,3) fwd transitions
+            pb_fwd_txs = get_minsyms_counts(sms_ids,sms_cases,min_cases)
+            save_as([pb_fwd,pb_fwd_txs],fname)
+        print(pb_fwd)
+
+    
+
+# remove decaying non-environmental cells (changes in CA counts, but no change in ids)
+    # pb_domains_ne = rm_non_env(pb_domains,block)
+
 
 
