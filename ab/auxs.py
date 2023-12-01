@@ -1088,6 +1088,13 @@ def check_basic_patterns(dxs,sx=[],dx_div=4,ids=False,print_data=True):
         return dxs,dxs_ids
     return dxs
 
+# for very large symsets dxs
+def incremental_symsets(dxs):
+    for xi in range(3,7):
+        xi_sms,xi_cases = mk_dxs_symsets(sum_is(dxs,xi,arrays=True),ids=True)
+        pdb.set_trace()
+    sum_in_range()
+
 # to match symsets and minsets ids
 def get_minsyms_counts(sms_ids,sms_cases,min_cases):
     # get ids and counts

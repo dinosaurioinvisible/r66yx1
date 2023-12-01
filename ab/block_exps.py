@@ -4,8 +4,6 @@ from block import *
 import os
 import networkx as nx
 import pdb
-import seaborn as sns
-import pandas as pd
 
 # block
 block = mk_gol_pattern('block')
@@ -353,36 +351,34 @@ if True:
         # 2.5) remove compositional patterns
         pb_sxys_ft,ft_ids = check_basic_patterns(pb_sxys_ne,exp_pb,dx_div=2,ids=True)
         # pb_dxs = pb_dxs[ft_ids]
-        # incremental
-        for i in range(3,10):
-            smi,smi_cases = mk_dxs_symsets(sum_is(pb_sxys_ft,i,arrays=True),pb,ids=True)
-            smi_ids_zeros = []
-            pb_sxys_ft[smi_ids_zeros] = 0
-            pb_sxys_ft = sum_nonzero(pb_sxys_ft,arrays=True)
-            pdb.set_trace()
+        if pi==1:
+            save_as([pb,pb_sxys_ft,ft_ids],'pb1_sxys_ids.gol')
+            break
+        
+            
         # 3) Categorization
         # 3.1) symsets
-        fname = 'pb{}_fwd_symsets_cases.gol'.format(pi)
-        if fname in os.listdir():
-            pb_fwd_sms,sms_cases = load_data(fname)
-            print_ac_cases(pb_fwd_sms,title='pb{} forward symsets:'.format(pi))
-        else:
-            pb_fwd_sms,sms_cases = mk_dxs_symsets(pb_sxys_ft,pb,ids=True)
-            sms_cases = mk_matching_ids(ft_ids,sms_cases)
-            save_as([pb_fwd_sms,sms_cases],fname)
-        sms_ids = np.array(sorted(list(set(sms_cases[:,0]))))
-        # 3.2) minimal sets
-        fname = 'pb{}_fwd_txs.gol'.format(pi)
-        if fname in os.listdir():
-            pb_fwd,pb_fwd_txs = load_data(fname)
-            print_ac_cases(pb_fwd,title='pb{} forward mins:'.format(pi))
-        else:
-            pb_fwd,min_cases = mk_minimal_sets(pb_fwd_sms,ids=True)
-            min_cases = mk_matching_ids(sms_ids,min_cases)
-            # 3,3) fwd transitions
-            pb_fwd_txs = get_minsyms_counts(sms_ids,sms_cases,min_cases)
-            save_as([pb_fwd,pb_fwd_txs],fname)
-        print(pb_fwd)
+        # fname = 'pb{}_fwd_symsets_cases.gol'.format(pi)
+        # if fname in os.listdir():
+        #     pb_fwd_sms,sms_cases = load_data(fname)
+        #     print_ac_cases(pb_fwd_sms,title='pb{} forward symsets:'.format(pi))
+        # else:
+        #     pb_fwd_sms,sms_cases = mk_dxs_symsets(pb_sxys_ft,pb,ids=True)
+        #     sms_cases = mk_matching_ids(ft_ids,sms_cases)
+        #     save_as([pb_fwd_sms,sms_cases],fname)
+        # sms_ids = np.array(sorted(list(set(sms_cases[:,0]))))
+        # # 3.2) minimal sets
+        # fname = 'pb{}_fwd_txs.gol'.format(pi)
+        # if fname in os.listdir():
+        #     pb_fwd,pb_fwd_txs = load_data(fname)
+        #     print_ac_cases(pb_fwd,title='pb{} forward mins:'.format(pi))
+        # else:
+        #     pb_fwd,min_cases = mk_minimal_sets(pb_fwd_sms,ids=True)
+        #     min_cases = mk_matching_ids(sms_ids,min_cases)
+        #     # 3,3) fwd transitions
+        #     pb_fwd_txs = get_minsyms_counts(sms_ids,sms_cases,min_cases)
+        #     save_as([pb_fwd,pb_fwd_txs],fname)
+        # print(pb_fwd)
 
     
 
