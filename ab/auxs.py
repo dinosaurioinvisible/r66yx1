@@ -193,7 +193,9 @@ def mk_gol_pattern(px):
 # dxs: matrix with arrays of gol sts
 # sx form for reshaping
 def mk_dxs_tensor(dxs,sx):
-    if dxs.shape[1] != sx.flatten().shape[0]:
+    if len(dxs.shape)==3:
+        return dxs
+    if dxs.shape[1] > sx.flatten().shape[0]:
         sx = expand_domain(sx)
     sxi,sxj = sx.shape
     tgol = np.zeros((dxs.shape[0],sxi,sxj))
@@ -312,11 +314,11 @@ def multi_gol_step(sx_domains,sx,mk_zero=True,expanded=False):
     # shape & output array
     sxys = np.zeros(sx_domains.shape) if not expanded else np.zeros((sx_domains.shape[0],expand_domain(sx).flatten().shape[0]))
     # for larger domains
-    if sx.shape[0]*sx.shape[1] > 30 and expanded == True:
+    if sx_domains.shape[0] > 2**12:
         for di in tqdm(range(sx_domains.shape[0])):
             dx = sx_domains[di].reshape(sx.shape)
             if np.sum(dx)>2:
-                sxys[di] = gol_step(dx,expanded=True).flatten()
+                sxys[di] = gol_step(dx,expanded=expanded).flatten()
         return sxys
     # simulate transitions
     for di,dx in enumerate(sx_domains):
@@ -330,16 +332,22 @@ def multi_gol_step(sx_domains,sx,mk_zero=True,expanded=False):
 # remove decaying activations within domain (not environment of sx)
 # dxs: domains in matrix form
 # sx: pattern being analyzed, but only for reshaping
-def rm_non_env(dxs,sx,print_data=True):
-    # if extended dx
+def rm_non_env(dxs,sx,ids=False,print_data=True):
+    # if expanded dx
     if sx.flatten().shape[0] < dxs.shape[1]:
         sx = expand_domain(sx)
     dxs_ne = dxs*1
-    for di,dx in enumerate(dxs):
+    # for di,dx in enumerate(dxs):
+    for di in tqdm(range(dxs.shape[0])):
+        dx = dxs[di]
         gx = gol_step(dx.reshape(sx.shape))
         dxs_ne[di] = ((mk_moore_nb(gx)+gx)*dx.reshape(sx.shape)).flatten()
+    dxs_ids = sum_higher(dxs_ne,2)
+    dxs_ne = dxs_ne[dxs_ids]
     if print_data:
         print_ac_cases(dxs_ne,title='after removing decaying non-env cells:')
+    if ids:
+        return dxs_ne,dxs_ids
     return dxs_ne
 
 # make moore neighborhood
@@ -370,7 +378,7 @@ def is_block(domx,e0=False):
                         if np.sum(domx[max(0,i-1):i+3,max(0,j-1):j+3]) == 4:
                             return True
     return False
-def is_protoblock(domx,pbx,pbx_type):
+def is_protoblock0(domx,pbx,pbx_type):
     m,n = domx.shape
     # def protoblock and min 'membrane'
     if pbx_type == 'pb0':
@@ -389,7 +397,6 @@ def is_protoblock(domx,pbx,pbx_type):
         else:
             pass
     return False
-                    
 # same for next timestep
 def is_block_next(domx,e0=False,expanded=True):
     # block may be outside of current domain
@@ -398,7 +405,7 @@ def is_block_next(domx,e0=False,expanded=True):
 # for proto blocks
 def is_pb_next(domx,pbx,pb_type,expanded=True):
     domy = gol_step(domx,expanded=expanded)
-    return is_protoblock(domy,pbx,pb_type)
+    return is_protoblock0(domy,pbx,pb_type)
 # blinker
 def is_blinker(domx):
     if np.sum(domx) == 3:
@@ -427,7 +434,69 @@ def is_sx_in_dx(sx,dx,mk_variants=False):
                 if np.array_equal(dw,vx):
                     return True
     return False
+# same but for the whole array of domains simultaneously
+# dxs: matrix of domain-arrays, sx in matrix form
+# sx has to have the dimensions for reshaping dxs
+# moore nb = True: symsets, if False: minsets
+def is_sx_in_dxs(sx,dxs,moore_nb=True,tensor=False,print_data=False):
+    if moore_nb and sx.flatten().shape[0] < 36:
+        dxs = np.pad(dxs.reshape(dxs.shape[0],sx.shape[0],sx.shape[1]),((0,0),(1,1),(1,1)))
+        sx = expand_domain(sx)
+    if len(dxs.shape)==3:
+        dxs = dxs.reshape(dxs.shape[0],sx.flatten().shape[0])
+    nz_ids = np.zeros(dxs.shape[0]).astype(int)
+    vxs = mk_min_sx_variants(sx,moore_nb=moore_nb)
+    for vx in vxs:
+        vx_nz_ids = np.zeros(dxs.shape[0]).astype(int)
+        for wi in range(sx.shape[0]-vx.shape[0]+1):
+            for wj in range(sx.shape[1]-vx.shape[1]+1):
+                wx = np.zeros((sx.shape))
+                wx[wi:wi+vx.shape[0],wj:wj+vx.shape[1]] = vx
+                # vx is there, env is unknown
+                vx_nz_ids[sum_is(dxs*wx.flatten(),np.sum(vx))] = 1
+                # remove if env is non zero
+                if moore_nb:
+                    vx_nz_ids[sum_nonzero(dxs*mk_moore_nb(wx).flatten())] = 0
+                nz_ids += vx_nz_ids
+    nz_ids = nz_ids.nonzero()[0]
+    if print_data:
+        print_ac_cases(dxs,title='sx in domains:')
+    if tensor:
+        dxs = dxs[nz_ids]
+        dxs = mk_dxs_tensor(dxs,sx)
+        if moore_nb:
+            dxs = dxs[:,1:-1,1:-1]
+        return dxs,nz_ids
+    return nz_ids
+def are_the_same_sx(sx1,sx2):
+    if np.sum(sx1) != np.sum(sx2):
+        return False
+    vxs = mk_min_sx_variants(sx1)
+    sx2 = rm_zero_layers(sx2)
+    for vx in vxs:
+        if np.array_equal(vx,sx2):
+            return True
+    return False
 
+# same but only rotation and transposition
+def mk_min_sx_variants(dx,moore_nb=False):
+    sx = rm_zero_layers(dx)
+    if moore_nb:
+        sx = expand_domain(sx)
+    sxs,vxs = [],[]
+    for ri in range(4):
+        sxr = np.rot90(sx,ri)
+        sxrt = np.ascontiguousarray(sxr.T)
+        sxs.extend([sxr,sxrt])
+    for sxi in sxs:
+        sxi_in_vxs = False
+        for vxi in vxs:
+            if np.array_equal(sxi,vxi):
+                sxi_in_vxs = True
+                break
+        if sxi_in_vxs==False:
+            vxs.append(sxi)
+    return vxs
 # make all variants (rotation,transposition,non-env/moore nb)
 def mk_sx_variants(sx,mk_non_env=True):
     vxs,sxs = [],[]
@@ -478,6 +547,32 @@ def mk_binary_domains(n_cells):
         doms[:,-1-i] = np.tile(xi,n)
     return doms
 
+# sx: pattern in domain in matrix form
+# min space for pattern + moore nb (deactivatable)
+def mk_min_sqrd_domain(sx,moore_nb=True):
+    if sx.shape[0] == sx.shape[1]:
+        if sum_borders(sx) > 0:
+            if moore_nb:
+                return expand_domain(sx)
+            return sx
+        sx = rm_zero_layers(sx,squared=True)
+        if moore_nb:
+            return expand_domain(sx)
+        return sx
+    # check if difference is even or not
+    ds = abs(int((sx.shape[0]-sx.shape[1])/2))
+    ds1,ds2 = ds,ds
+    if (sx.shape[0]-sx.shape[1])%2 != 0:
+        ds2 += 1
+    # fill 
+    if sx.shape[0]<sx.shape[1]:
+        sx = np.pad(sx,((ds1,ds2),(0,0)))
+    else:
+        sx = np.pad(sx,((0,0),(ds1,ds2)))
+    if moore_nb:
+        return expand_domain(sx)
+    return sx
+
 # more general fx, for gol patterns
 # domain environmental (sx + env) tensor
 # given a block, blinker or any other structure from the gol (sx)
@@ -489,9 +584,8 @@ def mk_sx_domains(sx,membrane=False):
         return mk_sx_membrane_domains(sx)
     # for unnamed patterns/domains
     if type(sx) == np.ndarray:
-        sx = expand_domain(rm_zero_layers(sx)) # centering
-        if sx.shape[0] + 2 == sx.shape[1]:
-            sx = np.pad(sx,((1,1),(0,0)))
+        # centering and check squared domain 
+        sx = mk_min_sqrd_domain(sx,moore_nb=True)
         sx_env = mk_moore_nb(sx)
         binary_dxs = mk_binary_domains(np.sum(sx_env).astype(int))
         non_env_ids = np.where(sx_env.flatten()==0)[0]
@@ -607,10 +701,13 @@ def mk_sxs_from_sy(sy,proto_dxs=[],ids=True,print_data=True):
     return sxs
 
 # same, but simpler, to apply things separatedly
-def mk_sxys_from_sx(sx,sx_dxs=[],ids=True,print_data=True):
+def mk_sxys_from_sx(sx,sx_dxs=[],ids=True,expanded=True,print_data=True):
     if len(sx_dxs)==0:
         sx_dxs = mk_sx_domains(sx)
-    sxys = multi_gol_step(sx_dxs,sx,expanded=True)
+    # expanded only makes sense if for sx->sy, if dx(sy) < moore_nb(sy)
+    if sum_borders(sx)==0:
+        expanded = False
+    sxys = multi_gol_step(sx_dxs,sx,expanded=expanded)
     nz_ids = sum_higher(sxys,2)
     # nz_ids = sum_nonzero(sxys)
     sxys = sxys[nz_ids]
@@ -624,7 +721,7 @@ def mk_sxys_from_sx(sx,sx_dxs=[],ids=True,print_data=True):
 # in this case we can't assume what sy is valid or not
 # so we should look for self-sustaining resulting patterns
 # sx: initial gol pattern in matrix form
-# dxs: tensor for all domains for sx
+# dxs: tensor for all domains 
 # decay txs: number of sy->z1->z2->...->zn transitions
 # mk_zero: auto make zero domains < 3
 def get_sxys_from_sx(dxs,sx,mk_zero=True,expanded=True,ct=True,decay_txs=3,expanded_decay=False,decay_ct=True,print_data=True,return_data=False):
@@ -655,9 +752,14 @@ def get_sxys_from_sx(dxs,sx,mk_zero=True,expanded=True,ct=True,decay_txs=3,expan
     return dxs,sxys
 
 # same, but super simple
-def mk_yz_decay(sxys,sx,ids=False,print_data=True):
-    yz = multi_gol_step(sxys,sx,expanded=True)
-    yz_ids = sum_nonzero(yz)
+# sxys: domains in matrix form, sx: in matrix form
+def mk_yz_decay(sxys,sx,expanded=True,ids=False,print_data=True):
+    if sx.flatten().shape[0] < sxys.shape[1]:
+        sx = expand_domain(sx)
+    if sum_borders(sx) == 0:
+        expanded = False
+    yz = multi_gol_step(sxys,sx,expanded=expanded)
+    yz_ids = sum_higher(yz,2)
     sxys = sxys[yz_ids]
     if print_data:
         print_ac_cases(sxys,title='after yz decay:')
@@ -718,6 +820,16 @@ def print_ac_cases(doms,rl=0,rh=0,nonzero=True,title=''):
         print('acs: {}, cases: {}'.format(ac,ncases))
     total = sum([nc for ac,nc in ids])
     print('total: {}'.format(total))
+def write_ac_cases(dxs,title,fname):
+    ids = [(ac,len(sum_is(dxs,ac))) for ac in range(0,dxs.shape[1]) if sum_is(dxs,ac).shape[0]>0]
+    fname = fname if '.txt' in fname else '{}.txt'.format(fname)
+    with open (fname,'a') as f:
+        f.write('\ntitle')
+        for ac,ncases in ids:
+            f.write('acs: {}, cases: {}'.format(ac,ncases))
+        total = sum([nc for ac,nc in ids])
+        f.write('total: {}'.format(total))
+    
 
 # to make ids from a reduced domain, match ids from a previous larger domain
 # dx_ids: large (original) domain ids (array)
@@ -733,6 +845,11 @@ def mk_matching_ids(dx_ids,subset_ids):
         for ri in range(subset_ids.shape[0]):
             subset_ids[ri] = dx_ids[subset_ids[ri]]
         return subset_ids
+def match_ids_sequence(ids_seq):
+    mt_ids = ids_seq[0]
+    for sqi_ids in ids_seq[1:]:
+        mt_ids = mt_ids[sqi_ids]
+    return mt_ids
 
 # same as below, but more exhaustive, with new algorithms
 def mk_dxs_symsets(dxs,sxc,ids=False,print_data=True):
@@ -834,6 +951,54 @@ def mk_incremental_symsets(sxs,sx,sms_cases,pbs_ids,print_data=True,return_data=
     if return_data:
         return sms_tensor,sms_cases,pbs_ids
     return sms_tensor
+# final version, much faster
+def mk_symsets_large_dxs(dxs,print_data=True):
+    dxs = sort_by_sum(dxs)
+    dxs = center_tensor_sxs(dxs)
+    # canon/type, if instance, number of instances
+    symset_cases = np.ones((dxs.shape[0],2)).astype(int)*-1
+    reps = np.zeros(dxs.shape[0])
+    for di in tqdm(range(dxs.shape[0])):
+        if reps[di] == 0:
+            dx_ids = is_sx_in_dxs(dxs[di],dxs)
+            symset_cases[di] = [di,dx_ids.shape[0]]
+            reps[dx_ids] = 1
+    sms_ids = np.where(symset_cases[:,1]>0)[0]
+    dxs = dxs[sms_ids]
+    symset_cases = symset_cases[sms_ids]
+    if print_data:
+        print_ac_cases(dxs,title='symsets:')
+    dxs = sort_by_sum(dxs)
+    dxs = center_tensor_sxs(dxs)
+    return dxs,symset_cases
+# also final version, using faster algorithm
+# dxs: can be symsets or raw dxs
+def mk_minsets_large_dxs(dxs,print_data=True):
+    dxs = center_tensor_sxs(sort_by_sum(dxs))
+    min_cases = np.ones((dxs.shape[0],2)).astype(int)*-1
+    reps = np.zeros(dxs.shape[0])
+    minmap = {}
+    for di in tqdm(range(dxs.shape[0])):
+        if reps[di] == 0:
+            dx_ids = is_sx_in_dxs(dxs[di],dxs,moore_nb=False)
+            min_cases[di] = [di,dx_ids.shape[0]]
+            reps[dx_ids] += 1
+            minmap[di] = dx_ids
+    min_ids = np.where(min_cases[:,1]>0)[0]
+    dxs = dxs[min_ids]
+    min_cases = min_cases[min_ids]
+    if print_data:
+        print_ac_cases(dxs,title='minimal sets:')
+    dxs = center_tensor_sxs(sort_by_sum(dxs))
+    return dxs,min_cases,minmap
+# map min to sms cases for counts and dists
+def mk_minmap_counts(sms_cases,min_cases,minmap):
+    counts = min_cases*1
+    for i in range(min_cases.shape[0]):
+        mi_id,mi_sum = min_cases[i]
+        mi_sum += np.sum(sms_cases[minmap[mi_id],1])
+        counts[i] = [mi_id,mi_sum]
+    return counts
 
 # just to get ids as from the whole proto domain
 # dxs_ids = array of ids
@@ -910,8 +1075,15 @@ def is_in_domain(sx,dx,zeros=False):
                     return True
     return False
 
-def rm_zero_layers(xdx):
+# remove all zero rows/cols (assumes sx is centered in dx)
+# if squared: remove considering entire row-col layers 
+def rm_zero_layers(xdx,squared=False):
     dx = xdx*1
+    if squared and np.sum(xdx)>0:
+        while squared==False:
+            dx = dx[1:-1,1:-1]
+            if sum_borders(dx) > 0:
+                return dx
     vs = np.sum(dx,axis=1).nonzero()[0]
     dx = dx[min(vs):max(vs)+1]
     hs = np.sum(dx,axis=0).nonzero()[0]
@@ -986,7 +1158,9 @@ def check_adjacency(dxs,sx=[],print_data=True,ids=False):
     if len(dxs.shape) == 2:
         dxs = mk_dxs_tensor(dxs,sx)
         tensor = False
-    for di,dx in enumerate(dxs):
+    # for di,dx in enumerate(dxs):
+    for di in tqdm(range(dxs.shape[0])):
+        dx = dxs[di]
         adj_ct = True
         dx = rm_zero_layers(dx)
         ml = max(max(dx.shape)-min(dx.shape)+1,2)
@@ -1011,6 +1185,27 @@ def check_adjacency(dxs,sx=[],print_data=True,ids=False):
         print_ac_cases(dxs,title='after adjacency:')
     if ids:
         return dxs,dxs_ids
+    return dxs
+
+# same as below, but faster & more precise:
+def rm_composed_dv2(dxs,sx,ids=False,print_data=True):
+    bp1 = np.zeros((sx.shape))
+    bp2 = np.zeros((sx.shape))
+    bp1[:2,:2] = np.array((1,1,0,0)).reshape(2,2)
+    bp2[:2,:2] = np.array([1,0,0,1]).reshape(2,2)
+    bp1 = center_sx_in_dx(bp1)
+    bp2 = center_sx_in_dx(bp2)
+    bps = np.array([np.rot90(bp1,ri) for ri in range(4)]+[np.rot90(bp2,ri) for ri in range(2)])
+    bp_ids = np.ones(dxs.shape[0]).astype(int)
+    for bpi in bps:
+        bpi_ids = is_sx_in_dxs(bpi,dxs)#,moore_nb=False)
+        bp_ids[bpi_ids] = 0
+    bp_ids = bp_ids.nonzero()[0]
+    dxs = dxs[bp_ids]
+    if print_data:
+        print_ac_cases(dxs,title='after removing dv2s:')
+    if ids:
+        return dxs,bp_ids
     return dxs
 
 # remove basic patterns present in domains and check symmetries again
@@ -1077,6 +1272,10 @@ def check_basic_patterns(dxs,sx=[],dx_div=4,ids=False,print_data=True):
                     if np.array_equal(dw,bx):
                         ids_bpxs.append(di)
     # all_ids = ids_bp + ids_bpxs
+    if len(ids_bpxs)==0:
+        if ids:
+            return dxs,sum_nonzero(dxs)
+        return dxs
     dxs[np.array(ids_bpxs)] = 0
     dxs = sum_nonzero(dxs,arrays=True)
     if not tensor:
@@ -1087,13 +1286,6 @@ def check_basic_patterns(dxs,sx=[],dx_div=4,ids=False,print_data=True):
         dxs_ids = sum_nonzero(dxs)
         return dxs,dxs_ids
     return dxs
-
-# for very large symsets dxs
-def incremental_symsets(dxs):
-    for xi in range(3,7):
-        xi_sms,xi_cases = mk_dxs_symsets(sum_is(dxs,xi,arrays=True),ids=True)
-        pdb.set_trace()
-    sum_in_range()
 
 # to match symsets and minsets ids
 def get_minsyms_counts(sms_ids,sms_cases,min_cases):
@@ -1111,6 +1303,57 @@ def get_minsyms_counts(sms_ids,sms_cases,min_cases):
         else:
             txs_counts[np.where(txs_counts[:,0]==smi),1] += count
     return txs_counts
+
+# slow but works
+# dxs: tensor of dxs 
+def filter_composed_dxs(dxs,ids=False):
+    for di,dx in enumerate(dxs):
+        if is_composed(dx):
+            dxs[di]=0
+    nc_ids = sum_nonzero(dxs)
+    dxs = dxs[nc_ids]
+    if ids:
+        return dxs,nc_ids
+    return dxs
+def is_composed(dx):
+    ijs = [[i,j] for i,j in zip(dx.nonzero()[0],dx.nonzero()[1])]
+    uxs = []
+    for e1,x1 in enumerate(ijs):
+        u = []
+        for e2,x2 in enumerate(ijs):
+            if abs(x1[0]-x2[0])>= 2 or abs(x1[1]-x2[1])>=2:
+                pass
+            else:
+                u.extend([e1,e2])
+        uxs.append(list(set(u)))
+    mu = [0]
+    for _ in range(3):
+        for i in range(len(uxs)):
+            if i in mu and i in uxs[i]:
+                mu.extend(uxs[i])
+    mu = list(set(mu))
+    if len(mu) < len(ijs):
+        return True
+    return False
+def mk_binary_index(px,arrays=True,dims=4):
+    px = mk_min_sqrd_domain(px,moore_nb=False)
+    if px.shape[0]<dims:
+        px = center_sx_in_dx(np.pad(px,((0,dims-px.shape[0]),(0,0))))
+    if px.shape[1]<dims:
+        px = center_sx_in_dx(np.pad(px,((0,0),(0,dims-px.shape[1]))))
+    px_id = array2int(px)
+    if not arrays:
+        return px_id
+    return px_id,px
+def mk_txs_matrix(pxs,txs,dims=4):
+    # clean discontinuous patterns
+    pxtx = []
+    for pbi,fpxs in enumerate(pxs):
+        for fpi,fpx in enumerate(fpxs):
+            if is_composed(fpx):
+                fpx_id,px = mk_binary_index(fpx,dims=dims)
+                pxtx.append([fpx_id,(pbi,fpi),px,txs[pbi][fpi][1]])
+    return pxtx
 
 
 # sxs1,sxs2: arrays for gol sts 
@@ -1147,12 +1390,14 @@ def make_dms(count):
     # transition matrix for x
     # given x, what are the probs for y
     # every value divided by the sum of the rows (values for x)
-    tm_x = count/np.sum(count,axis=1)
+    # tm_x = count/np.sum(count,axis=1)
+    tm_x = count*1
     # transition matrix for y
     # given y, the probs of x
     # knowing y, it is each value divided by the vertical sum (values of y)
     # then transposed, so it is in function of y->x instead of x->y
-    tm_y = (count/np.sum(count,axis=0)).T
+    # tm_y = (count/np.sum(count,axis=0)).T
+    tm_y = np.ascontiguousarray(count.T)
     # distance matrices
     dim = tm_x.shape[0]
     # fill x
@@ -1162,10 +1407,11 @@ def make_dms(count):
             dmx[ei,ej] = np.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
     # fill y 
     dmy = np.zeros((dim,dim))
+    pdb.set_trace()
     for ei,i in enumerate(tm_y):
         for ej,j in enumerate(tm_y):
             dmy[ei,ej] = np.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
-    return dmx,dmy
+    return dmx,dmy#.T
 
 # saving and loading with pickle
 def save_as(file,name,ext=''):
@@ -1215,6 +1461,7 @@ def load_data(filename='',auto=True,ext=''):
         if auto==True:
             print('\ndidn\'t find anything\n')
             auto = False
+
 
 class GolPx:
     def __init__(self,px_name,px=[]):
